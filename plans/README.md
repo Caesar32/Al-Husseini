@@ -10,6 +10,7 @@
 | # | الوثيقة التقنية | الوصف ومحتوى الملف | الرابط المباشر |
 |---|---|---|---|
 | 📐 | **تحليل التطبيع (3NF/BCNF)** | دراسة معالجة العيوب والتحويل من 1NF إلى 3NF والتخلص من التكرار والاعتماديات الوظيفية. | [DATABASE_NORMALIZATION_ANALYSIS.md](file:///d:/Projects/Al-Husseini/plans/DATABASE_NORMALIZATION_ANALYSIS.md) |
+| 👥 | **هندسة الإدارة وشؤون الموظفين** | بنية الصلاحيات (RBAC)، فصل User عن Employee، عمولات الفنيين، ودورة حياة الرواتب. | [HR_AND_ADMINISTRATION_ARCHITECTURE.md](file:///d:/Projects/Al-Husseini/plans/HR_AND_ADMINISTRATION_ARCHITECTURE.md) |
 | 01 | **المرحلة 1: مخطط قاعدة البيانات** | كود الـ Migrations الكامل مع القيود الحسابية، المفاتيح الأجنبية، والفهارس المركبة. | [PHASE_01_DATABASE_SCHEMA.md](file:///d:/Projects/Al-Husseini/plans/PHASE_01_DATABASE_SCHEMA.md) |
 | 02 | **المرحلة 2: نماذج Eloquent والمراقبين** | تعريفات الـ Models، العلاقات، الـ Scopes، و الـ Observers لأتمتة المخزون والضمان والآجل. | [PHASE_02_ELOQUENT_MODELS_OBSERVERS.md](file:///d:/Projects/Al-Husseini/plans/PHASE_02_ELOQUENT_MODELS_OBSERVERS.md) |
 | 03 | **المرحلة 3: طلبات التحقق وتأمين المدخلات** | فئات الـ Form Requests، قواعد التحقق من سقف الائتمان، وفحص أرقام الباركود ورسائل الخطأ. | [PHASE_03_FORM_REQUESTS_VALIDATION.md](file:///d:/Projects/Al-Husseini/plans/PHASE_03_FORM_REQUESTS_VALIDATION.md) |
