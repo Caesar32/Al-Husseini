@@ -69,16 +69,18 @@ class AttendanceService implements AttendanceServiceInterface
 
             $workDate = $punchTime->toDateString();
 
-            $attendance = Attendance::firstOrCreate(
-                [
+            $attendance = Attendance::where('employee_id', $employee->id)
+                ->whereDate('work_date', $workDate)
+                ->first();
+
+            if (!$attendance) {
+                $attendance = Attendance::create([
                     'employee_id' => $employee->id,
                     'work_date' => $workDate,
-                ],
-                [
                     'status' => 'present',
                     'source' => $source,
-                ]
-            );
+                ]);
+            }
 
             // 0 أو check_in
             if ($punchState === 0 || $punchState === '0' || $punchState === 'check_in') {
