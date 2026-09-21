@@ -4,6 +4,11 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
+use App\Models\Invoice;
+use App\Models\Attendance;
+use App\Observers\InvoiceObserver;
+use App\Observers\AttendanceObserver;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,6 +24,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Invoice::observe(InvoiceObserver::class);
+        Attendance::observe(AttendanceObserver::class);
     }
 }
