@@ -6,8 +6,6 @@
 <!-- Layout config Js -->
 <script src="{{ asset('assets/js/layout.js') }}"></script>
 
-@yield('css')
-
 @php
     $isRtl = true;
     if (session('locale') === 'en' || (request()->has('lang') && request('lang') === 'en')) {
@@ -22,8 +20,6 @@
     <link href="{{ asset('assets/css/icons.min.css') }}" rel="stylesheet" type="text/css" />
     <!-- App Css RTL -->
     <link href="{{ asset('assets/css/app-rtl.min.css') }}" rel="stylesheet" type="text/css" />
-    <!-- Custom Css RTL -->
-    <link href="{{ asset('assets/css/custom-rtl.min.css') }}" rel="stylesheet" type="text/css" />
 @else
     <!-- Bootstrap Css LTR -->
     <link href="{{ asset('assets/css/bootstrap.min.css') }}" rel="stylesheet" type="text/css" />
@@ -31,9 +27,10 @@
     <link href="{{ asset('assets/css/icons.min.css') }}" rel="stylesheet" type="text/css" />
     <!-- App Css LTR -->
     <link href="{{ asset('assets/css/app.min.css') }}" rel="stylesheet" type="text/css" />
-    <!-- Custom Css LTR -->
-    <link href="{{ asset('assets/css/custom.min.css') }}" rel="stylesheet" type="text/css" />
 @endif
+
+<!-- SweetAlert2 Css -->
+<link href="{{ asset('assets/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
 
 <style>
     /* =======================================================
@@ -64,14 +61,27 @@
         letter-spacing: -0.2px;
     }
 
-    /* Sidebar Navigation Links */
-    .navbar-nav .nav-link, .menu-link {
-        font-weight: 600 !important;
-        font-size: 0.94rem;
+    /* =======================================================
+       Clean & Comfortable Sidebar Typography (Preserves Velzon Layout & SimpleBar)
+       ======================================================= */
+    :not([data-sidebar-size="sm"]) .navbar-nav .nav-link,
+    :not([data-sidebar-size="sm"]) .menu-link {
+        font-weight: 500;
+        font-size: 0.86rem;
+        border-radius: 6px;
+        transition: all 0.2s ease;
     }
-    .menu-title {
-        font-weight: 800 !important;
-        font-size: 0.78rem;
+
+    :not([data-sidebar-size="sm"]) .navbar-nav .nav-link.active,
+    :not([data-sidebar-size="sm"]) .menu-link.active {
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    :not([data-sidebar-size="sm"]) .menu-title {
+        font-weight: 700;
+        font-size: 0.72rem;
+        text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
@@ -113,4 +123,41 @@
     i[class*="mdi"], [class*="mdi-"] {
         font-family: 'Material Design Icons' !important;
     }
+
+    /* =======================================================
+       Fix Velzon's 1400px forced min-height bug on small sidebar
+       ======================================================= */
+    html[data-sidebar-size=sm],
+    body[data-sidebar-size=sm],
+    :is([data-layout=vertical],[data-layout=semibox])[data-sidebar-size=sm],
+    :is([data-layout=vertical],[data-layout=semibox])[data-sidebar-size=sm] .main-content,
+    :is([data-layout=vertical],[data-layout=semibox])[data-layout-style=detached][data-sidebar-size=sm] .main-content,
+    [data-layout-width=boxed][data-sidebar-size=sm][data-layout=vertical] #layout-wrapper,
+    [data-sidebar-size=sm] #layout-wrapper,
+    #layout-wrapper,
+    .main-content {
+        min-height: auto !important;
+    }
+
+    #layout-wrapper {
+        min-height: 100vh !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .main-content {
+        min-height: 100vh !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .page-content {
+        flex: 1 0 auto;
+    }
+
+    .footer {
+        flex-shrink: 0;
+    }
 </style>
+
+@yield('css')

@@ -1,5 +1,6 @@
 <!-- JAVASCRIPT -->
 <script src="{{ asset('assets/libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ asset('assets/libs/sweetalert2/sweetalert2.min.js') }}"></script>
 <script src="{{ asset('assets/libs/simplebar/simplebar.min.js') }}"></script>
 <script src="{{ asset('assets/libs/node-waves/waves.min.js') }}"></script>
 <script src="{{ asset('assets/libs/feather-icons/feather.min.js') }}"></script>
@@ -8,146 +9,145 @@
 <script src="{{ asset('assets/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
 <script src="{{ asset('assets/js/plugins.js') }}"></script>
 
-@yield('script')
-@stack('scripts')
+<!-- Al-Husseini Core Stores (Available to all views) -->
+<script src="{{ asset('assets/js/hr-store.js') }}"></script>
+<script src="{{ asset('assets/js/sales-store.js') }}"></script>
 
 <!-- App js -->
 <script src="{{ asset('assets/js/app.js') }}"></script>
 
-<!-- Guaranteed Interactive Handlers for Sidebar, Fullscreen, Dark/Light Mode & Controls -->
+@yield('script')
+@stack('scripts')
+
+<!-- Theme Icon & Sidebar State Sync (Non-conflicting) -->
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-    // 1. Fullscreen Toggle
-    const fsButtons = document.querySelectorAll('[data-toggle="fullscreen"]');
-    fsButtons.forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            document.body.classList.toggle('fullscreen-enable');
-            if (!document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement) {
-                if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen();
-                } else if (document.documentElement.mozRequestFullScreen) {
-                    document.documentElement.mozRequestFullScreen();
-                } else if (document.documentElement.webkitRequestFullscreen) {
-                    document.documentElement.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-                }
+(function () {
+    // 1. Theme Icon Synchronization (Dark / Light Mode)
+    function syncThemeIcon() {
+        var currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
+        var isDark = currentTheme === 'dark';
+        var modeIcons = document.querySelectorAll('.light-dark-mode i');
+        modeIcons.forEach(function (icon) {
+            if (isDark) {
+                icon.className = 'bx bx-sun fs-22';
             } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                } else if (document.mozCancelFullScreen) {
-                    document.mozCancelFullScreen();
-                } else if (document.webkitExitFullscreen) {
-                    document.webkitExitFullscreen();
+                icon.className = 'bx bx-moon fs-22';
+            }
+        });
+    }
+
+    // Run on initial load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', syncThemeIcon);
+    } else {
+        syncThemeIcon();
+    }
+
+    // 2. Observe changes to data-bs-theme and data-sidebar-size on <html>
+    var observer = new MutationObserver(function (mutations) {
+        mutations.forEach(function (mutation) {
+            if (mutation.attributeName === 'data-bs-theme') {
+                syncThemeIcon();
+                var theme = document.documentElement.getAttribute('data-bs-theme');
+                if (theme) {
+                    sessionStorage.setItem('data-bs-theme', theme);
+                    localStorage.setItem('data-bs-theme', theme);
+                }
+            }
+            if (mutation.attributeName === 'data-sidebar-size') {
+                var size = document.documentElement.getAttribute('data-sidebar-size');
+                if (size) {
+                    sessionStorage.setItem('data-sidebar-size', size);
                 }
             }
         });
     });
 
-    // 2. Sidebar Toggle (Hamburger Menu)
-    const hamburgerBtn = document.getElementById('topnav-hamburger-icon');
-    if (hamburgerBtn) {
-        hamburgerBtn.addEventListener('click', function (e) {
-            e.preventDefault();
-            const width = document.documentElement.clientWidth;
-            const hamburgerIcon = document.querySelector('.hamburger-icon');
-            if (hamburgerIcon) {
-                hamburgerIcon.classList.toggle('open');
-            }
+    observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-bs-theme', 'data-sidebar-size']
+    });
+})();
+</script>
 
-            if (width > 1025) {
-                const currentSize = document.documentElement.getAttribute('data-sidebar-size');
-                const newSize = (currentSize === 'sm' || currentSize === 'sm-hover') ? 'lg' : 'sm';
-                document.documentElement.setAttribute('data-sidebar-size', newSize);
-                sessionStorage.setItem('data-sidebar-size', newSize);
-            } else if (width <= 767) {
-                document.body.classList.toggle('vertical-sidebar-enable');
-                document.documentElement.setAttribute('data-sidebar-size', 'lg');
-            } else {
-                const currentSize = document.documentElement.getAttribute('data-sidebar-size');
-                const newSize = currentSize === 'sm' ? 'lg' : 'sm';
-                document.documentElement.setAttribute('data-sidebar-size', newSize);
-                sessionStorage.setItem('data-sidebar-size', newSize);
-            }
+<script>
+// Global Toast Alert Helper for HR System
+window.showHrToast = function(title, message, type) {
+    const isLate = type === 'lateness';
+    const bgClass = isLate ? '#e63946' : '#2a9d8f';
+    
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: `<span class="fs-15 fw-bold">${title}</span>`,
+            html: `<div class="fs-13 text-muted text-start">${message}</div>`,
+            icon: isLate ? 'warning' : 'info',
+            toast: true,
+            position: 'top-start',
+            showConfirmButton: false,
+            timer: 4500,
+            timerProgressBar: true,
+            background: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? '#212529' : '#ffffff',
+            color: document.documentElement.getAttribute('data-bs-theme') === 'dark' ? '#f8f9fa' : '#212529'
         });
     }
+};
 
-    // 3. Vertical Overlay Click (Close sidebar on mobile click)
-    const overlay = document.querySelector('.vertical-overlay');
-    if (overlay) {
-        overlay.addEventListener('click', function () {
-            document.body.classList.remove('vertical-sidebar-enable');
-            const hamburgerIcon = document.querySelector('.hamburger-icon');
-            if (hamburgerIcon) {
-                hamburgerIcon.classList.remove('open');
-            }
-        });
-    }
+// Sync Topbar Notifications with AlHusseiniHR
+document.addEventListener('DOMContentLoaded', function() {
+    function renderTopbarNotifications() {
+        if (!window.AlHusseiniHR) return;
+        const notifs = window.AlHusseiniHR.getNotifications();
+        const unreadCount = notifs.filter(n => !n.read).length;
 
-    // 4. Vertical hover button on sidebar top
-    const verticalHover = document.getElementById('vertical-hover');
-    if (verticalHover) {
-        verticalHover.addEventListener('click', function () {
-            const currentSize = document.documentElement.getAttribute('data-sidebar-size');
-            const newSize = currentSize === 'sm-hover' ? 'sm-hover-active' : 'sm-hover';
-            document.documentElement.setAttribute('data-sidebar-size', newSize);
-        });
-    }
+        const badge = document.getElementById('topbar-notification-badge');
+        const countHeader = document.getElementById('topbar-notification-count');
+        const listContainer = document.getElementById('topbar-notification-list');
 
-    // 5. Dark / Light Mode Switcher
-    function applyTheme(theme) {
-        document.documentElement.setAttribute('data-bs-theme', theme);
-        sessionStorage.setItem('data-bs-theme', theme);
-        localStorage.setItem('data-bs-theme', theme);
-
-        // Toggle icon in topbar
-        const modeIcons = document.querySelectorAll('.light-dark-mode i');
-        modeIcons.forEach(function (icon) {
-            if (theme === 'dark') {
-                icon.classList.remove('bx-moon');
-                icon.classList.add('bx-sun');
-            } else {
-                icon.classList.remove('bx-sun');
-                icon.classList.add('bx-moon');
-            }
-        });
-
-        // Sync customizer radio buttons
-        const targetRadio = document.getElementById('layout-mode-' + theme);
-        if (targetRadio) {
-            targetRadio.checked = true;
+        if (badge) {
+            badge.textContent = unreadCount;
+            badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
+        }
+        if (countHeader) {
+            countHeader.textContent = `${unreadCount} جديد`;
         }
 
-        // Trigger resize event for ApexCharts recolor
-        window.dispatchEvent(new Event('resize'));
+        if (listContainer) {
+            if (notifs.length === 0) {
+                listContainer.innerHTML = '<div class="text-center py-4 text-muted fs-13"><i class="ri-notification-off-line fs-24 d-block mb-1"></i>لا توجد تنبيهات حالياً</div>';
+                return;
+            }
+
+            let html = '';
+            notifs.slice(0, 10).forEach(n => {
+                const isLate = n.type === 'lateness';
+                const iconBg = isLate ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning';
+                const iconClass = isLate ? 'ri-alarm-warning-line' : 'ri-money-dollar-circle-line';
+                const unreadDot = !n.read ? '<span class="badge badge-dot bg-danger me-1"></span>' : '';
+
+                html += `
+                    <div class="text-reset notification-item d-block dropdown-item position-relative ${!n.read ? 'active bg-light-subtle' : ''}">
+                        <div class="d-flex align-items-start">
+                            <div class="avatar-xs me-3 flex-shrink-0">
+                                <span class="avatar-title ${iconBg} rounded-circle fs-16">
+                                    <i class="${iconClass}"></i>
+                                </span>
+                            </div>
+                            <div class="flex-grow-1 overflow-hidden">
+                                <h6 class="mt-0 mb-1 fs-13 fw-bold">${unreadDot}${n.title}</h6>
+                                <p class="mb-1 fs-12 text-muted text-truncate-2">${n.message}</p>
+                                <p class="mb-0 fs-11 fw-medium text-muted">
+                                    <span><i class="mdi mdi-clock-outline"></i> ${n.time}</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            listContainer.innerHTML = html;
+        }
     }
 
-    // Initial theme setup from storage or html attribute
-    const initialTheme = sessionStorage.getItem('data-bs-theme') || localStorage.getItem('data-bs-theme') || document.documentElement.getAttribute('data-bs-theme') || 'light';
-    applyTheme(initialTheme);
-
-    // Click event for all .light-dark-mode buttons
-    const darkLightBtns = document.querySelectorAll('.light-dark-mode');
-    darkLightBtns.forEach(function (btn) {
-        btn.addEventListener('click', function (e) {
-            e.preventDefault();
-            const currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            applyTheme(newTheme);
-        });
-    });
-
-    // Customizer radios change event
-    const lightRadio = document.getElementById('layout-mode-light');
-    const darkRadio = document.getElementById('layout-mode-dark');
-    if (lightRadio) {
-        lightRadio.addEventListener('change', function () {
-            if (this.checked) applyTheme('light');
-        });
-    }
-    if (darkRadio) {
-        darkRadio.addEventListener('change', function () {
-            if (this.checked) applyTheme('dark');
-        });
-    }
+    renderTopbarNotifications();
+    window.addEventListener('alhusseini-hr-updated', renderTopbarNotifications);
 });
 </script>

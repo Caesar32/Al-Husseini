@@ -1,1 +1,16 @@
-(document.querySelectorAll("[toast-list]")||document.querySelectorAll("[data-choices]")||document.querySelectorAll("[data-provider]"))&&(document.writeln("<script type='text/javascript' src='https://cdn.jsdelivr.net/npm/toastify-js'><\/script>"),document.writeln("<script type='text/javascript' src='/assets/libs/choices.js/public/assets/scripts/choices.min.js'><\/script>"),document.writeln("<script type='text/javascript' src='/assets/libs/flatpickr/flatpickr.min.js'><\/script>"));
+/**
+ * Velzon Plugins Loader - Al-Husseini Optimized
+ * Prevents parser-blocking document.writeln and redundant double-script loading.
+ */
+(function() {
+    'use strict';
+    // Flatpickr & Choices are already explicitly loaded in vendor-scripts.blade.php
+    // If toast-list exists and Toastify is needed, load dynamically without document.writeln
+    if (document.querySelector('[toast-list]') && typeof Toastify === 'undefined') {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = 'https://cdn.jsdelivr.net/npm/toastify-js';
+        script.async = true;
+        document.head.appendChild(script);
+    }
+})();

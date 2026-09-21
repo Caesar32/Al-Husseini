@@ -16,6 +16,7 @@
     <meta content="نظام إدارة مجموعة الحسيني | Al-Husseini Management System" name="description" />
     <meta content="Al-Husseini" name="author" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="asset-url" content="{{ asset('') }}">
 
     <!-- App favicon -->
     <link rel="shortcut icon" href="{{ asset('assets/images/alhusseini-icon.jpg') }}">

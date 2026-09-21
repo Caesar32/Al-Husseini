@@ -43,6 +43,7 @@
                         <input type="text" class="form-control" placeholder="بحث..." autocomplete="off" id="search-options" value="">
                         <span class="mdi mdi-magnify search-widget-icon"></span>
                         <span class="mdi mdi-close-circle search-widget-icon search-widget-icon-close d-none" id="search-close-options"></span>
+                        <div class="dropdown-menu dropdown-menu-lg" id="search-dropdown"></div>
                     </div>
                 </form>
             </div>
@@ -67,15 +68,21 @@
 
                 <!-- Language Dropdown -->
                 <div class="dropdown ms-1 topbar-head-dropdown header-item">
+                    @php
+                        $currentLocale = session('locale', 'ar');
+                        if (request()->has('lang') && in_array(request('lang'), ['ar', 'en'])) {
+                            $currentLocale = request('lang');
+                        }
+                    @endphp
                     <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <img id="header-lang-img" src="{{ asset('assets/images/flags/' . (app()->getLocale() == 'ar' ? 'ae.svg' : 'us.svg')) }}" alt="Header Language" height="20" class="rounded">
+                        <img id="header-lang-img" src="{{ asset('assets/images/flags/' . ($currentLocale === 'en' ? 'us.svg' : 'ae.svg')) }}" alt="Header Language" height="20" class="rounded">
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
-                        <a href="javascript:void(0);" class="dropdown-item notify-item language" data-lang="ar" title="Arabic">
+                        <a href="{{ route('switch-lang', 'ar') }}" class="dropdown-item notify-item language {{ $currentLocale === 'ar' ? 'active' : '' }}" data-lang="ar" title="العربية">
                             <img src="{{ asset('assets/images/flags/ae.svg') }}" alt="user-image" class="me-2 rounded" height="18">
                             <span class="align-middle">العربية</span>
                         </a>
-                        <a href="javascript:void(0);" class="dropdown-item notify-item language py-2" data-lang="en" title="English">
+                        <a href="{{ route('switch-lang', 'en') }}" class="dropdown-item notify-item language py-2 {{ $currentLocale === 'en' ? 'active' : '' }}" data-lang="en" title="English">
                             <img src="{{ asset('assets/images/flags/us.svg') }}" alt="user-image" class="me-2 rounded" height="18">
                             <span class="align-middle">English</span>
                         </a>
@@ -100,7 +107,7 @@
                 <div class="dropdown topbar-head-dropdown ms-1 header-item" id="notificationDropdown">
                     <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle" id="page-header-notifications-dropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-haspopup="true" aria-expanded="false">
                         <i class='bx bx-bell fs-22'></i>
-                        <span class="position-absolute topbar-badge fs-10 translate-middle badge rounded-pill bg-danger">3<span class="visually-hidden">unread messages</span></span>
+                        <span class="position-absolute topbar-badge fs-10 translate-middle badge rounded-pill bg-danger" id="topbar-notification-badge">0<span class="visually-hidden">unread messages</span></span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0" aria-labelledby="page-header-notifications-dropdown">
 
@@ -108,10 +115,10 @@
                             <div class="p-3">
                                 <div class="row align-items-center">
                                     <div class="col">
-                                        <h6 class="m-0 fs-16 fw-semibold text-white"> التنبيهات </h6>
+                                        <h6 class="m-0 fs-16 fw-semibold text-white"> التنبيهات الإدارية </h6>
                                     </div>
                                     <div class="col-auto dropdown-tabs">
-                                        <span class="badge bg-light text-body fs-13"> 3 جديد</span>
+                                        <span class="badge bg-light text-body fs-13" id="topbar-notification-count">0 جديد</span>
                                     </div>
                                 </div>
                             </div>
@@ -119,24 +126,13 @@
 
                         <div class="tab-content position-relative" id="notificationItemsTabContent">
                             <div class="tab-pane fade show active py-2 ps-2" id="all-noti-tab" role="tabpanel">
-                                <div data-simplebar style="max-height: 300px;" class="pe-2">
-                                    <div class="text-reset notification-item d-block dropdown-item position-relative">
-                                        <div class="d-flex">
-                                            <div class="avatar-xs me-3 flex-shrink-0">
-                                                <span class="avatar-title bg-info-subtle text-info rounded-circle fs-16">
-                                                    <i class="bx bx-badge-check"></i>
-                                                </span>
-                                            </div>
-                                            <div class="flex-grow-1">
-                                                <a href="#!" class="stretched-link">
-                                                    <h6 class="mt-0 mb-2 lh-base">تم تحديث النظام بنجاح</h6>
-                                                </a>
-                                                <p class="mb-0 fs-11 fw-medium text-uppercase text-muted">
-                                                    <span><i class="mdi mdi-clock-outline"></i> منذ قليل</span>
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div data-simplebar style="max-height: 300px;" class="pe-2" id="topbar-notification-list">
+                                    <!-- Populated dynamically by HR Store -->
+                                </div>
+                                <div class="text-center py-2 border-top">
+                                    <button type="button" class="btn btn-sm btn-link text-primary" onclick="if(window.AlHusseiniHR) window.AlHusseiniHR.markAllAsRead();">
+                                        <i class="ri-check-double-line align-middle me-1"></i> تحديد الكل كمقروء
+                                    </button>
                                 </div>
                             </div>
                         </div>

@@ -124,6 +124,13 @@
                     </div>
                 </div>
 
+                <div id="sidebar-size" style="display:none;"></div>
+                <div id="sidebar-view" style="display:none;"></div>
+                <div id="sidebar-img" style="display:none;"></div>
+                <div id="layout-position" style="display:none;"></div>
+                <div id="layout-width" style="display:none;"></div>
+                <div id="sidebar-visibility" style="display:none;"></div>
+
                 <div id="sidebar-color">
                     <h6 class="mt-4 mb-0 fw-semibold text-uppercase">لون القائمة الجانبية (Sidebar Color)</h6>
                     <p class="text-muted">اختر لون القائمة</p>

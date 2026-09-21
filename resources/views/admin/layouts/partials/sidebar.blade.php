@@ -5,24 +5,24 @@
         <!-- Dark Logo-->
         <a href="{{ route('admin.dashboard') }}" class="logo logo-dark">
             <span class="logo-sm">
-                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-circle shadow-sm">
+                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
             </span>
             <span class="logo-lg">
                 <span class="d-inline-flex align-items-center gap-2">
-                    <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="32" class="rounded-circle shadow-sm">
-                    <span class="fw-bold fs-17 text-dark" style="letter-spacing: 0.5px;">الحسيني <span class="text-primary fs-13 fw-semibold">Al-Husseini</span></span>
+                    <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-circle shadow-sm">
+                    <span class="fw-bold fs-15 text-dark" style="letter-spacing: 0.3px;">الحسيني <span class="text-primary fs-12 fw-semibold">Al-Husseini</span></span>
                 </span>
             </span>
         </a>
         <!-- Light Logo-->
         <a href="{{ route('admin.dashboard') }}" class="logo logo-light">
             <span class="logo-sm">
-                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-circle shadow-sm">
+                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
             </span>
             <span class="logo-lg">
                 <span class="d-inline-flex align-items-center gap-2">
-                    <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="32" class="rounded-circle shadow-sm">
-                    <span class="fw-bold fs-17 text-white" style="letter-spacing: 0.5px;">الحسيني <span class="text-warning fs-13 fw-semibold">Al-Husseini</span></span>
+                    <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-circle shadow-sm">
+                    <span class="fw-bold fs-15 text-white" style="letter-spacing: 0.3px;">الحسيني <span class="text-warning fs-12 fw-semibold">Al-Husseini</span></span>
                 </span>
             </span>
         </a>
@@ -31,121 +31,95 @@
         </button>
     </div>
 
+    <!-- Scrollable Sidebar Area -->
     <div id="scrollbar">
         <div class="container-fluid">
 
             <div id="two-column-menu"></div>
             <ul class="navbar-nav" id="navbar-nav">
-                <li class="menu-title"><span>القائمة الرئيسية</span></li>
 
-                <!-- Dashboards -->
-                <li class="nav-item">
-                    <a class="nav-link menu-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="#sidebarDashboards" data-bs-toggle="collapse" role="button" aria-expanded="{{ request()->routeIs('admin.dashboard') ? 'true' : 'false' }}" aria-controls="sidebarDashboards">
-                        <i class="ri-dashboard-2-line"></i> <span>لوحات التحكم</span>
-                    </a>
-                    <div class="collapse menu-dropdown {{ request()->routeIs('admin.dashboard') ? 'show' : '' }}" id="sidebarDashboards">
-                        <ul class="nav nav-sm flex-column">
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}">
-                                    الرئيسية والتجارة الإلكترونية
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">
-                                    تحليلات النظام
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">
-                                    المشاريع والمهام
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
+                <li class="menu-title"><span>الرئيسية</span></li>
 
-                <!-- Starter Page -->
+                <!-- Dashboard -->
                 <li class="nav-item">
-                    <a class="nav-link menu-link {{ request()->routeIs('admin.starter') ? 'active' : '' }}" href="{{ route('admin.starter') }}">
-                        <i class="ri-pages-line"></i> <span>صفحة بداية (Starter)</span>
-                        <span class="badge bg-success-subtle text-success fs-11">جديد</span>
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}" href="{{ route('admin.dashboard') }}">
+                        <i class="ri-dashboard-2-line"></i> <span>لوحة التحكم الرئيسية</span>
                     </a>
                 </li>
 
-                <li class="menu-title"><span>إدارة المتجر والمبيعات</span></li>
+                <li class="menu-title"><span>المبيعات والفواتير</span></li>
 
-                <!-- Ecommerce Menu -->
+                <!-- Point of Sale (POS) -->
                 <li class="nav-item">
-                    <a class="nav-link menu-link" href="#sidebarEcommerce" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarEcommerce">
-                        <i class="ri-shopping-bag-3-line"></i> <span>المتجر والمنتجات</span>
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.sales.pos') ? 'active' : '' }}" href="{{ route('admin.sales.pos') }}">
+                        <i class="ri-shopping-cart-2-line"></i> <span>نقطة البيع وفاتورة سريعة</span>
                     </a>
-                    <div class="collapse menu-dropdown" id="sidebarEcommerce">
-                        <ul class="nav nav-sm flex-column">
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">قائمة المنتجات</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.starter') }}" class="nav-link">إضافة منتج جديد</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">الطلبات والمبيعات</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">العملاء</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.dashboard') }}" class="nav-link">الفواتير والدفعات</a>
-                            </li>
-                        </ul>
-                    </div>
                 </li>
 
-                <li class="menu-title"><span>إدارة النظام والحسابات</span></li>
-
-                <!-- Authentication -->
+                <!-- Invoices Register -->
                 <li class="nav-item">
-                    <a class="nav-link menu-link" href="#sidebarAuth" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarAuth">
-                        <i class="ri-shield-user-line"></i> <span>المصادقة والحماية</span>
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.sales.invoices') ? 'active' : '' }}" href="{{ route('admin.sales.invoices') }}">
+                        <i class="ri-bill-line"></i> <span>فواتير المبيعات والضمان</span>
                     </a>
-                    <div class="collapse menu-dropdown" id="sidebarAuth">
-                        <ul class="nav nav-sm flex-column">
-                            <li class="nav-item">
-                                <a href="{{ route('admin.login') }}" class="nav-link" target="_blank">تسجيل الدخول</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.register') }}" class="nav-link" target="_blank">إنشاء حساب جديد</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.error.404') }}" class="nav-link" target="_blank">صفحة خطأ 404</a>
-                            </li>
-                        </ul>
-                    </div>
                 </li>
 
-                <!-- Settings & Tools -->
+                <!-- Credit & Dues (الآجل) -->
                 <li class="nav-item">
-                    <a class="nav-link menu-link" href="#sidebarSettings" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="sidebarSettings">
-                        <i class="ri-settings-4-line"></i> <span>الإعدادات والخيارات</span>
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.sales.credit') ? 'active' : '' }}" href="{{ route('admin.sales.credit') }}">
+                        <i class="ri-hand-coin-line"></i> <span>حسابات الآجل والمستحقات</span>
+                        <span class="badge bg-warning-subtle text-warning fs-10 ms-auto fw-bold px-2 py-1">الآجل</span>
                     </a>
-                    <div class="collapse menu-dropdown" id="sidebarSettings">
-                        <ul class="nav nav-sm flex-column">
-                            <li class="nav-item">
-                                <a href="javascript:void(0);" class="nav-link" data-bs-toggle="offcanvas" data-bs-target="#theme-settings-offcanvas">تخصيص الواجهة</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.starter') }}" class="nav-link">الملف الشخصي</a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ route('admin.starter') }}" class="nav-link">إعدادات النظام العامة</a>
-                            </li>
-                        </ul>
-                    </div>
+                </li>
+
+                <!-- Battery Inventory / Products -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.sales.products') ? 'active' : '' }}" href="{{ route('admin.sales.products') }}">
+                        <i class="ri-battery-2-charge-line"></i> <span>بطاريات ومنتجات المركز</span>
+                    </a>
+                </li>
+
+                <!-- Customers Directory -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.sales.customers') ? 'active' : '' }}" href="{{ route('admin.sales.customers') }}">
+                        <i class="ri-user-shared-line"></i> <span>دليل وسجل العملاء والسيارات</span>
+                    </a>
+                </li>
+
+                <li class="menu-title"><span>شؤون العاملين والورشة</span></li>
+
+                <!-- Employees -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.hr.employees') ? 'active' : '' }}" href="{{ route('admin.hr.employees') }}">
+                        <i class="ri-user-star-line"></i> <span>دليل البائعين والفنيين</span>
+                    </a>
+                </li>
+
+                <!-- Attendance & Biometrics -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.hr.attendance') ? 'active' : '' }}" href="{{ route('admin.hr.attendance') }}">
+                        <i class="ri-fingerprint-2-line"></i> <span>بصمة الحضور ومواعيد الورشة</span>
+                    </a>
+                </li>
+
+                <!-- Payroll & Deductions -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.hr.payroll') ? 'active' : '' }}" href="{{ route('admin.hr.payroll') }}">
+                        <i class="ri-money-dollar-circle-line"></i> <span>مسير الرواتب والخصومات</span>
+                    </a>
+                </li>
+
+                <!-- Reports & Analytics -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.hr.reports') ? 'active' : '' }}" href="{{ route('admin.hr.reports') }}">
+                        <i class="ri-file-chart-line"></i> <span>تقارير الحضور والغياب والخصومات</span>
+                    </a>
                 </li>
 
             </ul>
         </div>
-        <!-- Sidebar -->
+        <!-- Container -->
     </div>
+    <!-- Scrollbar -->
 
     <div class="sidebar-background"></div>
 </div>
