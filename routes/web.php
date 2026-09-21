@@ -1,12 +1,27 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Hr\EmployeeController;
+use App\Http\Controllers\Hr\AttendanceController;
+use App\Http\Controllers\Hr\LeaveController;
+use App\Http\Controllers\Hr\DeductionController;
+use App\Http\Controllers\Hr\PayrollController;
+use App\Http\Controllers\Hr\NotificationController;
+
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
 Route::get('/', function () {
-    return redirect()->route('admin.dashboard');
+    return auth()->check()
+        ? redirect()->route('admin.dashboard')
+        : redirect()->route('admin.login');
 });
 
-// Language Switcher Route
+// تبديل اللغة (Language Switcher)
 Route::get('/lang/{locale}', function (string $locale) {
     if (in_array($locale, ['ar', 'en'])) {
         session(['locale' => $locale]);
@@ -14,89 +29,98 @@ Route::get('/lang/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('switch-lang');
 
-// Admin Panel Routes
+// مسارات لوحة التحكم (Admin Panel Routes)
 Route::prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', function () {
-        return view('admin.dashboard');
-    })->name('dashboard');
 
-    Route::get('/starter', function () {
-        return view('admin.starter');
-    })->name('starter');
-
-    Route::get('/login', function () {
-        return view('admin.auth.login');
-    })->name('login');
-
-    Route::get('/register', function () {
-        return view('admin.auth.register');
-    })->name('register');
-
-    Route::get('/404', function () {
-        return view('admin.errors.404');
-    })->name('error.404');
-
-    // HR Management Routes
-    Route::prefix('hr')->name('hr.')->group(function () {
-        // الموظفون
-        Route::get('/employees', [\App\Http\Controllers\Hr\EmployeeController::class, 'index'])->name('employees');
-        Route::post('/employees', [\App\Http\Controllers\Hr\EmployeeController::class, 'store'])->name('employees.store');
-        Route::get('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'show'])->name('employees.show');
-        Route::put('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'update'])->name('employees.update');
-        Route::delete('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'destroy'])->name('employees.destroy');
-
-        // الحضور والانصراف
-        Route::get('/attendance', [\App\Http\Controllers\Hr\AttendanceController::class, 'index'])->name('attendance');
-        Route::post('/attendance/punch', [\App\Http\Controllers\Hr\AttendanceController::class, 'recordManual'])->name('attendance.punch');
-
-        // الإجازات
-        Route::get('/leaves', [\App\Http\Controllers\Hr\LeaveController::class, 'index'])->name('leaves.index');
-        Route::post('/leaves', [\App\Http\Controllers\Hr\LeaveController::class, 'store'])->name('leaves.store');
-        Route::post('/leaves/{leave}/status', [\App\Http\Controllers\Hr\LeaveController::class, 'updateStatus'])->name('leaves.status');
-
-        // الجزاءات والخصومات
-        Route::get('/deductions', [\App\Http\Controllers\Hr\DeductionController::class, 'index'])->name('deductions.index');
-        Route::post('/deductions', [\App\Http\Controllers\Hr\DeductionController::class, 'store'])->name('deductions.store');
-        Route::post('/deductions/{deduction}/status', [\App\Http\Controllers\Hr\DeductionController::class, 'updateStatus'])->name('deductions.status');
-
-        // مسيرات الرواتب
-        Route::get('/payroll', [\App\Http\Controllers\Hr\PayrollController::class, 'index'])->name('payroll');
-        Route::post('/payroll/generate', [\App\Http\Controllers\Hr\PayrollController::class, 'generate'])->name('payroll.generate');
-        Route::get('/payroll/{payroll}', [\App\Http\Controllers\Hr\PayrollController::class, 'show'])->name('payroll.show');
-        Route::post('/payroll/{payroll}/approve', [\App\Http\Controllers\Hr\PayrollController::class, 'approve'])->name('payroll.approve');
-        Route::post('/payroll/{payroll}/disburse', [\App\Http\Controllers\Hr\PayrollController::class, 'disburse'])->name('payroll.disburse');
-
-        // تقارير الموارد البشرية
-        Route::get('/reports', function () {
-            return view('admin.hr.reports');
-        })->name('reports');
-
-        // إشعارات الإدارة
-        Route::get('/notifications', [\App\Http\Controllers\Hr\NotificationController::class, 'index'])->name('notifications.index');
-        Route::post('/notifications/{id}/read', [\App\Http\Controllers\Hr\NotificationController::class, 'markAsRead'])->name('notifications.read');
-        Route::post('/notifications/read-all', [\App\Http\Controllers\Hr\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
+    // مسارات المصادقة للضيوف (Guest Authentication)
+    Route::middleware('guest')->group(function () {
+        Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+        Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+        Route::get('/register', function () {
+            return view('admin.auth.register');
+        })->name('register');
     });
 
-    // Sales, Customers, Invoices, Products & Credit (الآجل) Routes
-    Route::prefix('sales')->name('sales.')->group(function () {
-        Route::get('/pos', function () {
-            return view('admin.sales.pos');
-        })->name('pos');
+    // تسجيل الخروج للمستخدمين المسجلين
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
 
-        Route::get('/invoices', function () {
-            return view('admin.sales.invoices');
-        })->name('invoices');
+    // مسارات لوحة التحكم المحمية بالكامل (Authenticated Admin Routes)
+    Route::middleware('auth')->group(function () {
 
-        Route::get('/credit', function () {
-            return view('admin.sales.credit');
-        })->name('credit');
+        Route::get('/', function () {
+            return view('admin.dashboard');
+        })->name('dashboard')->middleware('can:dashboard.view');
 
-        Route::get('/customers', function () {
-            return view('admin.sales.customers');
-        })->name('customers');
+        Route::get('/starter', function () {
+            return view('admin.starter');
+        })->name('starter');
 
-        Route::get('/products', function () {
-            return view('admin.sales.products');
-        })->name('products');
+        Route::get('/404', function () {
+            return view('admin.errors.404');
+        })->name('error.404');
+
+        // إدارة شؤون الموظفين والعمليات (HR Management)
+        Route::prefix('hr')->name('hr.')->group(function () {
+            // الموظفون
+            Route::get('/employees', [EmployeeController::class, 'index'])->name('employees')->middleware('can:employees.view');
+            Route::post('/employees', [EmployeeController::class, 'store'])->name('employees.store')->middleware('can:employees.create');
+            Route::get('/employees/{employee}', [EmployeeController::class, 'show'])->name('employees.show')->middleware('can:employees.view');
+            Route::put('/employees/{employee}', [EmployeeController::class, 'update'])->name('employees.update')->middleware('can:employees.edit');
+            Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy'])->name('employees.destroy')->middleware('can:employees.delete');
+
+            // الحضور والانصراف
+            Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance')->middleware('can:attendance.view');
+            Route::post('/attendance/punch', [AttendanceController::class, 'recordManual'])->name('attendance.punch')->middleware('can:attendance.manual_punch');
+
+            // الإجازات
+            Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index')->middleware('can:leaves.manage');
+            Route::post('/leaves', [LeaveController::class, 'store'])->name('leaves.store')->middleware('can:leaves.manage');
+            Route::post('/leaves/{leave}/status', [LeaveController::class, 'updateStatus'])->name('leaves.status')->middleware('can:leaves.manage');
+
+            // الجزاءات والخصومات
+            Route::get('/deductions', [DeductionController::class, 'index'])->name('deductions.index')->middleware('can:deductions.manage');
+            Route::post('/deductions', [DeductionController::class, 'store'])->name('deductions.store')->middleware('can:deductions.manage');
+            Route::post('/deductions/{deduction}/status', [DeductionController::class, 'updateStatus'])->name('deductions.status')->middleware('can:deductions.manage');
+
+            // مسيرات الرواتب
+            Route::get('/payroll', [PayrollController::class, 'index'])->name('payroll')->middleware('can:payroll.generate');
+            Route::post('/payroll/generate', [PayrollController::class, 'generate'])->name('payroll.generate')->middleware('can:payroll.generate');
+            Route::get('/payroll/{payroll}', [PayrollController::class, 'show'])->name('payroll.show')->middleware('can:payroll.generate');
+            Route::post('/payroll/{payroll}/approve', [PayrollController::class, 'approve'])->name('payroll.approve')->middleware('can:payroll.approve');
+            Route::post('/payroll/{payroll}/disburse', [PayrollController::class, 'disburse'])->name('payroll.disburse')->middleware('can:payroll.disburse');
+
+            // تقارير الموارد البشرية
+            Route::get('/reports', function () {
+                return view('admin.hr.reports');
+            })->name('reports')->middleware('can:reports.hr');
+
+            // إشعارات الإدارة
+            Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index')->middleware('can:notifications.view');
+            Route::post('/notifications/{id}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read')->middleware('can:notifications.view');
+            Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll')->middleware('can:notifications.view');
+        });
+
+        // المبيعات ونقاط البيع والعملاء والمنتجات (Sales & Operations)
+        Route::prefix('sales')->name('sales.')->group(function () {
+            Route::get('/pos', function () {
+                return view('admin.sales.pos');
+            })->name('pos')->middleware('can:pos.access');
+
+            Route::get('/invoices', function () {
+                return view('admin.sales.invoices');
+            })->name('invoices')->middleware('can:invoices.view');
+
+            Route::get('/credit', function () {
+                return view('admin.sales.credit');
+            })->name('credit')->middleware('can:credit.view');
+
+            Route::get('/customers', function () {
+                return view('admin.sales.customers');
+            })->name('customers')->middleware('can:customers.view');
+
+            Route::get('/products', function () {
+                return view('admin.sales.products');
+            })->name('products')->middleware('can:products.view');
+        });
     });
 });

@@ -14,6 +14,9 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
     $this->seed(\Database\Seeders\InitialDataSeeder::class);
+
+    $admin = User::where('email', 'admin@alhusseini.com')->first();
+    $this->actingAs($admin);
 });
 
 test('hr employees page returns a successful view', function () {

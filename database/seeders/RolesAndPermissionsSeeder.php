@@ -82,6 +82,13 @@ class RolesAndPermissionsSeeder extends Seeder
             'reports.financial',
             'reports.sales',
             'reports.hr',
+
+            // لوحة التحكم والتنبيهات وإدارة النظام (Dashboard & System Administration)
+            'dashboard.view',
+            'notifications.view',
+            'roles.manage',
+            'users.manage',
+            'settings.manage',
         ];
 
         foreach ($permissions as $permission) {

@@ -59,9 +59,9 @@ class InitialDataSeeder extends Seeder
         ]);
 
         // 5. حساب المشرف العام للتجربة
-        $superAdminUser = User::firstOrCreate(['email' => 'admin@alhusseini.com'], [
+        $superAdminUser = User::updateOrCreate(['email' => 'admin@alhusseini.com'], [
             'name' => 'المهندس أحمد الحسيني',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'branch_id' => $mainBranch->id,
             'is_active' => true,
         ]);
@@ -70,9 +70,9 @@ class InitialDataSeeder extends Seeder
         }
 
         // 6. حساب المحاسب للتجربة
-        $accountantUser = User::firstOrCreate(['email' => 'accountant@alhusseini.com'], [
+        $accountantUser = User::updateOrCreate(['email' => 'accountant@alhusseini.com'], [
             'name' => 'محمد كمال - محاسب الفرع',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'branch_id' => $mainBranch->id,
             'is_active' => true,
         ]);

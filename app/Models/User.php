@@ -20,9 +20,11 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'branch_id',
         'name',
         'email',
         'password',
+        'is_active',
     ];
 
     /**
@@ -45,6 +47,12 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'is_active' => 'boolean',
         ];
+    }
+
+    public function branch(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

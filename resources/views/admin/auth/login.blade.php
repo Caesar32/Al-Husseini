@@ -42,11 +42,35 @@
                                 <h5 class="text-primary fw-bold">مرحباً بك في نظام الحسيني !</h5>
                                 <p class="text-muted">قم بتسجيل الدخول للمتابعة إلى لوحة تحكم Al-Husseini.</p>
                             </div>
-                            <div class="p-2 mt-4">
-                                <form action="{{ route('admin.dashboard') }}" method="GET">
+
+                            @if (session('status'))
+                                <div class="alert alert-success alert-border-left alert-dismissible fade show my-3" role="alert">
+                                    <i class="ri-check-double-line me-2 align-middle fs-16"></i> {{ session('status') }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @endif
+
+                            @if ($errors->any())
+                                <div class="alert alert-danger alert-border-left alert-dismissible fade show my-3" role="alert">
+                                    <i class="ri-error-warning-line me-2 align-middle fs-16"></i>
+                                    <ul class="mb-0 ps-3">
+                                        @foreach ($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @endif
+
+                            <div class="p-2 mt-2">
+                                <form action="{{ route('admin.login.submit') }}" method="POST">
+                                    @csrf
                                     <div class="mb-3">
-                                        <label for="username" class="form-label">البريد الإلكتروني / اسم المستخدم</label>
-                                        <input type="text" class="form-control" id="username" placeholder="أدخل البريد الإلكتروني" value="admin@alhusseini.com">
+                                        <label for="email" class="form-label">البريد الإلكتروني</label>
+                                        <input type="email" name="email" class="form-control @error('email') is-invalid @enderror" id="email" placeholder="أدخل البريد الإلكتروني" value="{{ old('email', 'admin@alhusseini.com') }}" required autofocus>
+                                        @error('email')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </div>
 
                                     <div class="mb-3">
@@ -55,18 +79,23 @@
                                         </div>
                                         <label class="form-label" for="password-input">كلمة المرور</label>
                                         <div class="position-relative auth-pass-inputgroup mb-3">
-                                            <input type="password" class="form-control pe-5 password-input" placeholder="أدخل كلمة المرور" id="password-input" value="12345678">
+                                            <input type="password" name="password" class="form-control pe-5 password-input @error('password') is-invalid @enderror" placeholder="أدخل كلمة المرور" id="password-input" value="12345678" required>
                                             <button class="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted password-addon material-shadow-none" type="button" id="password-addon"><i class="ri-eye-fill align-middle"></i></button>
+                                            @error('password')
+                                                <div class="invalid-feedback">{{ $message }}</div>
+                                            @enderror
                                         </div>
                                     </div>
 
                                     <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" value="" id="auth-remember-check" checked>
-                                        <label class="form-check-label" for="auth-remember-check">تذكرني</label>
+                                        <input class="form-check-input" type="checkbox" name="remember" value="1" id="auth-remember-check" checked>
+                                        <label class="form-check-label" for="auth-remember-check">تذكرني على هذا الجهاز</label>
                                     </div>
 
                                     <div class="mt-4">
-                                        <button class="btn btn-primary w-100" type="submit">دخول</button>
+                                        <button class="btn btn-primary w-100" type="submit">
+                                            <i class="ri-login-box-line me-1 align-middle"></i> تسجيل الدخول
+                                        </button>
                                     </div>
                                 </form>
                             </div>

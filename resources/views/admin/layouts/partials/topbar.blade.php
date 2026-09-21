@@ -145,18 +145,22 @@
                         <span class="d-flex align-items-center">
                             <img class="rounded-circle header-profile-user" src="{{ asset('assets/images/users/avatar-1.jpg') }}" alt="Header Avatar">
                             <span class="text-start ms-xl-2">
-                                <span class="d-none d-xl-inline-block ms-1 fw-bold user-name-text">المشرف العام</span>
-                                <span class="d-none d-xl-block ms-1 fs-12 user-name-sub-text">إدارة نظام الحسيني (Al-Husseini)</span>
+                                <span class="d-none d-xl-inline-block ms-1 fw-bold user-name-text">{{ auth()->user()->name ?? 'المهندس أحمد الحسيني' }}</span>
+                                <span class="d-none d-xl-block ms-1 fs-12 user-name-sub-text">{{ auth()->user()?->roles?->first()?->name ?? 'super-admin' }} ({{ auth()->user()?->branch?->name ?? 'الفرع الرئيسي' }})</span>
                             </span>
                         </span>
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
-                        <h6 class="dropdown-header">مرحباً بك!</h6>
+                        <h6 class="dropdown-header">مرحباً {{ auth()->user()->name ?? 'بك' }}!</h6>
                         <a class="dropdown-item" href="javascript:void(0);"><i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الملف الشخصي</span></a>
                         <a class="dropdown-item" href="javascript:void(0);"><i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الإعدادات</span></a>
-                        <a class="dropdown-item" href="javascript:void(0);"><i class="mdi mdi-lock text-muted fs-16 align-middle me-1"></i> <span class="align-middle">قفل الشاشة</span></a>
                         <div class="dropdown-divider"></div>
-                        <a class="dropdown-item" href="{{ route('admin.login') }}"><i class="mdi mdi-logout text-muted fs-16 align-middle me-1"></i> <span class="align-middle">تسجيل الخروج</span></a>
+                        <form action="{{ route('admin.logout') }}" method="POST" class="m-0 p-0">
+                            @csrf
+                            <button type="submit" class="dropdown-item text-danger border-0 bg-transparent w-100 text-start">
+                                <i class="mdi mdi-logout text-danger fs-16 align-middle me-1"></i> <span class="align-middle">تسجيل الخروج</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
