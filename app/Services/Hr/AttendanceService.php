@@ -20,7 +20,7 @@ class AttendanceService implements AttendanceServiceInterface
     public function getDailyAttendance(string $date, ?int $branchId = null, ?string $status = null): Collection
     {
         $query = Attendance::with(['employee.branch', 'employee.jobTitle', 'deductions'])
-            ->where('work_date', $date);
+            ->whereDate('work_date', $date);
 
         if (!empty($branchId)) {
             $query->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
@@ -40,9 +40,9 @@ class AttendanceService implements AttendanceServiceInterface
     {
         return [
             'total_expected' => Employee::active()->count(),
-            'present' => Attendance::where('work_date', $date)->where('status', 'present')->count(),
-            'late' => Attendance::where('work_date', $date)->where('status', 'late')->count(),
-            'absent' => Attendance::where('work_date', $date)->where('status', 'absent')->count(),
+            'present' => Attendance::whereDate('work_date', $date)->where('status', 'present')->count(),
+            'late' => Attendance::whereDate('work_date', $date)->where('status', 'late')->count(),
+            'absent' => Attendance::whereDate('work_date', $date)->where('status', 'absent')->count(),
         ];
     }
 
