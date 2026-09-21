@@ -1,4 +1,5 @@
 # 🔬 تحليل ومخطط تطبيع قاعدة البيانات (Database Normalization Analysis - 3NF / BCNF)
+
 ### مركز ومجموعة الحسيني لبطاريات وزيوت وصيانة السيارات
 
 ---
@@ -8,34 +9,37 @@
 في الواجهة الحالية ومتاجر `LocalStorage` (`hr-store.js` و `sales-store.js`)، البيانات مسطحة وتواجه ثلاث مشاكل بنيوية خطيرة إذا نُقلت كما هي لقاعدة بيانات إنتاجية:
 
 1. **شذوذ التحديث (Update Anomalies)**:
-   - بيانات السيارة ورقم اللوحة مخزنة مباشرة كحقول داخل جدول العميل (`customers.car_model`, `customers.plate_number`). إذا امتلك العميل أكثر من سيارة (مثلاً سيارة ملاكي وسيارة نصف نقل)، أو قام بتغيير سيارته، تتلف فواتير الضمان السابقة أو يُجبر النظام على تكرار العميل.
+    - بيانات السيارة ورقم اللوحة مخزنة مباشرة كحقول داخل جدول العميل (`customers.car_model`, `customers.plate_number`). إذا امتلك العميل أكثر من سيارة (مثلاً سيارة ملاكي وسيارة نصف نقل)، أو قام بتغيير سيارته، تتلف فواتير الضمان السابقة أو يُجبر النظام على تكرار العميل.
 2. **شذوذ الحذف (Deletion Anomalies)**:
-   - تخزين الماركة وبيانات الأمبير ونوع البطارية داخل اسم المنتج يؤدي إلى عدم إمكانية تصنيف أو جرد منتجات ماركة معينة (مثل "فارتا Varta") إذا نفد مخزونها أو حُذفت سجلاتها مؤقتاً.
+    - تخزين الماركة وبيانات الأمبير ونوع البطارية داخل اسم المنتج يؤدي إلى عدم إمكانية تصنيف أو جرد منتجات ماركة معينة (مثل "فارتا Varta") إذا نفد مخزونها أو حُذفت سجلاتها مؤقتاً.
 3. **شذوذ المعاملات المالية (Financial Ledger Discrepancy)**:
-   - تخزين حقل منفرد `credit_balance` في جدول العميل وتعديله يدوياً بدون **سجل أستاذ مزدوج (Double-Entry Ledger)** يعرض الحسابات للانهيار وفقدان أثر التدقيق (Audit Trail) عند حدوث خطأ أو تراجع في فاتورة.
+    - تخزين حقل منفرد `credit_balance` في جدول العميل وتعديله يدوياً بدون **سجل أستاذ مزدوج (Double-Entry Ledger)** يعرض الحسابات للانهيار وفقدان أثر التدقيق (Audit Trail) عند حدوث خطأ أو تراجع في فاتورة.
 
 ---
 
 ## 2. مراحل التطبيع الهندسي (Normalization Stages)
 
 ### أ) الشكل الطبيعي الأول (1NF - First Normal Form)
+
 - **القاعدة**: كل عمود يحتوي على قيمة ذرية وحيدة (Atomic Values)، ولا توجد مصفوفات أو مجموعات متكررة.
 - **التطبيق**:
-  * فصل بنود الفاتورة (`invoice_items`) بالكامل عن الفاتورة الأم (`invoices`).
-  * فصل بطاريات الكهنة المسترجعة (`scrap_items`) ككيان محاسبي مستقل بسعر توريد وخردة محدد.
+    - فصل بنود الفاتورة (`invoice_items`) بالكامل عن الفاتورة الأم (`invoices`).
+    - فصل بطاريات الكهنة المسترجعة (`scrap_items`) ككيان محاسبي مستقل بسعر توريد وخردة محدد.
 
 ### ب) الشكل الطبيعي الثاني (2NF - Second Normal Form)
+
 - **القاعدة**: تحقيق 1NF + اعتماد كافة الأعمدة غير المفتاحية اعتماداً وظيفياً كاملاً على المفتاح الأساسي (No Partial Dependencies).
 - **التطبيق**:
-  * سعر شراء وبيع وصلاحية كارت الضمان للبطارية (`warranty_serial`, `warranty_months`) تعتمد على البند الفعلي المباع وليس الفاتورة الإجمالية.
-  * بيانات الفني والوردية ترتبط بالموظف وليس بسجل البصمة.
+    - سعر شراء وبيع وصلاحية كارت الضمان للبطارية (`warranty_serial`, `warranty_months`) تعتمد على البند الفعلي المباع وليس الفاتورة الإجمالية.
+    - بيانات الفني والوردية ترتبط بالموظف وليس بسجل البصمة.
 
 ### ج) الشكل الطبيعي الثالث (3NF - Third Normal Form)
+
 - **القاعدة**: تحقيق 2NF + عدم وجود أي اعتماد متعدٍ (No Transitive Dependencies: عمود غير مفتاحي يعتمد على عمود غير مفتاحي آخر).
 - **التطبيق**:
-  * فصل الماركات (`brands`) ومجموعات البطاريات (`battery_models`) عن جدول المخزون.
-  * فصل سيارات العملاء (`customer_vehicles`) في جدول مستقل متعدد لواحد (`customers` 1:N `customer_vehicles`).
-  * فصل حسابات الآجل إلى سجل قيود مالي (`credit_ledger_entries`) مع الاحتفاظ بـ `credit_balance` المحسوب عبر Trigger أو Generated Column لضمان سرعة القراءة دون المساس بصحة التدقيق.
+    - فصل الماركات (`brands`) ومجموعات البطاريات (`battery_models`) عن جدول المخزون.
+    - فصل سيارات العملاء (`customer_vehicles`) في جدول مستقل متعدد لواحد (`customers` 1:N `customer_vehicles`).
+    - فصل حسابات الآجل إلى سجل قيود مالي (`credit_ledger_entries`) مع الاحتفاظ بـ `credit_balance` المحسوب عبر Trigger أو Generated Column لضمان سرعة القراءة دون المساس بصحة التدقيق.
 
 ---
 
@@ -61,6 +65,7 @@
 ### 4.1 قطاع المبيعات والمخزن والسيارات
 
 #### جدول الماركات والمصنعين (`brands`):
+
 ```sql
 CREATE TABLE brands (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -73,6 +78,7 @@ CREATE TABLE brands (
 ```
 
 #### جدول المنتجات والمواصفات الفنية (`products`):
+
 ```sql
 CREATE TABLE products (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -102,6 +108,7 @@ CREATE TABLE products (
 ```
 
 #### جدول العملاء (`customers`):
+
 ```sql
 CREATE TABLE customers (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -121,6 +128,7 @@ CREATE TABLE customers (
 ```
 
 #### جدول مركبات العملاء (`customer_vehicles`):
+
 ```sql
 CREATE TABLE customer_vehicles (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -140,6 +148,7 @@ CREATE TABLE customer_vehicles (
 ```
 
 #### جدول الفواتير (`invoices`):
+
 ```sql
 CREATE TABLE invoices (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -170,6 +179,7 @@ CREATE TABLE invoices (
 ```
 
 #### جدول بنود الفاتورة والضمان (`invoice_items`):
+
 ```sql
 CREATE TABLE invoice_items (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -193,6 +203,7 @@ CREATE TABLE invoice_items (
 ```
 
 #### جدول بطاريات الكهنة المسترجعة (`scrap_batteries_inventory`):
+
 ```sql
 CREATE TABLE scrap_batteries_inventory (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -209,6 +220,7 @@ CREATE TABLE scrap_batteries_inventory (
 ```
 
 #### دفتر أستاذ حسابات الآجل المزدوج (`credit_ledger_entries`):
+
 ```sql
 CREATE TABLE credit_ledger_entries (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -235,6 +247,7 @@ CREATE TABLE credit_ledger_entries (
 ### 4.2 قطاع شؤون العاملين ومواعيد الورشة
 
 #### جدول الأقسام (`departments`):
+
 ```sql
 CREATE TABLE departments (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -247,6 +260,7 @@ CREATE TABLE departments (
 ```
 
 #### جدول الموظفين (`employees`):
+
 ```sql
 CREATE TABLE employees (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -274,6 +288,7 @@ CREATE TABLE employees (
 ```
 
 #### جدول سجلات البصمة والحضور (`attendances`):
+
 ```sql
 CREATE TABLE attendances (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -297,6 +312,7 @@ CREATE TABLE attendances (
 ```
 
 #### جدول الخصومات والقرارات الإدارية (`deductions`):
+
 ```sql
 CREATE TABLE deductions (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -319,6 +335,7 @@ CREATE TABLE deductions (
 ```
 
 #### جدول مسيرات الرواتب المغلقة شهرياً (`payroll_settlements`):
+
 ```sql
 CREATE TABLE payroll_settlements (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
