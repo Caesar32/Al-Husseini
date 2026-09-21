@@ -529,3 +529,61 @@ class AttendanceObserver
     }
 }
 ```
+
+---
+
+### `app/Observers/PurchaseInvoiceObserver.php`
+يتحكم في توريد شحنات البطاريات للمخازن تلقائياً:
+1. **زيادة رصيد مخزون البطاريات الواردة** فور اعتماد الفاتورة.
+2. **تحديث سعر التكلفة للبطارية** إلى أحدث سعر شراء من المورد.
+3. **تحديث حساب المورد الدائن** وتسجيل حركة استحقاق في دفتر أستاذ المورد (`supplier_ledger_entries`).
+
+```php
+<?php
+
+namespace App\Observers;
+
+use App\Models\PurchaseInvoice;
+use App\Models\SupplierLedgerEntry;
+use Illuminate\Support\Facades\DB;
+
+class PurchaseInvoiceObserver
+{
+    public function created(PurchaseInvoice $invoice): void
+    {
+        DB::transaction(function () use ($invoice) {
+            // 1. زيادة المخزون وتحديث سعر التكلفة
+            foreach ($invoice->items as $item) {
+                $product = $item->product;
+                if ($product) {
+                    $product->increment('current_stock', $item->quantity);
+                    $product->update(['cost_price' => $item->unit_cost_price]);
+                }
+            }
+
+            // 2. تحديث حساب المورد الدائن
+            $supplier = $invoice->supplier;
+            if ($supplier) {
+                $balanceBefore = $supplier->current_balance;
+                $balanceAfter = $balanceBefore + $invoice->remaining_amount;
+
+                $supplier->update(['current_balance' => $balanceAfter]);
+
+                if ($invoice->remaining_amount > 0) {
+                    SupplierLedgerEntry::create([
+                        'supplier_id' => $supplier->id,
+                        'purchase_invoice_id' => $invoice->id,
+                        'entry_type' => 'purchase_invoice',
+                        'amount' => $invoice->remaining_amount,
+                        'balance_before' => $balanceBefore,
+                        'balance_after' => $balanceAfter,
+                        'payment_method' => 'cash',
+                        'paid_by' => $invoice->received_by,
+                        'notes' => "استحقاق آجل لفاتورة توريد رقم {$invoice->invoice_number}",
+                    ]);
+                }
+            }
+        });
+    }
+}
+```

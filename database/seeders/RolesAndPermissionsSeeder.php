@@ -51,6 +51,15 @@ class RolesAndPermissionsSeeder extends Seeder
             'scrap.view',
             'scrap.transfer',
 
+            // إدارة الموردين وفواتير الشراء (Suppliers & Purchases)
+            'suppliers.view',
+            'suppliers.create',
+            'suppliers.edit',
+            'suppliers.delete',
+            'purchases.view',
+            'purchases.create',
+            'purchases.settle_payment',
+
             // الضمانات وخدمات الورشة (Warranties & Workshop Claims)
             'warranties.view',
             'warranties.claim',

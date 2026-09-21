@@ -6,8 +6,10 @@ use Illuminate\Support\ServiceProvider;
 
 use App\Models\Invoice;
 use App\Models\Attendance;
+use App\Models\PurchaseInvoice;
 use App\Observers\InvoiceObserver;
 use App\Observers\AttendanceObserver;
+use App\Observers\PurchaseInvoiceObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -26,5 +28,6 @@ class AppServiceProvider extends ServiceProvider
     {
         Invoice::observe(InvoiceObserver::class);
         Attendance::observe(AttendanceObserver::class);
+        PurchaseInvoice::observe(PurchaseInvoiceObserver::class);
     }
 }
