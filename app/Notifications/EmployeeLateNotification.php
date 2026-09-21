@@ -32,7 +32,7 @@ class EmployeeLateNotification extends Notification
             'time' => now()->toTimeString(),
             'icon' => 'ri-time-line',
             'color' => 'warning',
-            'url' => route('hr.attendance.index'),
+            'url' => route('admin.hr.attendance'),
         ];
     }
 }

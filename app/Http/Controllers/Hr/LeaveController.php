@@ -62,7 +62,7 @@ class LeaveController extends Controller
 
         $leave->update([
             'status' => $request->status,
-            'actioned_by' => auth()->id(),
+            'actioned_by' => \Illuminate\Support\Facades\Auth::id(),
             'action_notes' => $request->action_notes,
         ]);
 

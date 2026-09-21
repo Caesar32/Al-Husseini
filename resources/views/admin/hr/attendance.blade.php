@@ -100,58 +100,30 @@
         animation: pulse-glow 2s infinite;
     }
     @keyframes pulse-glow {
-        0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
-        70% { box-shadow: 0 0 0 15px rgba(16, 185, 129, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        0% { box-shadow: 0 0 0 0 rgba(10, 179, 156, 0.5); }
+        70% { box-shadow: 0 0 0 12px rgba(10, 179, 156, 0); }
+        100% { box-shadow: 0 0 0 0 rgba(10, 179, 156, 0); }
     }
 </style>
 @endsection
 
 @section('content')
-    @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية', 'title' => 'تسجيل بصمة الحضور والانصراف اليومي'])
+    @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية والورشة', 'title' => 'شاشة متابعة حضور وبصمة العمال والفنيين اليومية'])
 
-    <!-- Top Notice Banner for Friendly Clarity -->
-    <div class="row mb-3">
-        <div class="col-12">
-            <div class="alert alert-primary bg-primary-subtle border-0 shadow-sm d-flex flex-wrap align-items-center justify-content-between p-3 rounded-3">
-                <div class="d-flex align-items-center mb-2 mb-md-0">
-                    <div class="avatar-sm me-3 flex-shrink-0">
-                        <span class="avatar-title bg-primary text-white rounded-circle fs-20 shadow-sm">
-                            <i class="ri-user-follow-line"></i>
-                        </span>
-                    </div>
-                    <div>
-                        <h5 class="alert-heading fw-bold mb-1 fs-15 text-primary">مرحباً بك في شاشة متابعة حضور وبصمة فريق مركز البطاريات</h5>
-                        <p class="mb-0 fs-13 text-muted">
-                            يمكنك بنقرة زر واحدة تسجيل حضور أو انصراف أي عامل، أو النقر مباشرة على زر <strong>"حضر الآن"</strong> أمام اسم الموظف بالجدول.
-                        </p>
-                    </div>
-                </div>
-                <div>
-                    <a href="{{ route('admin.hr.reports') }}" class="btn btn-outline-primary btn-sm fw-bold">
-                        <i class="ri-file-chart-line me-1"></i> استعراض التقارير الشهرية واليومية
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Live Shop Station & 1-Click Biometric Punch Bar -->
-    <div class="row mb-4">
-        <!-- Live Clock & Center Shift Status -->
-        <div class="col-xl-4 col-lg-5 mb-3 mb-lg-0">
+    <!-- Top Station: Shop Clock & 1-Click Punch Device -->
+    <div class="row mb-4 g-3 align-items-stretch">
+        <!-- Live Shop Clock -->
+        <div class="col-xl-4 col-lg-5">
             <div class="card shop-clock-card h-100 border-0 mb-0">
-                <div class="card-body p-4 d-flex flex-column justify-content-between text-center text-lg-start">
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
                     <div>
-                        <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="badge bg-success-subtle text-success fs-12 px-3 py-1 fw-bold">
-                                <i class="ri-checkbox-blank-circle-fill me-1 fs-10 text-success"></i> وردية المركز تعمل الآن
-                            </span>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="badge bg-primary text-white fs-11 px-2 py-1"><i class="ri-broadcast-line me-1"></i> مباشر من توقيت القاهرة</span>
                             <span class="text-white-50 fs-12" id="shopLiveDate">اليوم</span>
                         </div>
                         <div class="live-digital-time text-center my-2" id="liveDigitalClock">00:00:00</div>
                         <p class="text-white-50 fs-12 text-center mb-0">
-                            مواعيد فتح معرض وورشة البطاريات: <strong>08:30 ص حتى 06:00 م</strong>
+                            مواعيد عمل مركز وبطاريات الحسيني: <strong>09:00 ص حتى 06:00 م</strong>
                         </p>
                     </div>
                     <div class="pt-3 border-top border-secondary mt-3 d-flex justify-content-between text-white fs-12">
@@ -183,6 +155,11 @@
                             <label class="form-label fw-bold fs-13 text-dark mb-1">اختر الموظف:</label>
                             <select class="form-select form-select-lg border-2 border-primary fw-semibold fs-14" id="quickPunchSelect">
                                 <option value="">-- اضغط هنا لاختيار الموظف --</option>
+                                @foreach($employees as $emp)
+                                    <option value="{{ $emp->id }}" data-name="{{ $emp->full_name }}" data-role="{{ $emp->jobTitle?->title_name }}" data-branch="{{ $emp->branch?->name }}">
+                                        {{ $emp->full_name }} — ({{ $emp->jobTitle?->title_name ?? 'موظف' }})
+                                    </option>
+                                @endforeach
                             </select>
                         </div>
 
@@ -199,10 +176,10 @@
                         </div>
                     </div>
 
-                    <!-- Optional simulation drawer / toggle for custom time testing -->
+                    <!-- Custom time toggle for testing -->
                     <div class="mt-3 pt-2 border-top d-flex justify-content-between align-items-center">
                         <button class="btn btn-link btn-sm text-muted p-0 text-decoration-none fs-12" type="button" data-bs-toggle="collapse" data-bs-target="#customTimeCollapse" aria-expanded="false">
-                            <i class="ri-settings-4-line me-1"></i> تجربة وقت يدوي مخصص (اختياري للاختبار والتجربة)
+                            <i class="ri-settings-4-line me-1"></i> تجربة وقت يدوي مخصص (اختياري للاختبار)
                         </button>
                         <span class="text-muted fs-11">فترة السماح الصباحية: <strong>15 دقيقة</strong></span>
                     </div>
@@ -219,16 +196,16 @@
         </div>
     </div>
 
-    <!-- Big 4 Visual Stat Cards (Clickable to Filter instantly!) -->
+    <!-- Big 4 Visual Stat Cards -->
     <div class="row mb-3">
         <!-- 1. Present On Time -->
         <div class="col-xl-3 col-md-6 mb-3">
-            <div class="card stat-filter-card border-start border-success border-4 shadow-sm mb-0 active-filter" id="card-filter-on_time" onclick="setQuickTabFilter('on_time')">
+            <div class="card stat-filter-card border-start border-success border-4 shadow-sm mb-0 active-filter" id="card-filter-present" onclick="setQuickTabFilter('present')">
                 <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">🟢 حاضرون في الموعد</p>
-                            <h3 class="fs-24 fw-extrabold text-success mb-0" id="statCountOnTime">0</h3>
+                            <h3 class="fs-24 fw-extrabold text-success mb-0" id="statCountOnTime">{{ $stats['present'] ?? 0 }}</h3>
                             <small class="text-muted fs-11">منضبطون في وردية اليوم</small>
                         </div>
                         <div class="avatar-sm">
@@ -248,7 +225,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">🟡 متأخرون عن الوردية</p>
-                            <h3 class="fs-24 fw-extrabold text-warning mb-0" id="statCountLate">0</h3>
+                            <h3 class="fs-24 fw-extrabold text-warning mb-0" id="statCountLate">{{ $stats['late'] ?? 0 }}</h3>
                             <small class="text-muted fs-11">تجاوزوا وقت الحضور</small>
                         </div>
                         <div class="avatar-sm">
@@ -268,7 +245,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">🔴 غائبون / لم يسجلوا بعد</p>
-                            <h3 class="fs-24 fw-extrabold text-danger mb-0" id="statCountAbsent">0</h3>
+                            <h3 class="fs-24 fw-extrabold text-danger mb-0" id="statCountAbsent">{{ $stats['absent'] ?? 0 }}</h3>
                             <small class="text-muted fs-11">لم يثبتوا بصمتهم اليوم</small>
                         </div>
                         <div class="avatar-sm">
@@ -288,8 +265,8 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">🔵 إجمالي فريق المركز</p>
-                            <h3 class="fs-24 fw-extrabold text-primary mb-0" id="statCountTotal">8 موظفين</h3>
-                            <small class="text-success fw-bold fs-11" id="statPunctualityText">نسبة الالتزام: 0%</small>
+                            <h3 class="fs-24 fw-extrabold text-primary mb-0" id="statCountTotal">{{ $stats['total_expected'] ?? count($employees) }} موظف</h3>
+                            <small class="text-success fw-bold fs-11" id="statPunctualityText">نسبة الحضور: 0%</small>
                         </div>
                         <div class="avatar-sm">
                             <span class="avatar-title bg-primary-subtle text-primary rounded-circle fs-20">
@@ -313,28 +290,26 @@
                             <div class="d-flex flex-wrap gap-2 align-items-center">
                                 <span class="fw-bold fs-13 text-muted me-1">عرض السجلات:</span>
                                 <button type="button" class="filter-tab-pill active" id="tab-all" onclick="setQuickTabFilter('all')">
-                                    الكل (<span id="pillCountAll">8</span>)
+                                    الكل (<span id="pillCountAll">{{ count($employees) }}</span>)
                                 </button>
-                                <button type="button" class="filter-tab-pill" id="tab-on_time" onclick="setQuickTabFilter('on_time')">
-                                    🟢 في الموعد (<span id="pillCountOnTime">0</span>)
+                                <button type="button" class="filter-tab-pill" id="tab-present" onclick="setQuickTabFilter('present')">
+                                    🟢 في الموعد (<span id="pillCountOnTime">{{ $stats['present'] ?? 0 }}</span>)
                                 </button>
                                 <button type="button" class="filter-tab-pill" id="tab-late" onclick="setQuickTabFilter('late')">
-                                    🟡 متأخرين (<span id="pillCountLate">0</span>)
+                                    🟡 متأخرين (<span id="pillCountLate">{{ $stats['late'] ?? 0 }}</span>)
                                 </button>
                                 <button type="button" class="filter-tab-pill" id="tab-absent" onclick="setQuickTabFilter('absent')">
-                                    🔴 غياب / لم يسجل (<span id="pillCountAbsent">0</span>)
-                                </button>
-                                <button type="button" class="filter-tab-pill" id="tab-on_leave" onclick="setQuickTabFilter('on_leave')">
-                                    ✈️ إجازات (<span id="pillCountLeave">0</span>)
+                                    🔴 غياب / لم يسجل (<span id="pillCountAbsent">{{ $stats['absent'] ?? 0 }}</span>)
                                 </button>
                             </div>
                         </div>
 
-                        <!-- Search Box -->
-                        <div class="col-lg-4 col-12">
+                        <!-- Date & Search Box -->
+                        <div class="col-lg-5 col-12 d-flex gap-2">
+                            <input type="date" class="form-control" id="attendanceDateFilter" value="{{ $date ?? date('Y-m-d') }}" style="max-width: 160px;">
                             <div class="input-group">
                                 <span class="input-group-text bg-light border-end-0"><i class="ri-search-line text-muted"></i></span>
-                                <input type="text" class="form-control border-start-0" id="searchEmployeeInput" placeholder="ابحث باسم الموظف أو الفني..." oninput="renderTable()">
+                                <input type="text" class="form-control border-start-0" id="searchEmployeeInput" placeholder="ابحث باسم الموظف أو الفني...">
                                 <button class="btn btn-light border" type="button" onclick="clearSearch()" title="مسح البحث">
                                     <i class="ri-close-line"></i>
                                 </button>
@@ -350,7 +325,7 @@
                             <thead class="table-light">
                                 <tr class="text-muted fs-12 text-uppercase">
                                     <th style="min-width: 200px;">الموظف / الفني</th>
-                                    <th>الوظيفة والقسم بالمركز</th>
+                                    <th>الوظيفة والفرع</th>
                                     <th>موعد الوردية الرسمي</th>
                                     <th>وقت البصمة الفعلي</th>
                                     <th>وقت الانصراف</th>
@@ -360,7 +335,7 @@
                                 </tr>
                             </thead>
                             <tbody id="attendanceTableBody">
-                                <!-- Rendered dynamically -->
+                                <!-- Loaded dynamically -->
                             </tbody>
                         </table>
                     </div>
@@ -370,7 +345,7 @@
                 <div class="card-footer bg-light p-3 border-top d-flex flex-wrap justify-content-between align-items-center fs-12 text-muted">
                     <div>
                         <i class="ri-information-line me-1 text-primary"></i> 
-                        <strong>ملاحظة للمدير:</strong> يمكنك الضغط مباشرة على زر <strong>"حضر الآن"</strong> أو <strong>"انصرف الآن"</strong> أمام أي اسم لتحديث سجله فورياً.
+                        <strong>ملاحظة للمدير:</strong> تسجيل البصمة يتم بربط فوري مع قاعدة بيانات وسيرفر الموارد البشرية، ويتم احتساب دقائق التأخير تلقائياً.
                     </div>
                     <div>
                         تم التحديث تلقائياً: <span class="fw-bold text-dark" id="lastUpdatedTime">-</span>
@@ -404,7 +379,9 @@
                     <div class="modal-body p-4">
                         <!-- Target Employee Card -->
                         <div class="p-3 bg-light rounded-3 mb-3 d-flex align-items-center gap-3 border">
-                            <img src="/assets/images/users/avatar-1.jpg" id="quickDedAvatar" class="avatar-sm rounded-circle border" alt="">
+                            <div class="avatar-sm">
+                                <span class="avatar-title bg-primary-subtle text-primary rounded-circle fs-16 fw-bold" id="quickDedAvatarText">م</span>
+                            </div>
                             <div>
                                 <h6 class="fw-bold text-dark mb-0 fs-14" id="quickDedEmployeeName">-</h6>
                                 <span class="badge bg-primary-subtle text-primary fs-11" id="quickDedRole">-</span>
@@ -460,7 +437,6 @@
             </div>
         </div>
     </div>
-
 @endsection
 
 @section('script')
@@ -468,8 +444,12 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', function() {
-    let currentFilterTab = 'all'; // 'all' | 'on_time' | 'late' | 'absent' | 'on_leave'
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const quickDeductionModal = new bootstrap.Modal(document.getElementById('quickDeductionModal'));
+
+    let currentFilterTab = 'all'; // 'all' | 'present' | 'late' | 'absent'
+    let cachedAttendances = [];
+    let allEmployees = @json($employees);
 
     // 1. Live Digital Clock in Cairo Time
     function updateShopClock() {
@@ -485,99 +465,97 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(updateShopClock, 1000);
     updateShopClock();
 
-    // 2. Populate Dropdown for 1-Click Biometric Punch Bar
-    function populateDropdown() {
-        if (!window.AlHusseiniHR) return;
-        const employees = window.AlHusseiniHR.getEmployees();
-        const select = document.getElementById('quickPunchSelect');
-        if (!select) return;
+    // 2. Fetch Attendance Data from Backend
+    function fetchAttendance() {
+        const date = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
 
-        const currentVal = select.value;
-        let html = '<option value="">-- اضغط هنا لاختيار الموظف --</option>';
-
-        employees.forEach(emp => {
-            html += `<option value="${emp.id}">${emp.name} — (${emp.role})</option>`;
-        });
-
-        select.innerHTML = html;
-        if (currentVal) select.value = currentVal;
+        fetch(`/admin/hr/attendance?date=${date}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            cachedAttendances = data.attendances || [];
+            updateStatsUI(data.stats);
+            renderTable();
+            const timeNow = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('lastUpdatedTime').textContent = timeNow;
+        })
+        .catch(err => console.error('Error fetching attendance:', err));
     }
 
-    // 3. Render Attendance Table and Update Stats
+    function updateStatsUI(stats) {
+        if (!stats) return;
+        const present = stats.present || 0;
+        const late = stats.late || 0;
+        const absent = stats.absent || 0;
+        const total = stats.total_expected || allEmployees.length;
+
+        document.getElementById('statCountOnTime').textContent = present;
+        document.getElementById('statCountLate').textContent = late;
+        document.getElementById('statCountAbsent').textContent = absent;
+        document.getElementById('statCountTotal').textContent = `${total} موظف`;
+
+        document.getElementById('pillCountAll').textContent = total;
+        document.getElementById('pillCountOnTime').textContent = present;
+        document.getElementById('pillCountLate').textContent = late;
+        document.getElementById('pillCountAbsent').textContent = absent;
+
+        const attended = present + late;
+        const punctuality = total > 0 ? Math.round((present / total) * 100) : 0;
+        document.getElementById('statPunctualityText').textContent = `نسبة الانضباط: ${punctuality}% (${attended}/${total} حضروا)`;
+    }
+
+    // 3. Render Table Rows
     window.renderTable = function() {
-        if (!window.AlHusseiniHR) return;
-
-        const employees = window.AlHusseiniHR.getEmployees();
-        const todayAttendance = window.AlHusseiniHR.getAttendance();
         const searchVal = (document.getElementById('searchEmployeeInput')?.value || '').trim().toLowerCase();
-
-        let countOnTime = 0;
-        let countLate = 0;
-        let countAbsent = 0;
-        let countLeave = 0;
-
         const tbody = document.getElementById('attendanceTableBody');
         if (!tbody) return;
 
         let rowsHtml = '';
 
-        employees.forEach(emp => {
-            const att = todayAttendance.find(a => a.employeeId === emp.id);
+        allEmployees.forEach(emp => {
+            const att = cachedAttendances.find(a => a.employee_id === emp.id);
 
-            let status = 'absent';
-            let punchIn = '-';
-            let punchOut = '-';
-            let lateness = 0;
-
-            if (emp.status === 'on_leave') {
-                status = 'on_leave';
-                countLeave++;
-            } else if (att) {
-                status = att.status || (att.punchIn ? 'on_time' : 'absent');
-                punchIn = att.punchIn ? `${att.punchIn}` : '-';
-                punchOut = att.punchOut ? `${att.punchOut}` : '-';
-                lateness = att.latenessMinutes || 0;
-
-                if (status === 'on_time') countOnTime++;
-                else if (status === 'late') countLate++;
-                else countAbsent++;
-            } else {
-                countAbsent++;
-            }
+            let status = att ? att.status : 'absent';
+            let punchIn = att?.check_in_time ? att.check_in_time.substring(11, 16) : '-';
+            let punchOut = att?.check_out_time ? att.check_out_time.substring(11, 16) : '-';
+            let lateness = att?.lateness_minutes || 0;
 
             // Status Filter Tab Check
-            if (currentFilterTab !== 'all' && status !== currentFilterTab) {
-                return;
+            if (currentFilterTab !== 'all') {
+                if (currentFilterTab === 'present' && status !== 'present') return;
+                if (currentFilterTab === 'late' && status !== 'late') return;
+                if (currentFilterTab === 'absent' && status !== 'absent') return;
             }
 
-            // Search Keyword Check
+            // Search Filter
             if (searchVal) {
-                const matchName = emp.name.toLowerCase().includes(searchVal);
-                const matchRole = emp.role.toLowerCase().includes(searchVal);
-                const matchDept = emp.department.toLowerCase().includes(searchVal);
-                const matchId = emp.id.toLowerCase().includes(searchVal);
-                if (!matchName && !matchRole && !matchDept && !matchId) {
-                    return;
-                }
+                const matchName = (emp.full_name || '').toLowerCase().includes(searchVal);
+                const matchCode = (emp.employee_code || '').toLowerCase().includes(searchVal);
+                const matchRole = (emp.job_title?.title_name || '').toLowerCase().includes(searchVal);
+                if (!matchName && !matchCode && !matchRole) return;
             }
 
-            // Visual Status Badges & Text
+            // Badges
             let statusBadge = '';
             let latenessBadge = '<span class="text-muted fs-12">-</span>';
             let directActionBtn = '';
 
-            if (status === 'on_time') {
+            if (status === 'present') {
                 statusBadge = '<span class="badge bg-success text-white fs-12 px-3 py-1 fw-bold shadow-sm"><i class="ri-checkbox-circle-line me-1"></i>حاضر في الموعد</span>';
-                latenessBadge = '<span class="badge bg-success-subtle text-success fs-11 fw-bold">منضبط (0 دقيقة)</span>';
+                latenessBadge = '<span class="badge bg-success-subtle text-success fs-11 fw-bold">منضبط (0 د)</span>';
 
                 if (punchOut === '-') {
                     directActionBtn = `
-                        <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'out')">
+                        <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'check_out')">
                             <i class="ri-logout-box-r-line"></i> تسجيل انصراف الآن
                         </button>
                     `;
                 } else {
-                    directActionBtn = `<span class="badge bg-light text-muted border px-2 py-1 fs-12"><i class="ri-check-double-line text-success me-1"></i>أتم وريديته وانصرف</span>`;
+                    directActionBtn = `<span class="badge bg-light text-muted border px-2 py-1 fs-12"><i class="ri-check-double-line text-success me-1"></i>أتم الوردية وانصرف</span>`;
                 }
             } else if (status === 'late') {
                 statusBadge = '<span class="badge bg-warning text-dark fs-12 px-3 py-1 fw-bold shadow-sm"><i class="ri-alarm-warning-line me-1"></i>متأخر</span>';
@@ -586,7 +564,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 directActionBtn = `
                     <div class="d-inline-flex gap-1">
                         ${punchOut === '-' ? `
-                            <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'out')" title="تسجيل انصراف">
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'check_out')" title="تسجيل انصراف">
                                 <i class="ri-logout-box-r-line"></i> انصراف
                             </button>
                         ` : ''}
@@ -595,17 +573,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         </button>
                     </div>
                 `;
-            } else if (status === 'on_leave') {
-                statusBadge = '<span class="badge bg-info-subtle text-info fs-12 px-3 py-1 fw-bold"><i class="ri-flight-takeoff-line me-1"></i>إجازة رسمية / مرضية</span>';
-                latenessBadge = '<span class="text-muted fs-11">معتمد بإذن</span>';
+            } else if (emp.status === 'on_leave') {
+                statusBadge = '<span class="badge bg-info-subtle text-info fs-12 px-3 py-1 fw-bold"><i class="ri-flight-takeoff-line me-1"></i>إجازة رسمية</span>';
+                latenessBadge = '<span class="text-muted fs-11">إجازة معتمدة</span>';
                 directActionBtn = `<span class="badge bg-light text-muted border px-2 py-1 fs-12">لا توجد إجراءات</span>`;
             } else {
-                statusBadge = '<span class="badge bg-danger-subtle text-danger fs-12 px-3 py-1 fw-bold"><i class="ri-close-circle-line me-1"></i>لم يسجل بصمته بعد</span>';
+                statusBadge = '<span class="badge bg-danger-subtle text-danger fs-12 px-3 py-1 fw-bold"><i class="ri-close-circle-line me-1"></i>لم يسجل بصمته</span>';
                 latenessBadge = '<span class="text-danger fw-bold fs-11">غير حاضر بالمركز</span>';
 
                 directActionBtn = `
                     <div class="d-inline-flex gap-1">
-                        <button type="button" class="btn btn-sm btn-success btn-punch-action" onclick="punchDirect('${emp.id}', 'in')">
+                        <button type="button" class="btn btn-sm btn-success btn-punch-action" onclick="punchDirect('${emp.id}', 'check_in')">
                             <i class="ri-fingerprint-line"></i> حضر الآن
                         </button>
                         <button type="button" class="btn btn-sm btn-soft-danger btn-punch-action" onclick="openDeductionModal('${emp.id}')" title="خصم غياب">
@@ -615,27 +593,31 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
             }
 
-            const punchInDisplay = punchIn !== '-' ? `<span class="fw-bold fs-13 font-monospace text-success">${punchIn} ص</span>` : '<span class="text-muted fs-12">لم يسجل</span>';
-            const punchOutDisplay = punchOut !== '-' ? `<span class="fw-bold fs-13 font-monospace text-primary">${punchOut} م</span>` : '<span class="text-muted fs-12">-</span>';
+            const punchInDisplay = punchIn !== '-' ? `<span class="fw-bold fs-13 font-monospace text-success">${punchIn}</span>` : '<span class="text-muted fs-12">لم يسجل</span>';
+            const punchOutDisplay = punchOut !== '-' ? `<span class="fw-bold fs-13 font-monospace text-primary">${punchOut}</span>` : '<span class="text-muted fs-12">-</span>';
 
             rowsHtml += `
                 <tr>
                     <td>
                         <div class="d-flex align-items-center">
-                            <img src="${emp.avatar || '/assets/images/users/avatar-1.jpg'}" alt="" class="avatar-sm rounded-circle me-3 border shadow-sm">
+                            <div class="avatar-xs me-2">
+                                <span class="avatar-title bg-primary-subtle text-primary rounded-circle fw-bold">
+                                    ${emp.full_name.charAt(0)}
+                                </span>
+                            </div>
                             <div>
-                                <h6 class="mb-0 fs-14 fw-bold text-dark">${emp.name}</h6>
-                                <span class="badge bg-light text-secondary font-monospace fs-11">كود: ${emp.id}</span>
+                                <h6 class="mb-0 fs-14 fw-bold text-dark">${emp.full_name}</h6>
+                                <span class="badge bg-light text-secondary font-monospace fs-11">${emp.employee_code}</span>
                             </div>
                         </div>
                     </td>
                     <td>
-                        <span class="fw-bold fs-13 text-dark d-block">${emp.role}</span>
-                        <span class="text-muted fs-11"><i class="ri-tools-line me-1"></i>${emp.department}</span>
+                        <span class="fw-bold fs-13 text-dark d-block">${emp.job_title?.title_name || 'فني'}</span>
+                        <span class="text-muted fs-11"><i class="ri-tools-line me-1"></i>${emp.branch?.name || 'الفرع الرئيسي'}</span>
                     </td>
                     <td>
                         <span class="badge bg-light text-dark border fs-12 px-2 py-1">
-                            ${emp.startTime || '09:00'} ص - ${emp.endTime || '18:00'} م
+                            ${emp.shift_start_time ? emp.shift_start_time.substring(0, 5) : '09:00'} - ${emp.shift_end_time ? emp.shift_end_time.substring(0, 5) : '17:00'}
                         </span>
                     </td>
                     <td>${punchInDisplay}</td>
@@ -647,55 +629,26 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         });
 
-        tbody.innerHTML = rowsHtml || `<tr><td colspan="8" class="text-center py-5 text-muted fs-14"><i class="ri-user-search-line fs-24 d-block mb-1"></i>لا توجد نتائج مطابقة لبحثك في هذا القسم</td></tr>`;
-
-        // Update Top Stat Numbers
-        document.getElementById('statCountOnTime').textContent = `${countOnTime} موظف`;
-        document.getElementById('statCountLate').textContent = `${countLate} متأخر`;
-        document.getElementById('statCountAbsent').textContent = `${countAbsent} غائب`;
-        document.getElementById('statCountTotal').textContent = `${employees.length} موظف بالمركز`;
-
-        // Update Pill Badges
-        document.getElementById('pillCountAll').textContent = employees.length;
-        document.getElementById('pillCountOnTime').textContent = countOnTime;
-        document.getElementById('pillCountLate').textContent = countLate;
-        document.getElementById('pillCountAbsent').textContent = countAbsent;
-        document.getElementById('pillCountLeave').textContent = countLeave;
-
-        const totalActive = countOnTime + countLate;
-        const punctualityRate = totalActive > 0 ? Math.round((countOnTime / totalActive) * 100) : 0;
-        document.getElementById('statPunctualityText').textContent = `نسبة الالتزام بالموعد: ${punctualityRate}%`;
-
-        // Update Last Updated Timestamp
-        const now = new Date();
-        document.getElementById('lastUpdatedTime').textContent = now.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        tbody.innerHTML = rowsHtml || `<tr><td colspan="8" class="text-center py-5 text-muted fs-14"><i class="ri-user-search-line fs-24 d-block mb-1"></i>لا توجد نتائج مطابقة لبحثك</td></tr>`;
     };
 
-    // 4. Easy Quick Filter Tab Switcher
+    // 4. Quick Tab Filtering
     window.setQuickTabFilter = function(tabName) {
         currentFilterTab = tabName;
 
-        // Sync pills
-        ['all', 'on_time', 'late', 'absent', 'on_leave'].forEach(tab => {
-            const pill = document.getElementById(`tab-${tab}`);
-            if (pill) {
-                if (tab === tabName) pill.classList.add('active');
-                else pill.classList.remove('active');
-            }
-        });
+        // update tabs
+        document.querySelectorAll('.filter-tab-pill').forEach(btn => btn.classList.remove('active'));
+        const activeTabEl = document.getElementById(`tab-${tabName}`);
+        if (activeTabEl) activeTabEl.classList.add('active');
 
-        // Sync top stat cards visual active state
-        ['on_time', 'late', 'absent', 'all'].forEach(c => {
-            const card = document.getElementById(`card-filter-${c}`);
-            if (card) {
-                card.classList.remove('active-filter', 'active-filter-warning', 'active-filter-danger');
-                if (c === tabName) {
-                    if (c === 'late') card.classList.add('active-filter-warning');
-                    else if (c === 'absent') card.classList.add('active-filter-danger');
-                    else card.classList.add('active-filter');
-                }
-            }
-        });
+        // update cards
+        document.querySelectorAll('.stat-filter-card').forEach(card => card.classList.remove('active-filter', 'active-filter-warning', 'active-filter-danger'));
+        const activeCard = document.getElementById(`card-filter-${tabName}`);
+        if (activeCard) {
+            if (tabName === 'late') activeCard.classList.add('active-filter-warning');
+            else if (tabName === 'absent') activeCard.classList.add('active-filter-danger');
+            else activeCard.classList.add('active-filter');
+        }
 
         renderTable();
     };
@@ -708,7 +661,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     };
 
-    // 5. Punch Animation & Sensor Effect
+    // 5. Sensor Animation
     function animatePunchSensor() {
         const sensor = document.getElementById('punchSensorAvatar');
         if (!sensor) return;
@@ -720,25 +673,56 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 500);
     }
 
-    // 6. Direct 1-Click Punch In or Out from Table or Bar
+    // 6. Punch Direct
     window.punchDirect = function(employeeId, type) {
-        if (!window.AlHusseiniHR) return;
         animatePunchSensor();
 
-        const customTime = document.getElementById('customSimTime')?.value || null;
-        const result = window.AlHusseiniHR.recordPunch(employeeId, type, customTime);
+        const selectedDate = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
+        const customTime = document.getElementById('customSimTime')?.value;
+        let punchTimestamp;
 
-        if (result.success) {
-            if (type === 'in') {
-                if (result.isLate) {
+        if (customTime) {
+            punchTimestamp = `${selectedDate} ${customTime}:00`;
+        } else {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            punchTimestamp = `${selectedDate} ${hours}:${minutes}:${seconds}`;
+        }
+
+        fetch('/admin/hr/attendance/punch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                employee_id: employeeId,
+                timestamp: punchTimestamp,
+                punch_state: type
+            })
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'تعذر تسجيل حركة البصمة.');
+            return data;
+        })
+        .then(data => {
+            const att = data.attendance;
+            const empName = att?.employee?.full_name || 'الموظف';
+
+            if (type === 'check_in') {
+                if (att.status === 'late') {
                     Swal.fire({
                         icon: 'warning',
                         title: '⚠️ تم تسجيل الحضور بتأخير!',
                         html: `
                             <div class="text-start fs-13">
-                                <p class="mb-1">الموظف: <strong class="text-dark">${result.employee.name}</strong> (${result.employee.role})</p>
-                                <p class="mb-1">وقت البصمة: <strong class="text-primary font-monospace">${result.time} ص</strong></p>
-                                <p class="mb-2 text-danger fw-bold fs-14">مدة التأخير: ${result.latenessMinutes} دقيقة عن موعد الوردية (${result.employee.startTime})</p>
+                                <p class="mb-1">الموظف: <strong class="text-dark">${empName}</strong></p>
+                                <p class="mb-1">وقت البصمة: <strong class="text-primary font-monospace">${att.check_in_time}</strong></p>
+                                <p class="mb-2 text-danger fw-bold fs-14">مدة التأخير: ${att.lateness_minutes} دقيقة</p>
                                 <hr class="my-2">
                                 <p class="mb-0 text-muted fs-12">هل تريد تطبيق خصم إداري فوري على هذا الموظف الآن؟</p>
                             </div>
@@ -757,27 +741,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     Swal.fire({
                         icon: 'success',
                         title: '✅ تم تسجيل الحضور في الموعد!',
-                        html: `تم تسجيل بصمة الفني <strong>${result.employee.name}</strong> في تمام الساعة <strong>${result.time}</strong> بنجاح. منضبط وممتاز!`,
-                        timer: 3000,
-                        timerProgressBar: true,
-                        confirmButtonText: 'حسناً',
-                        confirmButtonColor: '#198754'
+                        html: `تم تسجيل بصمة <strong>${empName}</strong> بنجاح. حضور منضبط وممتاز!`,
+                        timer: 2500,
+                        timerProgressBar: true
                     });
                 }
             } else {
                 Swal.fire({
                     icon: 'info',
                     title: '👋 تم تسجيل بصمة الانصراف',
-                    html: `تم تسجيل انصراف الموظف <strong>${result.employee.name}</strong> في تمام الساعة <strong>${result.time}</strong>. بالسلامة والتوفيق!`,
-                    timer: 3000,
-                    timerProgressBar: true,
-                    confirmButtonText: 'حسناً',
-                    confirmButtonColor: '#0d6efd'
+                    html: `تم تسجيل انصراف <strong>${empName}</strong> في تمام <strong>${att.check_out_time}</strong>. بالسلامة والتوفيق!`,
+                    timer: 2500,
+                    timerProgressBar: true
                 });
             }
 
-            renderTable();
-        }
+            fetchAttendance();
+        })
+        .catch(err => {
+            Swal.fire({
+                icon: 'error',
+                title: 'تعذر التسجيل',
+                text: err.message
+            });
+        });
     };
 
     // Quick Punch Bar Event Handlers
@@ -787,7 +774,7 @@ document.addEventListener('DOMContentLoaded', function() {
             Swal.fire('اختر الموظف أولاً', 'يرجى اختيار اسم الموظف من القائمة أولاً لتسجيل بصمة الحضور.', 'warning');
             return;
         }
-        punchDirect(empId, 'in');
+        punchDirect(empId, 'check_in');
     };
 
     document.getElementById('btnQuickOut').onclick = function() {
@@ -796,23 +783,21 @@ document.addEventListener('DOMContentLoaded', function() {
             Swal.fire('اختر الموظف أولاً', 'يرجى اختيار اسم الموظف من القائمة أولاً لتسجيل بصمة الانصراف.', 'warning');
             return;
         }
-        punchDirect(empId, 'out');
+        punchDirect(empId, 'check_out');
     };
 
     // 7. Quick Deduction Management
     window.openDeductionModal = function(employeeId) {
-        if (!window.AlHusseiniHR) return;
-        const emp = window.AlHusseiniHR.getEmployeeById(employeeId);
+        const emp = allEmployees.find(e => e.id == employeeId);
         if (!emp) return;
 
-        const allAtt = window.AlHusseiniHR.getAttendance();
-        const empAtt = allAtt.find(a => a.employeeId === employeeId);
-        const lateness = empAtt?.latenessMinutes || 0;
+        const att = cachedAttendances.find(a => a.employee_id == employeeId);
+        const lateness = att?.lateness_minutes || 0;
 
         document.getElementById('quickDedEmployeeId').value = emp.id;
-        document.getElementById('quickDedEmployeeName').textContent = emp.name;
-        document.getElementById('quickDedRole').textContent = `${emp.role} - ${emp.department}`;
-        document.getElementById('quickDedAvatar').src = emp.avatar || '/assets/images/users/avatar-1.jpg';
+        document.getElementById('quickDedEmployeeName').textContent = emp.full_name;
+        document.getElementById('quickDedRole').textContent = `${emp.job_title?.title_name || 'موظف'} - ${emp.branch?.name || ''}`;
+        document.getElementById('quickDedAvatarText').textContent = emp.full_name.charAt(0);
 
         const latenessInfoEl = document.getElementById('quickDedLatenessInfo');
         if (lateness > 0) {
@@ -821,7 +806,6 @@ document.addEventListener('DOMContentLoaded', function() {
             latenessInfoEl.innerHTML = `<span class="badge bg-warning-subtle text-warning">غير حاضر اليوم</span>`;
         }
 
-        // Suggest amount based on lateness
         let defaultAmount = 250;
         if (lateness > 60) defaultAmount = 450;
         else if (lateness > 30) defaultAmount = 300;
@@ -840,34 +824,52 @@ document.addEventListener('DOMContentLoaded', function() {
         const amount = Number(document.getElementById('quickDedAmount').value);
         const reason = document.getElementById('quickDedReason').value;
         const notes = document.getElementById('quickDedNotes').value;
+        const date = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
 
-        window.AlHusseiniHR.addDeduction({
-            employeeId: empId,
-            amount: amount,
-            reason: reason,
-            managerNotes: notes
+        fetch('/admin/hr/deductions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                employee_id: empId,
+                amount: amount,
+                reason: notes ? `${reason} - ${notes}` : reason,
+                deduction_date: date
+            })
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'تعذر اعتماد الجزاء.');
+            return data;
+        })
+        .then(data => {
+            quickDeductionModal.hide();
+            Swal.fire({
+                icon: 'success',
+                title: 'تم اعتماد الخصم فورياً!',
+                html: `تم اعتماد خصم مبلغ <strong>${amount} ج.م</strong> وإدراجه في كشف مسير الرواتب.`,
+                confirmButtonText: 'ممتاز'
+            });
+            fetchAttendance();
+        })
+        .catch(err => {
+            Swal.fire({
+                icon: 'error',
+                title: 'خطأ',
+                text: err.message
+            });
         });
-
-        quickDeductionModal.hide();
-        Swal.fire({
-            icon: 'success',
-            title: 'تم اعتماد الخصم فورياً!',
-            html: `تم اعتماد خصم مبلغ <strong>${amount} ج.م</strong> وتحديث مسير الرواتب تلقائياً.`,
-            confirmButtonText: 'ممتاز'
-        });
-
-        renderTable();
     };
 
-    // Initial Loading
-    populateDropdown();
-    renderTable();
+    // Date filter change
+    document.getElementById('attendanceDateFilter').addEventListener('change', fetchAttendance);
+    document.getElementById('searchEmployeeInput').addEventListener('input', renderTable);
 
-    // Listen for cross-window / global updates
-    window.addEventListener('alhusseini-hr-updated', function() {
-        populateDropdown();
-        renderTable();
-    });
+    // Initial Load
+    fetchAttendance();
 });
 </script>
 @endsection

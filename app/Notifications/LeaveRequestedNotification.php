@@ -30,7 +30,7 @@ class LeaveRequestedNotification extends Notification
             'time' => now()->toTimeString(),
             'icon' => 'ri-calendar-event-line',
             'color' => 'info',
-            'url' => route('hr.leaves.index'),
+            'url' => route('admin.hr.leaves.index'),
         ];
     }
 }

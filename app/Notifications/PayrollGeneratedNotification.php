@@ -29,7 +29,7 @@ class PayrollGeneratedNotification extends Notification
             'time' => now()->toTimeString(),
             'icon' => 'ri-wallet-3-line',
             'color' => 'success',
-            'url' => route('hr.payroll.show', $this->payroll->id),
+            'url' => route('admin.hr.payroll.show', $this->payroll->id),
         ];
     }
 }

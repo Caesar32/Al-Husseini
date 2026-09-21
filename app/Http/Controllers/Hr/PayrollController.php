@@ -18,19 +18,26 @@ class PayrollController extends Controller
     public function index(Request $request): View|JsonResponse
     {
         $branches = Branch::where('is_active', true)->get();
-        $query = Payroll::with(['branch', 'approvedBy'])->latest();
+        $employees = \App\Models\Employee::active()->with(['branch', 'jobTitle.department', 'currentSalary'])->get();
+        $recentDeductions = \App\Models\EmployeeDeduction::with(['employee', 'approvedByUser'])->latest()->take(20)->get();
+
+        $query = Payroll::with(['branch', 'approvedBy', 'items.employee.jobTitle'])->latest();
 
         if ($request->filled('branch_id')) {
             $query->where('branch_id', $request->branch_id);
         }
 
         $payrolls = $query->paginate(15);
+        $latestPayroll = (clone $query)->first();
 
         if ($request->wantsJson()) {
-            return response()->json($payrolls);
+            return response()->json([
+                'payrolls' => $payrolls,
+                'latest_payroll' => $latestPayroll,
+            ]);
         }
 
-        return view('admin.hr.payroll', compact('payrolls', 'branches'));
+        return view('admin.hr.payroll', compact('payrolls', 'branches', 'employees', 'recentDeductions', 'latestPayroll'));
     }
 
     public function generate(GeneratePayrollRequest $request): JsonResponse
@@ -69,7 +76,7 @@ class PayrollController extends Controller
     public function approve(Payroll $payroll): JsonResponse
     {
         try {
-            $this->payrollService->approvePayroll($payroll, auth()->id());
+            $this->payrollService->approvePayroll($payroll, \Illuminate\Support\Facades\Auth::id());
 
             return response()->json([
                 'success' => true,

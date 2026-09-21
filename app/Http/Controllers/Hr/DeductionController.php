@@ -28,7 +28,7 @@ class DeductionController extends Controller
             'deduction_date' => $request->deduction_date,
             'amount' => $request->amount,
             'reason' => $request->reason,
-            'approved_by' => auth()->id(),
+            'approved_by' => \Illuminate\Support\Facades\Auth::id(),
             'status' => 'approved',
         ]);
 
@@ -47,7 +47,7 @@ class DeductionController extends Controller
 
         $deduction->update([
             'status' => $request->status,
-            'approved_by' => auth()->id(),
+            'approved_by' => \Illuminate\Support\Facades\Auth::id(),
         ]);
 
         return response()->json([

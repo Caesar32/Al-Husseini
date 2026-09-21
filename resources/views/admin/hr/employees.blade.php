@@ -13,7 +13,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <p class="text-uppercase fw-semibold text-muted text-truncate mb-0">إجمالي الموظفين</p>
-                            <h4 class="fs-22 fw-bold ff-secondary mb-0 mt-2" id="stat-total-employees">0</h4>
+                            <h4 class="fs-22 fw-bold ff-secondary mb-0 mt-2" id="stat-total-employees">{{ $stats['total'] ?? 0 }}</h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm flex-shrink-0">
@@ -33,7 +33,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <p class="text-uppercase fw-semibold text-muted text-truncate mb-0">على رأس العمل</p>
-                            <h4 class="fs-22 fw-bold ff-secondary text-success mb-0 mt-2" id="stat-active-employees">0</h4>
+                            <h4 class="fs-22 fw-bold ff-secondary text-success mb-0 mt-2" id="stat-active-employees">{{ $stats['active'] ?? 0 }}</h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm flex-shrink-0">
@@ -53,7 +53,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <p class="text-uppercase fw-semibold text-muted text-truncate mb-0">في إجازة رسمية</p>
-                            <h4 class="fs-22 fw-bold ff-secondary text-warning mb-0 mt-2" id="stat-leave-employees">0</h4>
+                            <h4 class="fs-22 fw-bold ff-secondary text-warning mb-0 mt-2" id="stat-leave-employees">{{ $stats['on_leave'] ?? 0 }}</h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm flex-shrink-0">
@@ -73,7 +73,7 @@
                     <div class="d-flex align-items-center">
                         <div class="flex-grow-1 overflow-hidden">
                             <p class="text-uppercase fw-semibold text-muted text-truncate mb-0">متوسط الرواتب الأساسية</p>
-                            <h4 class="fs-20 fw-bold ff-secondary text-info mb-0 mt-2" id="stat-avg-salary">0 ج.م</h4>
+                            <h4 class="fs-20 fw-bold ff-secondary text-info mb-0 mt-2" id="stat-avg-salary">{{ number_format($stats['avg_salary'] ?? 0) }} ج.م</h4>
                         </div>
                         <div class="flex-shrink-0">
                             <div class="avatar-sm flex-shrink-0">
@@ -96,31 +96,37 @@
                     <div class="row g-3 align-items-center">
                         <div class="col-lg-4 col-md-6">
                             <div class="search-box">
-                                <input type="text" class="form-control" id="searchEmployeeInput" placeholder="بحث بالاسم أو الرقم الوظيفي أو الوظيفة...">
+                                <input type="text" class="form-control" id="searchEmployeeInput" placeholder="بحث بالاسم أو الكود أو رقم الهاتف...">
                                 <i class="ri-search-line search-icon"></i>
                             </div>
                         </div>
 
                         <div class="col-lg-3 col-md-6">
-                            <select class="form-select" id="departmentFilter">
-                                <option value="all">جميع أقسام المركز</option>
-                                <option value="المبيعات والمعرض">المبيعات والمعرض (صالة البيع)</option>
-                                <option value="ورشة الصيانة والشحن">ورشة الصيانة والشحن والإصلاح</option>
-                                <option value="فنيو التركيب والكهرباء">فنيو التركيب والكهرباء</option>
-                                <option value="خدمة الطوارئ والإنقاذ المتنقل">خدمة الطوارئ والإنقاذ المتنقل</option>
-                                <option value="المخازن وسلاسل الإمداد">المخازن والبطاريات المسترجعة</option>
-                                <option value="الإدارة والإشراف">الإدارة والإشراف</option>
+                            <select class="form-select" id="branchFilter">
+                                <option value="">جميع فروع المركز</option>
+                                @foreach($branches as $branch)
+                                    <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                @endforeach
                             </select>
                         </div>
 
-                        <div class="col-lg-5 col-md-12 text-md-end">
+                        <div class="col-lg-2 col-md-6">
+                            <select class="form-select" id="statusFilter">
+                                <option value="">جميع الحالات</option>
+                                <option value="active">على رأس العمل</option>
+                                <option value="on_leave">في إجازة</option>
+                                <option value="suspended">موقوف</option>
+                            </select>
+                        </div>
+
+                        <div class="col-lg-3 col-md-6 text-md-end">
                             <div class="d-flex gap-2 justify-content-lg-end">
                                 <div class="btn-group" role="group">
                                     <button type="button" class="btn btn-outline-primary active" id="viewTableBtn" title="عرض جدول"><i class="ri-list-check"></i></button>
                                     <button type="button" class="btn btn-outline-primary" id="viewGridBtn" title="عرض بطاقات"><i class="ri-grid-fill"></i></button>
                                 </div>
                                 <button type="button" class="btn btn-success" id="btnAddEmployee">
-                                    <i class="ri-user-add-line align-bottom me-1"></i> إضافة موظف جديد
+                                    <i class="ri-user-add-line align-bottom me-1"></i> إضافة موظف
                                 </button>
                             </div>
                         </div>
@@ -140,8 +146,8 @@
                             <thead class="table-light">
                                 <tr>
                                     <th scope="col">الموظف</th>
-                                    <th scope="col">الرقم الوظيفي</th>
-                                    <th scope="col">القسم والوظيفة</th>
+                                    <th scope="col">الفرع</th>
+                                    <th scope="col">القسم والمسمى الوظيفي</th>
                                     <th scope="col">مواعيد العمل الرسمية</th>
                                     <th scope="col">الراتب الأساسي</th>
                                     <th scope="col">الحالة</th>
@@ -149,9 +155,12 @@
                                 </tr>
                             </thead>
                             <tbody id="employeesTableBody">
-                                <!-- Rendered dynamically -->
+                                <!-- Loaded dynamically -->
                             </tbody>
                         </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-3" id="paginationContainer">
+                        <!-- Pagination controls -->
                     </div>
                 </div>
             </div>
@@ -160,16 +169,16 @@
 
     <!-- Grid View Container -->
     <div class="row d-none" id="gridViewContainer">
-        <!-- Rendered dynamically -->
+        <!-- Loaded dynamically -->
     </div>
 
     <!-- Modal: Add/Edit Employee -->
     <div class="modal fade" id="employeeModal" tabindex="-1" aria-labelledby="employeeModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0">
-                <div class="modal-header p-3 bg-primary-subtle">
-                    <h5 class="modal-title fw-bold text-primary" id="employeeModalLabel">إضافة موظف جديد</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header p-3 bg-primary text-white">
+                    <h5 class="modal-title fw-bold text-white" id="employeeModalLabel">إضافة موظف جديد</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="employeeForm">
                     <input type="hidden" id="employeeId">
@@ -177,27 +186,52 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="empName" class="form-label fw-semibold">اسم الموظف بالكامل <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="empName" required placeholder="مثال: حسام علي إبراهيم">
+                                <input type="text" class="form-control" id="empName" required placeholder="مثال: محمود أحمد الحسيني">
                             </div>
 
-                            <div class="col-md-6">
-                                <label for="empRole" class="form-label fw-semibold">المسمى الوظيفي <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="empRole" required placeholder="مثال: فني صيانة بطاريات / مسؤول صالة بيع">
+                            <div class="col-md-3">
+                                <label for="empCode" class="form-label fw-semibold">كود الموظف <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control font-monospace" id="empCode" required placeholder="EMP-1001">
                             </div>
 
-                            <div class="col-md-6">
-                                <label for="empDepartment" class="form-label fw-semibold">القسم / ورشة المركز <span class="text-danger">*</span></label>
-                                <select class="form-select" id="empDepartment" required>
-                                    <option value="المبيعات والمعرض">المبيعات والمعرض (صالة البيع)</option>
-                                    <option value="ورشة الصيانة والشحن">ورشة الصيانة والشحن والإصلاح</option>
-                                    <option value="فنيو التركيب والكهرباء">فنيو التركيب والكهرباء</option>
-                                    <option value="خدمة الطوارئ والإنقاذ المتنقل">خدمة الطوارئ والإنقاذ المتنقل</option>
-                                    <option value="المخازن وسلاسل الإمداد">المخازن والبطاريات المسترجعة</option>
-                                    <option value="الإدارة والإشراف">الإدارة والإشراف</option>
+                            <div class="col-md-3">
+                                <label for="empBranch" class="form-label fw-semibold">الفرع التابع له <span class="text-danger">*</span></label>
+                                <select class="form-select" id="empBranch" required>
+                                    @foreach($branches as $branch)
+                                        <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                    @endforeach
                                 </select>
                             </div>
 
                             <div class="col-md-6">
+                                <label for="empJobTitle" class="form-label fw-semibold">المسمى الوظيفي والقسم <span class="text-danger">*</span></label>
+                                <select class="form-select" id="empJobTitle" required>
+                                    @foreach($departments as $dept)
+                                        <optgroup label="{{ $dept->name }}">
+                                            @foreach($dept->jobTitles as $jt)
+                                                <option value="{{ $jt->id }}">{{ $jt->title_name }}</option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="empNationalId" class="form-label fw-semibold">الرقم القومي (14 رقم) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control font-monospace" id="empNationalId" required maxlength="14" placeholder="29501011234567">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="empPhone" class="form-label fw-semibold">رقم الهاتف للتواصل <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control font-monospace" id="empPhone" required placeholder="01012345678">
+                            </div>
+
+                            <div class="col-md-3">
+                                <label for="empHireDate" class="form-label fw-semibold">تاريخ التعيين <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" id="empHireDate" required value="{{ date('Y-m-d') }}">
+                            </div>
+
+                            <div class="col-md-3">
                                 <label for="empStatus" class="form-label fw-semibold">الحالة الوظيفية</label>
                                 <select class="form-select" id="empStatus">
                                     <option value="active">على رأس العمل (نشط)</option>
@@ -206,44 +240,53 @@
                                 </select>
                             </div>
 
-                            <div class="col-md-6">
-                                <label for="empEmail" class="form-label fw-semibold">البريد الإلكتروني <span class="text-danger">*</span></label>
-                                <input type="email" class="form-control" id="empEmail" required placeholder="user@alhusseini.com">
-                            </div>
+                            <div class="col-12"><hr class="my-2 text-muted"></div>
 
-                            <div class="col-md-6">
-                                <label for="empPhone" class="form-label fw-semibold">رقم الهاتف <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="empPhone" required placeholder="+20 100 000 0000">
-                            </div>
-
-                            <div class="col-12"><hr class="my-2"></div>
-
-                            <div class="col-md-6">
-                                <label for="empStartTime" class="form-label fw-semibold">موعد الحضور الرسمي <span class="text-danger">*</span></label>
+                            <div class="col-md-4">
+                                <label for="empStartTime" class="form-label fw-semibold">بداية الوردية <span class="text-danger">*</span></label>
                                 <input type="time" class="form-control" id="empStartTime" required value="09:00">
-                                <div class="form-text fs-11 text-muted">الحد الأقصى للسماح هو 15 دقيقة بعد هذا التوقيت.</div>
                             </div>
 
-                            <div class="col-md-6">
-                                <label for="empEndTime" class="form-label fw-semibold">موعد الانصراف الرسمي <span class="text-danger">*</span></label>
+                            <div class="col-md-4">
+                                <label for="empEndTime" class="form-label fw-semibold">نهاية الوردية <span class="text-danger">*</span></label>
                                 <input type="time" class="form-control" id="empEndTime" required value="17:00">
                             </div>
 
-                            <div class="col-md-6">
-                                <label for="empBaseSalary" class="form-label fw-semibold">الراتب الأساسي (ج.م) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control" id="empBaseSalary" required min="1000" step="500" placeholder="مثال: 15000">
+                            <div class="col-md-4">
+                                <label for="empGracePeriod" class="form-label fw-semibold">فترة السماح (بالدقائق) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="empGracePeriod" required min="0" max="60" value="15">
                             </div>
 
                             <div class="col-md-6">
-                                <label for="empAllowances" class="form-label fw-semibold">إجمالي البدلات (ج.م)</label>
-                                <input type="number" class="form-control" id="empAllowances" min="0" step="250" value="0" placeholder="مثال: 2000">
+                                <label for="empPin" class="form-label fw-semibold">رقم PIN جهاز البصمة (ZKTeco) <small class="text-muted">(اختياري)</small></label>
+                                <input type="text" class="form-control font-monospace" id="empPin" placeholder="مثال: 101">
+                            </div>
+
+                            <div class="col-md-6">
+                                <label for="empBaseSalary" class="form-label fw-semibold">الراتب الأساسي الشهري (ج.م) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="empBaseSalary" required min="1000" step="500" placeholder="10000">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="empHousingAllowance" class="form-label fw-semibold">بدل السكن (ج.م)</label>
+                                <input type="number" class="form-control" id="empHousingAllowance" min="0" step="100" value="0">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="empTransportAllowance" class="form-label fw-semibold">بدل الانتقالات (ج.م)</label>
+                                <input type="number" class="form-control" id="empTransportAllowance" min="0" step="100" value="0">
+                            </div>
+
+                            <div class="col-md-4">
+                                <label for="empOtherAllowances" class="form-label fw-semibold">بدلات أخرى (ج.م)</label>
+                                <input type="number" class="form-control" id="empOtherAllowances" min="0" step="100" value="0">
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
                         <button type="submit" class="btn btn-primary" id="saveEmployeeBtn">
-                            <i class="ri-save-line align-bottom me-1"></i> حفظ البيانات
+                            <i class="ri-save-line align-bottom me-1"></i> حفظ البيانات في النظام
                         </button>
                     </div>
                 </form>
@@ -251,7 +294,7 @@
         </div>
     </div>
 
-    <!-- Offcanvas / Modal: Employee Detailed Profile -->
+    <!-- Modal: Employee Detailed Profile -->
     <div class="modal fade" id="employeeProfileModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modal-lg">
             <div class="modal-content border-0">
@@ -260,7 +303,10 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body p-4" id="profileModalBody">
-                    <!-- Loaded dynamically -->
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">جاري تحميل بيانات الموظف من السيرفر...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -270,192 +316,344 @@
 @section('script')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let currentView = 'table';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
     const employeeModal = new bootstrap.Modal(document.getElementById('employeeModal'));
     const employeeProfileModal = new bootstrap.Modal(document.getElementById('employeeProfileModal'));
 
-    function renderEmployees() {
-        if (!window.AlHusseiniHR) return;
-        const employees = window.AlHusseiniHR.getEmployees();
-        const searchTerm = document.getElementById('searchEmployeeInput').value.trim().toLowerCase();
-        const selectedDept = document.getElementById('departmentFilter').value;
+    let currentEmployees = [];
+    let currentPage = 1;
 
-        const filtered = employees.filter(emp => {
-            const matchesSearch = emp.name.toLowerCase().includes(searchTerm) ||
-                                  emp.id.toLowerCase().includes(searchTerm) ||
-                                  emp.role.toLowerCase().includes(searchTerm);
-            const matchesDept = selectedDept === 'all' || emp.department === selectedDept;
-            return matchesSearch && matchesDept;
+    // Load Employees via Backend API
+    function fetchEmployees(page = 1) {
+        currentPage = page;
+        const search = document.getElementById('searchEmployeeInput').value.trim();
+        const branchId = document.getElementById('branchFilter').value;
+        const status = document.getElementById('statusFilter').value;
+
+        const params = new URLSearchParams({
+            page: page,
+            ...(search && { search: search }),
+            ...(branchId && { branch_id: branchId }),
+            ...(status && { status: status })
         });
 
-        // Update Stat Cards
-        document.getElementById('stat-total-employees').textContent = employees.length;
-        document.getElementById('stat-active-employees').textContent = employees.filter(e => e.status === 'active').length;
-        document.getElementById('stat-leave-employees').textContent = employees.filter(e => e.status === 'on_leave').length;
-        
-        const totalBase = employees.reduce((sum, e) => sum + Number(e.baseSalary || 0), 0);
-        const avg = employees.length > 0 ? Math.round(totalBase / employees.length) : 0;
-        document.getElementById('stat-avg-salary').textContent = `${avg.toLocaleString('ar-EG')} ج.م`;
+        fetch(`/admin/hr/employees?${params.toString()}`, {
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            currentEmployees = data.employees?.data || [];
+            updateStats(data.stats);
+            renderTable(currentEmployees);
+            renderGrid(currentEmployees);
+            renderPagination(data.employees);
+        })
+        .catch(err => {
+            console.error('Error fetching employees:', err);
+        });
+    }
 
-        // Render Table View
+    function updateStats(stats) {
+        if (!stats) return;
+        document.getElementById('stat-total-employees').textContent = stats.total ?? 0;
+        document.getElementById('stat-active-employees').textContent = stats.active ?? 0;
+        document.getElementById('stat-leave-employees').textContent = stats.on_leave ?? 0;
+        document.getElementById('stat-avg-salary').textContent = `${Number(stats.avg_salary || 0).toLocaleString('ar-EG')} ج.م`;
+    }
+
+    function renderTable(employees) {
         const tbody = document.getElementById('employeesTableBody');
-        if (filtered.length === 0) {
+        if (!employees || employees.length === 0) {
             tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-muted fs-14">لا يوجد موظفون يطابقون خيارات البحث</td></tr>`;
-        } else {
-            let rowsHtml = '';
-            filtered.forEach(emp => {
-                const statusBadge = emp.status === 'active' 
-                    ? '<span class="badge bg-success-subtle text-success fs-12 px-2 py-1">على رأس العمل</span>'
-                    : (emp.status === 'on_leave' 
-                        ? '<span class="badge bg-warning-subtle text-warning fs-12 px-2 py-1">إجازة</span>'
-                        : '<span class="badge bg-danger-subtle text-danger fs-12 px-2 py-1">موقوف</span>');
-
-                rowsHtml += `
-                    <tr>
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <img src="${emp.avatar}" alt="" class="avatar-xs rounded-circle me-2 shadow-sm">
-                                <div>
-                                    <h6 class="mb-0 fs-14 fw-bold">${emp.name}</h6>
-                                    <small class="text-muted">${emp.email}</small>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="badge bg-light text-body fs-12 fw-bold font-monospace">${emp.id}</span></td>
-                        <td>
-                            <div class="fw-semibold fs-13 text-dark">${emp.role}</div>
-                            <small class="text-muted">${emp.department}</small>
-                        </td>
-                        <td>
-                            <span class="badge bg-info-subtle text-info fs-12"><i class="ri-time-line align-middle me-1"></i>${emp.startTime} - ${emp.endTime}</span>
-                        </td>
-                        <td>
-                            <span class="fw-bold fs-14 text-primary">${Number(emp.baseSalary).toLocaleString('ar-EG')} ج.م</span>
-                        </td>
-                        <td>${statusBadge}</td>
-                        <td class="text-center">
-                            <div class="dropdown">
-                                <button class="btn btn-soft-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                    <i class="ri-more-fill align-middle"></i>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li><a class="dropdown-item btn-view-profile" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-eye-line me-2 text-primary"></i>عرض الملف التعريفي</a></li>
-                                    <li><a class="dropdown-item btn-edit-emp" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-pencil-line me-2 text-warning"></i>تعديل البيانات</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item btn-delete-emp text-danger" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-delete-bin-line me-2"></i>حذف الموظف</a></li>
-                                </ul>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            tbody.innerHTML = rowsHtml;
+            return;
         }
 
-        // Render Grid View
+        let html = '';
+        employees.forEach(emp => {
+            const statusBadge = emp.status === 'active' 
+                ? '<span class="badge bg-success-subtle text-success fs-12 px-2 py-1"><i class="ri-checkbox-circle-fill me-1"></i>على رأس العمل</span>'
+                : (emp.status === 'on_leave' 
+                    ? '<span class="badge bg-warning-subtle text-warning fs-12 px-2 py-1"><i class="ri-calendar-todo-fill me-1"></i>في إجازة</span>'
+                    : '<span class="badge bg-danger-subtle text-danger fs-12 px-2 py-1"><i class="ri-close-circle-fill me-1"></i>موقوف</span>');
+
+            const basicSalary = emp.current_salary?.basic_salary ? Number(emp.current_salary.basic_salary).toLocaleString('ar-EG') : '—';
+            const deptName = emp.job_title?.department?.name || 'الورشة العامة';
+            const titleName = emp.job_title?.title_name || 'موظف';
+            const branchName = emp.branch?.name || 'الفرع الرئيسي';
+
+            html += `
+                <tr>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="avatar-xs me-2">
+                                <span class="avatar-title bg-primary-subtle text-primary rounded-circle fw-bold">
+                                    ${emp.full_name.charAt(0)}
+                                </span>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 fs-14 fw-bold">${emp.full_name}</h6>
+                                <small class="text-muted font-monospace">${emp.employee_code} | ${emp.phone}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge bg-secondary-subtle text-secondary fs-12">${branchName}</span></td>
+                    <td>
+                        <div class="fw-semibold fs-13 text-dark">${titleName}</div>
+                        <small class="text-muted">${deptName}</small>
+                    </td>
+                    <td>
+                        <span class="badge bg-info-subtle text-info fs-12">
+                            <i class="ri-time-line align-middle me-1"></i>${emp.shift_start_time.substring(0, 5)} - ${emp.shift_end_time.substring(0, 5)}
+                        </span>
+                        <small class="text-muted d-block fs-11">سماح: ${emp.grace_period_minutes} د</small>
+                    </td>
+                    <td>
+                        <span class="fw-bold fs-14 text-primary">${basicSalary} ج.م</span>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td class="text-center">
+                        <div class="dropdown">
+                            <button class="btn btn-soft-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                <i class="ri-more-fill align-middle"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item btn-view-profile" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-eye-line me-2 text-primary"></i>عرض الملف التعريفي</a></li>
+                                <li><a class="dropdown-item btn-edit-emp" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-pencil-line me-2 text-warning"></i>تعديل البيانات</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item btn-delete-emp text-danger" href="javascript:void(0);" data-id="${emp.id}" data-name="${emp.full_name}"><i class="ri-delete-bin-line me-2"></i>حذف الموظف</a></li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+
+        tbody.innerHTML = html;
+        attachTableEvents();
+    }
+
+    function renderGrid(employees) {
         const gridContainer = document.getElementById('gridViewContainer');
-        if (filtered.length === 0) {
+        if (!employees || employees.length === 0) {
             gridContainer.innerHTML = `<div class="col-12 text-center py-5 text-muted fs-14">لا يوجد موظفون يطابقون خيارات البحث</div>`;
-        } else {
-            let cardsHtml = '';
-            filtered.forEach(emp => {
-                const statusBadge = emp.status === 'active' 
-                    ? '<span class="badge bg-success-subtle text-success fs-11 px-2 py-1">على رأس العمل</span>'
-                    : '<span class="badge bg-warning-subtle text-warning fs-11 px-2 py-1">إجازة</span>';
+            return;
+        }
 
-                cardsHtml += `
-                    <div class="col-xl-3 col-md-6 mb-3">
-                        <div class="card h-100 border card-animate">
-                            <div class="card-body text-center p-4">
-                                <div class="position-relative d-inline-block mb-3">
-                                    <img src="${emp.avatar}" alt="" class="avatar-lg rounded-circle shadow border border-2 border-primary">
-                                    <span class="position-absolute bottom-0 start-0 p-1 bg-success border border-light rounded-circle"></span>
-                                </div>
-                                <h5 class="fs-16 fw-bold mb-1">${emp.name}</h5>
-                                <p class="text-muted fs-13 mb-2">${emp.role}</p>
-                                <div class="badge bg-light text-primary fs-12 mb-3">${emp.department}</div>
-                                
-                                <div class="d-flex justify-content-between border-top border-bottom py-2 my-2 text-start fs-12">
-                                    <span class="text-muted">الرقم الوظيفي:</span>
-                                    <span class="fw-bold font-monospace">${emp.id}</span>
-                                </div>
-                                <div class="d-flex justify-content-between text-start fs-12 mb-3">
-                                    <span class="text-muted">الراتب الأساسي:</span>
-                                    <span class="fw-bold text-success">${Number(emp.baseSalary).toLocaleString('ar-EG')} ج.م</span>
-                                </div>
+        let html = '';
+        employees.forEach(emp => {
+            const statusBadge = emp.status === 'active' 
+                ? '<span class="badge bg-success-subtle text-success fs-11 px-2 py-1">على رأس العمل</span>'
+                : '<span class="badge bg-warning-subtle text-warning fs-11 px-2 py-1">إجازة</span>';
 
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-soft-primary btn-sm flex-grow-1 btn-view-profile" data-id="${emp.id}"><i class="ri-user-line me-1"></i>الملف</button>
-                                    <button class="btn btn-soft-warning btn-sm btn-edit-emp" data-id="${emp.id}"><i class="ri-pencil-line"></i></button>
-                                    <button class="btn btn-soft-danger btn-sm btn-delete-emp" data-id="${emp.id}"><i class="ri-delete-bin-line"></i></button>
-                                </div>
+            const basicSalary = emp.current_salary?.basic_salary ? Number(emp.current_salary.basic_salary).toLocaleString('ar-EG') : '—';
+            const deptName = emp.job_title?.department?.name || 'الورشة';
+            const titleName = emp.job_title?.title_name || 'موظف';
+
+            html += `
+                <div class="col-xl-3 col-md-6 mb-3">
+                    <div class="card h-100 border card-animate">
+                        <div class="card-body text-center p-4">
+                            <div class="avatar-lg mx-auto mb-3">
+                                <span class="avatar-title bg-primary-subtle text-primary rounded-circle fs-24 fw-bold shadow-sm">
+                                    ${emp.full_name.charAt(0)}
+                                </span>
+                            </div>
+                            <h5 class="fs-16 fw-bold mb-1">${emp.full_name}</h5>
+                            <p class="text-muted fs-13 mb-1">${titleName}</p>
+                            <div class="badge bg-light text-primary fs-12 mb-3">${deptName}</div>
+                            
+                            <div class="d-flex justify-content-between border-top border-bottom py-2 my-2 text-start fs-12">
+                                <span class="text-muted">الرقم الوظيفي:</span>
+                                <span class="fw-bold font-monospace">${emp.employee_code}</span>
+                            </div>
+                            <div class="d-flex justify-content-between text-start fs-12 mb-3">
+                                <span class="text-muted">الراتب الأساسي:</span>
+                                <span class="fw-bold text-success">${basicSalary} ج.م</span>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-soft-primary btn-sm flex-grow-1 btn-view-profile" data-id="${emp.id}"><i class="ri-user-line me-1"></i>الملف</button>
+                                <button class="btn btn-soft-warning btn-sm btn-edit-emp" data-id="${emp.id}"><i class="ri-pencil-line"></i></button>
+                                <button class="btn btn-soft-danger btn-sm btn-delete-emp" data-id="${emp.id}" data-name="${emp.full_name}"><i class="ri-delete-bin-line"></i></button>
                             </div>
                         </div>
                     </div>
-                `;
-            });
-            gridContainer.innerHTML = cardsHtml;
-        }
+                </div>
+            `;
+        });
 
-        attachEventListeners();
+        gridContainer.innerHTML = html;
+        attachTableEvents();
     }
 
-    function attachEventListeners() {
+    function renderPagination(paginator) {
+        const container = document.getElementById('paginationContainer');
+        if (!paginator || paginator.last_page <= 1) {
+            container.innerHTML = '';
+            return;
+        }
+
+        let html = `
+            <div class="text-muted fs-13">
+                عرض <strong>${paginator.from || 0}</strong> إلى <strong>${paginator.to || 0}</strong> من أصل <strong>${paginator.total || 0}</strong> موظف
+            </div>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item ${paginator.current_page === 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="javascript:void(0);" onclick="fetchEmployees(${paginator.current_page - 1})">السابق</a>
+                </li>
+        `;
+
+        for (let i = 1; i <= paginator.last_page; i++) {
+            html += `
+                <li class="page-item ${paginator.current_page === i ? 'active' : ''}">
+                    <a class="page-link" href="javascript:void(0);" onclick="fetchEmployees(${i})">${i}</a>
+                </li>
+            `;
+        }
+
+        html += `
+                <li class="page-item ${paginator.current_page === paginator.last_page ? 'disabled' : ''}">
+                    <a class="page-link" href="javascript:void(0);" onclick="fetchEmployees(${paginator.current_page + 1})">التالي</a>
+                </li>
+            </ul>
+        `;
+
+        container.innerHTML = html;
+    }
+
+    window.fetchEmployees = fetchEmployees;
+
+    function attachTableEvents() {
         // View Profile
         document.querySelectorAll('.btn-view-profile').forEach(btn => {
             btn.onclick = function() {
                 const id = this.getAttribute('data-id');
-                const emp = window.AlHusseiniHR.getEmployeeById(id);
-                if (!emp) return;
-
-                const deductions = window.AlHusseiniHR.getDeductions().filter(d => d.employeeId === id);
-                const totalDeductions = deductions.reduce((sum, d) => sum + Number(d.amount), 0);
-                const attendanceRecords = window.AlHusseiniHR.getAllAttendance().filter(a => a.employeeId === id);
-                const lateDays = attendanceRecords.filter(a => a.status === 'late').length;
-
-                document.getElementById('profileModalBody').innerHTML = `
-                    <div class="row align-items-center mb-4">
-                        <div class="col-auto">
-                            <img src="${emp.avatar}" alt="" class="avatar-lg rounded-circle shadow border border-3 border-primary">
-                        </div>
-                        <div class="col">
-                            <h4 class="fw-bold mb-1">${emp.name}</h4>
-                            <p class="text-muted mb-1 fs-14">${emp.role} | <span class="badge bg-primary-subtle text-primary">${emp.department}</span></p>
-                            <span class="badge bg-light text-body font-monospace">${emp.id}</span>
-                        </div>
-                    </div>
-
-                    <div class="row g-3 mb-4">
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded bg-light-subtle text-center">
-                                <h6 class="text-muted fs-12 mb-1">الراتب الأساسي</h6>
-                                <h5 class="fw-bold text-success mb-0">${Number(emp.baseSalary).toLocaleString('ar-EG')} ج.م</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded bg-light-subtle text-center">
-                                <h6 class="text-muted fs-12 mb-1">مرات التأخير المرصودة</h6>
-                                <h5 class="fw-bold text-warning mb-0">${lateDays} يوم</h5>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="p-3 border rounded bg-light-subtle text-center">
-                                <h6 class="text-muted fs-12 mb-1">إجمالي الخصومات</h6>
-                                <h5 class="fw-bold text-danger mb-0">${totalDeductions.toLocaleString('ar-EG')} ج.م</h5>
-                            </div>
-                        </div>
-                    </div>
-
-                    <h6 class="fw-bold mb-3 border-bottom pb-2">بيانات الاتصال ومواعيد الدوام</h6>
-                    <div class="row g-2 fs-13">
-                        <div class="col-md-6"><span class="text-muted me-2">البريد الإلكتروني:</span> <span class="fw-semibold">${emp.email}</span></div>
-                        <div class="col-md-6"><span class="text-muted me-2">رقم الهاتف:</span> <span class="fw-semibold">${emp.phone}</span></div>
-                        <div class="col-md-6"><span class="text-muted me-2">تاريخ التعيين:</span> <span class="fw-semibold">${emp.joinDate}</span></div>
-                        <div class="col-md-6"><span class="text-muted me-2">فترة الدوام:</span> <span class="badge bg-info-subtle text-info">${emp.startTime} - ${emp.endTime}</span></div>
+                const modalBody = document.getElementById('profileModalBody');
+                modalBody.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-2 text-muted">جاري تحميل السجل الكامل للموظف...</p>
                     </div>
                 `;
-
                 employeeProfileModal.show();
+
+                fetch(`/admin/hr/employees/${id}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(res => res.json())
+                .then(emp => {
+                    const basic = emp.current_salary ? Number(emp.current_salary.basic_salary).toLocaleString('ar-EG') : '0';
+                    const housing = emp.current_salary ? Number(emp.current_salary.housing_allowance).toLocaleString('ar-EG') : '0';
+                    const transport = emp.current_salary ? Number(emp.current_salary.transport_allowance).toLocaleString('ar-EG') : '0';
+                    const attendances = emp.attendances || [];
+                    const deductions = emp.deductions || [];
+                    const leaves = emp.leaves || [];
+                    const commissions = emp.commissions || [];
+
+                    let attRows = attendances.length > 0 
+                        ? attendances.slice(0, 5).map(a => `
+                            <tr>
+                                <td>${a.work_date}</td>
+                                <td><span class="badge ${a.status === 'present' ? 'bg-success-subtle text-success' : (a.status === 'late' ? 'bg-warning-subtle text-warning' : 'bg-danger-subtle text-danger')}">${a.status}</span></td>
+                                <td>${a.check_in_time ? a.check_in_time.substring(11, 16) : '—'}</td>
+                                <td>${a.lateness_minutes > 0 ? `<span class="text-danger fw-bold">+${a.lateness_minutes} د</span>` : 'منضبط'}</td>
+                            </tr>
+                        `).join('')
+                        : '<tr><td colspan="4" class="text-center text-muted">لا توجد حركات بصمة مسجلة مؤخراً</td></tr>';
+
+                    modalBody.innerHTML = `
+                        <div class="row align-items-center mb-4">
+                            <div class="col-auto">
+                                <div class="avatar-lg">
+                                    <span class="avatar-title bg-primary text-white rounded-circle fs-28 fw-bold">
+                                        ${emp.full_name.charAt(0)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="col">
+                                <h4 class="fw-bold mb-1">${emp.full_name}</h4>
+                                <p class="text-muted mb-1 fs-14">${emp.job_title?.title_name || 'موظف'} | <span class="badge bg-primary-subtle text-primary">${emp.branch?.name || ''}</span></p>
+                                <span class="badge bg-light text-body font-monospace">${emp.employee_code}</span>
+                                <span class="badge bg-secondary-subtle text-secondary ms-1">الرقم القومي: ${emp.national_id}</span>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-subtle text-center">
+                                    <h6 class="text-muted fs-12 mb-1">الراتب الأساسي</h6>
+                                    <h5 class="fw-bold text-success mb-0">${basic} ج.م</h5>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-subtle text-center">
+                                    <h6 class="text-muted fs-12 mb-1">بدلات (سكن + انتقالات)</h6>
+                                    <h5 class="fw-bold text-info mb-0">${Number(Number(emp.current_salary?.housing_allowance || 0) + Number(emp.current_salary?.transport_allowance || 0)).toLocaleString('ar-EG')} ج.م</h5>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="p-3 border rounded bg-light-subtle text-center">
+                                    <h6 class="text-muted fs-12 mb-1">إجمالي الخصومات النشطة</h6>
+                                    <h5 class="fw-bold text-danger mb-0">${deductions.reduce((sum, d) => sum + Number(d.amount), 0).toLocaleString('ar-EG')} ج.م</h5>
+                                </div>
+                            </div>
+                        </div>
+
+                        <ul class="nav nav-tabs nav-tabs-custom mb-3" role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active" data-bs-toggle="tab" href="#tab-profile-info" role="tab">البيانات الوظيفية</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#tab-profile-attendance" role="tab">سجل الحضور (${attendances.length})</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" data-bs-toggle="tab" href="#tab-profile-deductions" role="tab">الجزاءات (${deductions.length})</a>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content">
+                            <div class="tab-pane active" id="tab-profile-info" role="tabpanel">
+                                <div class="row g-2 fs-13">
+                                    <div class="col-md-6"><span class="text-muted me-2">الهاتف:</span> <span class="fw-semibold font-monospace">${emp.phone}</span></div>
+                                    <div class="col-md-6"><span class="text-muted me-2">تاريخ التعيين:</span> <span class="fw-semibold">${emp.hire_date}</span></div>
+                                    <div class="col-md-6"><span class="text-muted me-2">فترة الدوام:</span> <span class="badge bg-info-subtle text-info">${emp.shift_start_time.substring(0, 5)} - ${emp.shift_end_time.substring(0, 5)}</span></div>
+                                    <div class="col-md-6"><span class="text-muted me-2">دقائق السماح:</span> <span class="fw-semibold">${emp.grace_period_minutes} دقيقة</span></div>
+                                    <div class="col-md-6"><span class="text-muted me-2">كود البصمة PIN:</span> <span class="fw-semibold font-monospace">${emp.zkteco_pin || 'غير محدد'}</span></div>
+                                    <div class="col-md-6"><span class="text-muted me-2">الحالة:</span> <span class="fw-semibold">${emp.status}</span></div>
+                                </div>
+                            </div>
+                            <div class="tab-pane" id="tab-profile-attendance" role="tabpanel">
+                                <table class="table table-sm table-bordered fs-12 mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>التاريخ</th>
+                                            <th>الحالة</th>
+                                            <th>وقت الحضور</th>
+                                            <th>التأخير</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${attRows}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="tab-pane" id="tab-profile-deductions" role="tabpanel">
+                                ${deductions.length > 0 ? deductions.map(d => `
+                                    <div class="alert alert-danger p-2 mb-2 fs-12">
+                                        <div class="d-flex justify-content-between fw-bold">
+                                            <span>${d.reason}</span>
+                                            <span>-${Number(d.amount).toLocaleString('ar-EG')} ج.م</span>
+                                        </div>
+                                        <small class="text-muted">${d.deduction_date} | الحالة: ${d.status}</small>
+                                    </div>
+                                `).join('') : '<p class="text-center text-muted py-3">لا توجد جزاءات مسجلة بحق هذا الموظف</p>'}
+                            </div>
+                        </div>
+                    `;
+                });
             };
         });
 
@@ -463,23 +661,32 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.btn-edit-emp').forEach(btn => {
             btn.onclick = function() {
                 const id = this.getAttribute('data-id');
-                const emp = window.AlHusseiniHR.getEmployeeById(id);
-                if (!emp) return;
+                fetch(`/admin/hr/employees/${id}`, {
+                    headers: { 'Accept': 'application/json' }
+                })
+                .then(res => res.json())
+                .then(emp => {
+                    document.getElementById('employeeModalLabel').textContent = `تعديل بيانات الموظف: ${emp.full_name}`;
+                    document.getElementById('employeeId').value = emp.id;
+                    document.getElementById('empName').value = emp.full_name;
+                    document.getElementById('empCode').value = emp.employee_code;
+                    document.getElementById('empBranch').value = emp.branch_id;
+                    document.getElementById('empJobTitle').value = emp.job_title_id;
+                    document.getElementById('empNationalId').value = emp.national_id;
+                    document.getElementById('empPhone').value = emp.phone;
+                    document.getElementById('empHireDate').value = emp.hire_date;
+                    document.getElementById('empStatus').value = emp.status;
+                    document.getElementById('empStartTime').value = emp.shift_start_time.substring(0, 5);
+                    document.getElementById('empEndTime').value = emp.shift_end_time.substring(0, 5);
+                    document.getElementById('empGracePeriod').value = emp.grace_period_minutes;
+                    document.getElementById('empPin').value = emp.zkteco_pin || '';
+                    document.getElementById('empBaseSalary').value = emp.current_salary?.basic_salary || '';
+                    document.getElementById('empHousingAllowance').value = emp.current_salary?.housing_allowance || 0;
+                    document.getElementById('empTransportAllowance').value = emp.current_salary?.transport_allowance || 0;
+                    document.getElementById('empOtherAllowances').value = emp.current_salary?.other_allowances || 0;
 
-                document.getElementById('employeeModalLabel').textContent = `تعديل بيانات الموظف: ${emp.name}`;
-                document.getElementById('employeeId').value = emp.id;
-                document.getElementById('empName').value = emp.name;
-                document.getElementById('empRole').value = emp.role;
-                document.getElementById('empDepartment').value = emp.department;
-                document.getElementById('empStatus').value = emp.status || 'active';
-                document.getElementById('empEmail').value = emp.email;
-                document.getElementById('empPhone').value = emp.phone;
-                document.getElementById('empStartTime').value = emp.startTime || '09:00';
-                document.getElementById('empEndTime').value = emp.endTime || '17:00';
-                document.getElementById('empBaseSalary').value = emp.baseSalary;
-                document.getElementById('empAllowances').value = emp.allowances || 0;
-
-                employeeModal.show();
+                    employeeModal.show();
+                });
             };
         });
 
@@ -487,21 +694,36 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.btn-delete-emp').forEach(btn => {
             btn.onclick = function() {
                 const id = this.getAttribute('data-id');
-                const emp = window.AlHusseiniHR.getEmployeeById(id);
-                if (!emp) return;
+                const name = this.getAttribute('data-name');
 
                 Swal.fire({
-                    title: 'تأكيد حذف الموظف',
-                    text: `هل أنت متأكد من رغبتك في حذف بيانات الموظف [${emp.name}] نهائياً؟`,
+                    title: 'تأكيد أرشفة الموظف',
+                    text: `هل أنت متأكد من رغبتك في حذف/أرشفة بيانات الموظف [${name}]؟`,
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'نعم، حذف',
+                    confirmButtonText: 'نعم، أرشفة',
                     cancelButtonText: 'إلغاء',
                     confirmButtonColor: '#e63946'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        window.AlHusseiniHR.deleteEmployee(id);
-                        Swal.fire('تم الحذف!', 'تم حذف الموظف بنجاح.', 'success');
+                        fetch(`/admin/hr/employees/${id}`, {
+                            method: 'DELETE',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken
+                            }
+                        })
+                        .then(res => res.json())
+                        .then(resp => {
+                            if (resp.success) {
+                                Swal.fire('تم بنجاح!', resp.message, 'success');
+                                fetchEmployees(currentPage);
+                            } else {
+                                Swal.fire('خطأ', resp.message || 'تعذر حذف الموظف.', 'error');
+                            }
+                        })
+                        .catch(() => Swal.fire('خطأ', 'حدث خطأ أثناء تنفيذ الطلب.', 'error'));
                     }
                 });
             };
@@ -513,39 +735,87 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('employeeForm').reset();
         document.getElementById('employeeId').value = '';
         document.getElementById('employeeModalLabel').textContent = 'إضافة موظف جديد لمجموعة الحسيني';
+        document.getElementById('empCode').value = `EMP-${Math.floor(1000 + Math.random() * 9000)}`;
         document.getElementById('empStartTime').value = '09:00';
         document.getElementById('empEndTime').value = '17:00';
+        document.getElementById('empGracePeriod').value = '15';
+        document.getElementById('empHireDate').value = new Date().toISOString().split('T')[0];
         employeeModal.show();
     };
 
-    // Save Form Submission
+    // Form Submit (Store or Update)
     document.getElementById('employeeForm').onsubmit = function(e) {
         e.preventDefault();
         const id = document.getElementById('employeeId').value;
-        const employeeData = {
-            id: id || undefined,
-            name: document.getElementById('empName').value.trim(),
-            role: document.getElementById('empRole').value.trim(),
-            department: document.getElementById('empDepartment').value,
-            status: document.getElementById('empStatus').value,
-            email: document.getElementById('empEmail').value.trim(),
+        const isEdit = Boolean(id);
+
+        const payload = {
+            branch_id: document.getElementById('empBranch').value,
+            job_title_id: document.getElementById('empJobTitle').value,
+            employee_code: document.getElementById('empCode').value.trim(),
+            full_name: document.getElementById('empName').value.trim(),
+            national_id: document.getElementById('empNationalId').value.trim(),
             phone: document.getElementById('empPhone').value.trim(),
-            startTime: document.getElementById('empStartTime').value,
-            endTime: document.getElementById('empEndTime').value,
-            baseSalary: Number(document.getElementById('empBaseSalary').value),
-            allowances: Number(document.getElementById('empAllowances').value || 0)
+            hire_date: document.getElementById('empHireDate').value,
+            shift_start_time: document.getElementById('empStartTime').value,
+            shift_end_time: document.getElementById('empEndTime').value,
+            grace_period_minutes: document.getElementById('empGracePeriod').value,
+            zkteco_pin: document.getElementById('empPin').value.trim() || null,
+            status: document.getElementById('empStatus').value,
+            basic_salary: document.getElementById('empBaseSalary').value,
+            housing_allowance: document.getElementById('empHousingAllowance').value || 0,
+            transport_allowance: document.getElementById('empTransportAllowance').value || 0,
+            other_allowances: document.getElementById('empOtherAllowances').value || 0,
         };
 
-        window.AlHusseiniHR.saveEmployee(employeeData);
-        employeeModal.hide();
-        Swal.fire('تم الحفظ بنجاح!', 'تم تحديث بيانات الموظف في قاعدة بيانات الحسيني.', 'success');
+        const url = isEdit ? `/admin/hr/employees/${id}` : '/admin/hr/employees';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) {
+                let errorMsg = data.message || 'يرجى مراجعة الحقول المطلوبة';
+                if (data.errors) {
+                    errorMsg = Object.values(data.errors).flat().join('<br>');
+                }
+                throw new Error(errorMsg);
+            }
+            return data;
+        })
+        .then(data => {
+            employeeModal.hide();
+            Swal.fire('تمت العملية بنجاح!', data.message, 'success');
+            fetchEmployees(currentPage);
+        })
+        .catch(err => {
+            Swal.fire({
+                icon: 'error',
+                title: 'تعذر الحفظ',
+                html: err.message
+            });
+        });
     };
 
-    // Filter & Search listeners
-    document.getElementById('searchEmployeeInput').addEventListener('input', renderEmployees);
-    document.getElementById('departmentFilter').addEventListener('change', renderEmployees);
+    // Search and filter inputs
+    let debounceTimer;
+    document.getElementById('searchEmployeeInput').addEventListener('input', function() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchEmployees(1), 350);
+    });
 
-    // Toggle Table / Grid
+    document.getElementById('branchFilter').addEventListener('change', () => fetchEmployees(1));
+    document.getElementById('statusFilter').addEventListener('change', () => fetchEmployees(1));
+
+    // View switch
     document.getElementById('viewTableBtn').onclick = function() {
         this.classList.add('active');
         document.getElementById('viewGridBtn').classList.remove('active');
@@ -559,9 +829,8 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('gridViewContainer').classList.remove('d-none');
     };
 
-    // Initial render and listen to global updates
-    renderEmployees();
-    window.addEventListener('alhusseini-hr-updated', renderEmployees);
+    // Initial Load
+    fetchEmployees(1);
 });
 </script>
 @endsection

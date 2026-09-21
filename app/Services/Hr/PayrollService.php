@@ -124,11 +124,13 @@ class PayrollService
     /**
      * اعتماد مسير الرواتب
      */
-    public function approvePayroll(Payroll $payroll, int $approvedBy): bool
+    public function approvePayroll(Payroll $payroll, ?int $approvedBy = null): bool
     {
         if ($payroll->status !== 'draft') {
             throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
         }
+
+        $approvedBy = $approvedBy ?? User::first()?->id ?? 1;
 
         return $payroll->update([
             'status' => 'approved',
