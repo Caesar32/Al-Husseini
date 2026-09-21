@@ -38,21 +38,43 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
     // HR Management Routes
     Route::prefix('hr')->name('hr.')->group(function () {
-        Route::get('/employees', function () {
-            return view('admin.hr.employees');
-        })->name('employees');
+        // الموظفون
+        Route::get('/employees', [\App\Http\Controllers\Hr\EmployeeController::class, 'index'])->name('employees');
+        Route::post('/employees', [\App\Http\Controllers\Hr\EmployeeController::class, 'store'])->name('employees.store');
+        Route::get('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'show'])->name('employees.show');
+        Route::put('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'update'])->name('employees.update');
+        Route::delete('/employees/{employee}', [\App\Http\Controllers\Hr\EmployeeController::class, 'destroy'])->name('employees.destroy');
 
-        Route::get('/attendance', function () {
-            return view('admin.hr.attendance');
-        })->name('attendance');
+        // الحضور والانصراف
+        Route::get('/attendance', [\App\Http\Controllers\Hr\AttendanceController::class, 'index'])->name('attendance');
+        Route::post('/attendance/punch', [\App\Http\Controllers\Hr\AttendanceController::class, 'recordManual'])->name('attendance.punch');
 
-        Route::get('/payroll', function () {
-            return view('admin.hr.payroll');
-        })->name('payroll');
+        // الإجازات
+        Route::get('/leaves', [\App\Http\Controllers\Hr\LeaveController::class, 'index'])->name('leaves.index');
+        Route::post('/leaves', [\App\Http\Controllers\Hr\LeaveController::class, 'store'])->name('leaves.store');
+        Route::post('/leaves/{leave}/status', [\App\Http\Controllers\Hr\LeaveController::class, 'updateStatus'])->name('leaves.status');
 
+        // الجزاءات والخصومات
+        Route::get('/deductions', [\App\Http\Controllers\Hr\DeductionController::class, 'index'])->name('deductions.index');
+        Route::post('/deductions', [\App\Http\Controllers\Hr\DeductionController::class, 'store'])->name('deductions.store');
+        Route::post('/deductions/{deduction}/status', [\App\Http\Controllers\Hr\DeductionController::class, 'updateStatus'])->name('deductions.status');
+
+        // مسيرات الرواتب
+        Route::get('/payroll', [\App\Http\Controllers\Hr\PayrollController::class, 'index'])->name('payroll');
+        Route::post('/payroll/generate', [\App\Http\Controllers\Hr\PayrollController::class, 'generate'])->name('payroll.generate');
+        Route::get('/payroll/{payroll}', [\App\Http\Controllers\Hr\PayrollController::class, 'show'])->name('payroll.show');
+        Route::post('/payroll/{payroll}/approve', [\App\Http\Controllers\Hr\PayrollController::class, 'approve'])->name('payroll.approve');
+        Route::post('/payroll/{payroll}/disburse', [\App\Http\Controllers\Hr\PayrollController::class, 'disburse'])->name('payroll.disburse');
+
+        // تقارير الموارد البشرية
         Route::get('/reports', function () {
             return view('admin.hr.reports');
         })->name('reports');
+
+        // إشعارات الإدارة
+        Route::get('/notifications', [\App\Http\Controllers\Hr\NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/{id}/read', [\App\Http\Controllers\Hr\NotificationController::class, 'markAsRead'])->name('notifications.read');
+        Route::post('/notifications/read-all', [\App\Http\Controllers\Hr\NotificationController::class, 'markAllAsRead'])->name('notifications.readAll');
     });
 
     // Sales, Customers, Invoices, Products & Credit (الآجل) Routes

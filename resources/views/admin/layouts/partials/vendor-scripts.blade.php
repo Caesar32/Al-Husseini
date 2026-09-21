@@ -92,62 +92,7 @@ window.showHrToast = function(title, message, type) {
     }
 };
 
-// Sync Topbar Notifications with AlHusseiniHR
-document.addEventListener('DOMContentLoaded', function() {
-    function renderTopbarNotifications() {
-        if (!window.AlHusseiniHR) return;
-        const notifs = window.AlHusseiniHR.getNotifications();
-        const unreadCount = notifs.filter(n => !n.read).length;
-
-        const badge = document.getElementById('topbar-notification-badge');
-        const countHeader = document.getElementById('topbar-notification-count');
-        const listContainer = document.getElementById('topbar-notification-list');
-
-        if (badge) {
-            badge.textContent = unreadCount;
-            badge.style.display = unreadCount > 0 ? 'inline-block' : 'none';
-        }
-        if (countHeader) {
-            countHeader.textContent = `${unreadCount} جديد`;
-        }
-
-        if (listContainer) {
-            if (notifs.length === 0) {
-                listContainer.innerHTML = '<div class="text-center py-4 text-muted fs-13"><i class="ri-notification-off-line fs-24 d-block mb-1"></i>لا توجد تنبيهات حالياً</div>';
-                return;
-            }
-
-            let html = '';
-            notifs.slice(0, 10).forEach(n => {
-                const isLate = n.type === 'lateness';
-                const iconBg = isLate ? 'bg-danger-subtle text-danger' : 'bg-warning-subtle text-warning';
-                const iconClass = isLate ? 'ri-alarm-warning-line' : 'ri-money-dollar-circle-line';
-                const unreadDot = !n.read ? '<span class="badge badge-dot bg-danger me-1"></span>' : '';
-
-                html += `
-                    <div class="text-reset notification-item d-block dropdown-item position-relative ${!n.read ? 'active bg-light-subtle' : ''}">
-                        <div class="d-flex align-items-start">
-                            <div class="avatar-xs me-3 flex-shrink-0">
-                                <span class="avatar-title ${iconBg} rounded-circle fs-16">
-                                    <i class="${iconClass}"></i>
-                                </span>
-                            </div>
-                            <div class="flex-grow-1 overflow-hidden">
-                                <h6 class="mt-0 mb-1 fs-13 fw-bold">${unreadDot}${n.title}</h6>
-                                <p class="mb-1 fs-12 text-muted text-truncate-2">${n.message}</p>
-                                <p class="mb-0 fs-11 fw-medium text-muted">
-                                    <span><i class="mdi mdi-clock-outline"></i> ${n.time}</span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-            listContainer.innerHTML = html;
-        }
-    }
-
-    renderTopbarNotifications();
-    window.addEventListener('alhusseini-hr-updated', renderTopbarNotifications);
-});
 </script>
+<!-- Al-Husseini Real-Time Admin Notifications -->
+<script src="{{ asset('assets/js/admin-notifications.js') }}"></script>
+

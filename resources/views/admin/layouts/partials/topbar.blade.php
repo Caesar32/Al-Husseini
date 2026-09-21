@@ -130,7 +130,7 @@
                                     <!-- Populated dynamically by HR Store -->
                                 </div>
                                 <div class="text-center py-2 border-top">
-                                    <button type="button" class="btn btn-sm btn-link text-primary" onclick="if(window.AlHusseiniHR) window.AlHusseiniHR.markAllAsRead();">
+                                    <button type="button" class="btn btn-sm btn-link text-primary" onclick="window.markAllNotificationsRead();">
                                         <i class="ri-check-double-line align-middle me-1"></i> تحديد الكل كمقروء
                                     </button>
                                 </div>
