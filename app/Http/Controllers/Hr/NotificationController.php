@@ -2,35 +2,34 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Contracts\Hr\NotificationServiceInterface;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 
 class NotificationController extends Controller
 {
+    public function __construct(
+        protected NotificationServiceInterface $notificationService
+    ) {}
+
     public function index(): JsonResponse
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!$user) {
             return response()->json(['notifications' => [], 'unread_count' => 0]);
         }
 
-        $notifications = $user->notifications()->take(20)->get();
-        $unreadCount = $user->unreadNotifications()->count();
+        $result = $this->notificationService->getUserNotifications($user);
 
-        return response()->json([
-            'notifications' => $notifications,
-            'unread_count' => $unreadCount,
-        ]);
+        return response()->json($result);
     }
 
     public function markAsRead(string $id): JsonResponse
     {
-        $user = auth()->user();
-        $notification = $user?->notifications()->where('id', $id)->first();
-
-        if ($notification) {
-            $notification->markAsRead();
+        $user = Auth::user();
+        if ($user) {
+            $this->notificationService->markNotificationAsRead($user, $id);
         }
 
         return response()->json(['success' => true]);
@@ -38,8 +37,10 @@ class NotificationController extends Controller
 
     public function markAllAsRead(): JsonResponse
     {
-        $user = auth()->user();
-        $user?->unreadNotifications->markAsRead();
+        $user = Auth::user();
+        if ($user) {
+            $this->notificationService->markAllNotificationsAsRead($user);
+        }
 
         return response()->json(['success' => true]);
     }

@@ -193,3 +193,45 @@ test('admin notifications api works correctly', function () {
     $readAllResponse->assertStatus(200)
                     ->assertJson(['success' => true]);
 });
+
+test('leave workflow creates request and manager can approve it', function () {
+    $emp = Employee::first();
+
+    $response = $this->postJson('/admin/hr/leaves', [
+        'employee_id' => $emp->id,
+        'leave_type' => 'annual',
+        'start_date' => '2026-10-01',
+        'end_date' => '2026-10-05',
+        'reason' => 'إجازة سنوية اعتيادية',
+    ]);
+
+    $response->assertStatus(200)
+             ->assertJson(['success' => true]);
+
+    $leave = \App\Models\EmployeeLeave::where('employee_id', $emp->id)->first();
+    expect($leave)->not->toBeNull()
+        ->and($leave->days_count)->toBe(5)
+        ->and($leave->status)->toBe('pending');
+
+    // Approve leave
+    $approveResponse = $this->postJson("/admin/hr/leaves/{$leave->id}/status", [
+        'status' => 'approved',
+        'action_notes' => 'معتمد من الإدارة',
+    ]);
+
+    $approveResponse->assertStatus(200)
+                    ->assertJson(['success' => true]);
+
+    expect($leave->fresh()->status)->toBe('approved');
+    expect($emp->fresh()->status)->toBe('on_leave');
+});
+
+test('hr service interfaces resolve correctly from container via SOLID provider', function () {
+    expect(app(\App\Contracts\Hr\EmployeeServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\EmployeeService::class)
+        ->and(app(\App\Contracts\Hr\AttendanceServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\AttendanceService::class)
+        ->and(app(\App\Contracts\Hr\PayrollServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\PayrollService::class)
+        ->and(app(\App\Contracts\Hr\DeductionServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\DeductionService::class)
+        ->and(app(\App\Contracts\Hr\LeaveServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\LeaveService::class)
+        ->and(app(\App\Contracts\Hr\NotificationServiceInterface::class))->toBeInstanceOf(\App\Services\Hr\NotificationService::class);
+});
+

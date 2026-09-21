@@ -2,22 +2,45 @@
 
 namespace App\Services\Hr;
 
+use App\Contracts\Hr\PayrollServiceInterface;
 use App\Models\Payroll;
 use App\Models\PayrollItem;
 use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\EmployeeDeduction;
 use App\Models\TechnicianCommission;
+use App\Models\Branch;
 use App\Models\User;
 use App\Notifications\PayrollGeneratedNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
-class PayrollService
+class PayrollService implements PayrollServiceInterface
 {
     /**
-     * توليد مسودة مسير الرواتب لفرع محدد لشهر وسنة معينة
+     * {@inheritDoc}
+     */
+    public function getPayrollIndexData(?int $branchId = null, int $perPage = 15): array
+    {
+        $branches = Branch::where('is_active', true)->get();
+        $employees = Employee::active()->with(['branch', 'jobTitle.department', 'currentSalary'])->get();
+        $recentDeductions = EmployeeDeduction::with(['employee', 'approvedByUser'])->latest('id')->take(20)->get();
+
+        $query = Payroll::with(['branch', 'approvedBy', 'items.employee.jobTitle'])->latest('id');
+
+        if (!empty($branchId)) {
+            $query->where('branch_id', $branchId);
+        }
+
+        $payrolls = $query->paginate($perPage);
+        $latestPayroll = (clone $query)->first();
+
+        return compact('payrolls', 'branches', 'employees', 'recentDeductions', 'latestPayroll');
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public function generateMonthlyPayroll(int $branchId, int $year, int $month): Payroll
     {
@@ -122,7 +145,7 @@ class PayrollService
     }
 
     /**
-     * اعتماد مسير الرواتب
+     * {@inheritDoc}
      */
     public function approvePayroll(Payroll $payroll, ?int $approvedBy = null): bool
     {
@@ -139,7 +162,7 @@ class PayrollService
     }
 
     /**
-     * صرف مسير الرواتب وإغلاقه
+     * {@inheritDoc}
      */
     public function disbursePayroll(Payroll $payroll): bool
     {
@@ -151,5 +174,13 @@ class PayrollService
             'status' => 'disbursed',
             'disbursed_at' => now(),
         ]);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getPayrollDetails(Payroll $payroll): Payroll
+    {
+        return $payroll->load(['branch', 'items.employee.jobTitle', 'approvedBy']);
     }
 }

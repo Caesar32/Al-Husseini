@@ -2,51 +2,50 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Contracts\Hr\PayrollServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\GeneratePayrollRequest;
-use App\Services\Hr\PayrollService;
 use App\Models\Payroll;
-use App\Models\Branch;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Auth;
+use Exception;
 
 class PayrollController extends Controller
 {
-    public function __construct(protected PayrollService $payrollService) {}
+    public function __construct(
+        protected PayrollServiceInterface $payrollService
+    ) {}
 
     public function index(Request $request): View|JsonResponse
     {
-        $branches = Branch::where('is_active', true)->get();
-        $employees = \App\Models\Employee::active()->with(['branch', 'jobTitle.department', 'currentSalary'])->get();
-        $recentDeductions = \App\Models\EmployeeDeduction::with(['employee', 'approvedByUser'])->latest()->take(20)->get();
-
-        $query = Payroll::with(['branch', 'approvedBy', 'items.employee.jobTitle'])->latest();
-
-        if ($request->filled('branch_id')) {
-            $query->where('branch_id', $request->branch_id);
-        }
-
-        $payrolls = $query->paginate(15);
-        $latestPayroll = (clone $query)->first();
+        $branchId = $request->filled('branch_id') ? (int) $request->branch_id : null;
+        $data = $this->payrollService->getPayrollIndexData($branchId);
 
         if ($request->wantsJson()) {
             return response()->json([
-                'payrolls' => $payrolls,
-                'latest_payroll' => $latestPayroll,
+                'payrolls' => $data['payrolls'],
+                'latest_payroll' => $data['latestPayroll'],
             ]);
         }
 
-        return view('admin.hr.payroll', compact('payrolls', 'branches', 'employees', 'recentDeductions', 'latestPayroll'));
+        return view('admin.hr.payroll', [
+            'payrolls' => $data['payrolls'],
+            'branches' => $data['branches'],
+            'employees' => $data['employees'],
+            'recentDeductions' => $data['recentDeductions'],
+            'latestPayroll' => $data['latestPayroll'],
+        ]);
     }
 
     public function generate(GeneratePayrollRequest $request): JsonResponse
     {
         try {
             $payroll = $this->payrollService->generateMonthlyPayroll(
-                $request->branch_id,
-                $request->year,
-                $request->month
+                (int) $request->branch_id,
+                (int) $request->year,
+                (int) $request->month
             );
 
             return response()->json([
@@ -54,7 +53,7 @@ class PayrollController extends Controller
                 'message' => 'تم احتساب مسير الرواتب بنجاح وتوليد المسودة للمراجعة.',
                 'payroll_id' => $payroll->id,
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -64,25 +63,25 @@ class PayrollController extends Controller
 
     public function show(Payroll $payroll): View|JsonResponse
     {
-        $payroll->load(['branch', 'items.employee.jobTitle', 'approvedBy']);
+        $detailedPayroll = $this->payrollService->getPayrollDetails($payroll);
 
         if (request()->wantsJson()) {
-            return response()->json($payroll);
+            return response()->json($detailedPayroll);
         }
 
-        return view('admin.hr.payroll_show', compact('payroll'));
+        return view('admin.hr.payroll_show', ['payroll' => $detailedPayroll]);
     }
 
     public function approve(Payroll $payroll): JsonResponse
     {
         try {
-            $this->payrollService->approvePayroll($payroll, \Illuminate\Support\Facades\Auth::id());
+            $this->payrollService->approvePayroll($payroll, Auth::id());
 
             return response()->json([
                 'success' => true,
                 'message' => 'تم اعتماد مسير الرواتب بنجاح.',
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -99,7 +98,7 @@ class PayrollController extends Controller
                 'success' => true,
                 'message' => 'تم صرف مسير الرواتب وإغلاقه نهائياً.',
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

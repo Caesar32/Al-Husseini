@@ -2,49 +2,31 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Contracts\Hr\LeaveServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\StoreLeaveRequest;
+use App\Http\Requests\Hr\UpdateLeaveStatusRequest;
 use App\Models\EmployeeLeave;
-use App\Models\Employee;
-use App\Models\User;
-use App\Notifications\LeaveRequestedNotification;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 
 class LeaveController extends Controller
 {
+    public function __construct(
+        protected LeaveServiceInterface $leaveService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
-        $leaves = EmployeeLeave::with(['employee.branch', 'actionedByUser'])
-            ->latest()
-            ->paginate(15);
+        $leaves = $this->leaveService->getPaginatedLeaves();
 
         return response()->json($leaves);
     }
 
     public function store(StoreLeaveRequest $request): JsonResponse
     {
-        $data = $request->validated();
-        $start = Carbon::parse($data['start_date']);
-        $end = Carbon::parse($data['end_date']);
-        $daysCount = $start->diffInDays($end) + 1;
-
-        $leave = EmployeeLeave::create([
-            'employee_id' => $data['employee_id'],
-            'leave_type' => $data['leave_type'],
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date'],
-            'days_count' => $daysCount,
-            'reason' => $data['reason'] ?? null,
-            'status' => 'pending',
-        ]);
-
-        // إشعار الإدارة بطلب إجازة جديد
-        $admins = User::role(['super-admin', 'branch-manager'])->get();
-        foreach ($admins as $admin) {
-            $admin->notify(new LeaveRequestedNotification($leave));
-        }
+        $leave = $this->leaveService->applyForLeave($request->validated());
 
         return response()->json([
             'success' => true,
@@ -53,22 +35,16 @@ class LeaveController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, EmployeeLeave $leave): JsonResponse
+    public function updateStatus(UpdateLeaveStatusRequest $request, EmployeeLeave $leave): JsonResponse
     {
-        $request->validate([
-            'status' => ['required', 'in:approved,rejected'],
-            'action_notes' => ['nullable', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
-        $leave->update([
-            'status' => $request->status,
-            'actioned_by' => \Illuminate\Support\Facades\Auth::id(),
-            'action_notes' => $request->action_notes,
-        ]);
-
-        if ($request->status === 'approved') {
-            $leave->employee->update(['status' => 'on_leave']);
-        }
+        $this->leaveService->updateLeaveStatus(
+            $leave,
+            $validated['status'],
+            $validated['action_notes'] ?? null,
+            Auth::id()
+        );
 
         return response()->json([
             'success' => true,

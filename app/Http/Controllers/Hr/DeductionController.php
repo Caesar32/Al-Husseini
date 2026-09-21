@@ -2,35 +2,34 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Contracts\Hr\DeductionServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\StoreDeductionRequest;
+use App\Http\Requests\Hr\UpdateDeductionStatusRequest;
 use App\Models\EmployeeDeduction;
-use App\Models\DeductionRule;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Auth;
 
 class DeductionController extends Controller
 {
+    public function __construct(
+        protected DeductionServiceInterface $deductionService
+    ) {}
+
     public function index(Request $request): JsonResponse
     {
-        $deductions = EmployeeDeduction::with(['employee', 'deductionRule', 'approvedByUser'])
-            ->latest()
-            ->paginate(15);
+        $deductions = $this->deductionService->getPaginatedDeductions();
 
         return response()->json($deductions);
     }
 
     public function store(StoreDeductionRequest $request): JsonResponse
     {
-        $deduction = EmployeeDeduction::create([
-            'employee_id' => $request->employee_id,
-            'deduction_rule_id' => $request->deduction_rule_id,
-            'deduction_date' => $request->deduction_date,
-            'amount' => $request->amount,
-            'reason' => $request->reason,
-            'approved_by' => \Illuminate\Support\Facades\Auth::id(),
-            'status' => 'approved',
-        ]);
+        $deduction = $this->deductionService->applyDeduction(
+            $request->validated(),
+            Auth::id()
+        );
 
         return response()->json([
             'success' => true,
@@ -39,16 +38,13 @@ class DeductionController extends Controller
         ]);
     }
 
-    public function updateStatus(Request $request, EmployeeDeduction $deduction): JsonResponse
+    public function updateStatus(UpdateDeductionStatusRequest $request, EmployeeDeduction $deduction): JsonResponse
     {
-        $request->validate([
-            'status' => ['required', 'in:approved,cancelled'],
-        ]);
-
-        $deduction->update([
-            'status' => $request->status,
-            'approved_by' => \Illuminate\Support\Facades\Auth::id(),
-        ]);
+        $this->deductionService->updateDeductionStatus(
+            $deduction,
+            $request->validated('status'),
+            Auth::id()
+        );
 
         return response()->json([
             'success' => true,

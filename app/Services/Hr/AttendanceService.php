@@ -2,17 +2,63 @@
 
 namespace App\Services\Hr;
 
+use App\Contracts\Hr\AttendanceServiceInterface;
 use App\Models\Employee;
 use App\Models\Attendance;
+use App\Models\Branch;
 use App\Models\User;
 use App\Notifications\EmployeeLateNotification;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
-class AttendanceService
+class AttendanceService implements AttendanceServiceInterface
 {
     /**
-     * تسجيل حركة حضور أو انصراف
+     * {@inheritDoc}
+     */
+    public function getDailyAttendance(string $date, ?int $branchId = null, ?string $status = null): Collection
+    {
+        $query = Attendance::with(['employee.branch', 'employee.jobTitle', 'deductions'])
+            ->where('work_date', $date);
+
+        if (!empty($branchId)) {
+            $query->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
+        }
+
+        if (!empty($status)) {
+            $query->where('status', $status);
+        }
+
+        return $query->latest('id')->get();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getDailyStats(string $date): array
+    {
+        return [
+            'total_expected' => Employee::active()->count(),
+            'present' => Attendance::where('work_date', $date)->where('status', 'present')->count(),
+            'late' => Attendance::where('work_date', $date)->where('status', 'late')->count(),
+            'absent' => Attendance::where('work_date', $date)->where('status', 'absent')->count(),
+        ];
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function getFormData(): array
+    {
+        return [
+            'branches' => Branch::where('is_active', true)->get(),
+            'employees' => Employee::active()->with('branch')->get(),
+        ];
+    }
+
+    /**
+     * {@inheritDoc}
      */
     public function recordPunch(mixed $employeeIdentifier, Carbon $punchTime, string|int $punchState, string $source = 'manual'): Attendance
     {
