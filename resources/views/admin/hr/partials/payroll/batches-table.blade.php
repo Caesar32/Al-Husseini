@@ -30,7 +30,7 @@
                             </thead>
                             <tbody>
                                 @foreach($payrolls as $p)
-                                    <tr>
+                                    <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}">
                                         <td><span class="badge bg-dark-subtle text-dark fs-12 fw-bold font-monospace">{{ $p->year }} / {{ sprintf('%02d', $p->month) }}</span></td>
                                         <td><span class="fw-semibold">{{ $p->branch?->name }}</span></td>
                                         <td>{{ number_format($p->total_basic_salaries) }} ج.م</td>
@@ -62,6 +62,12 @@
                                         </td>
                                     </tr>
                                 @endforeach
+                                <tr id="batchNoResultsRow" style="display: none;">
+                                    <td colspan="9" class="text-center py-4 text-muted fs-13">
+                                        <i class="ri-file-history-line fs-20 d-block mb-1 text-muted"></i>
+                                        لا توجد مسيرات مسجلة لهذا الفرع
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

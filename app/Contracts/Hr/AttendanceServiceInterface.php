@@ -27,4 +27,9 @@ interface AttendanceServiceInterface
      * Record a biometric or manual punch in/out and calculate lateness/early departure.
      */
     public function recordPunch(mixed $employeeIdentifier, Carbon $punchTime, string|int $punchState, string $source = 'manual'): Attendance;
+
+    /**
+     * Mark an employee as absent for a given date (admin override).
+     */
+    public function markAbsent(int $employeeId, string $date, ?string $reason = null): Attendance;
 }

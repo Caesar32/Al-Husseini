@@ -115,6 +115,22 @@
                     </a>
                 </li>
 
+                <li class="menu-title"><span>إدارة النظام والإعدادات</span></li>
+
+                <!-- User Profile -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.profile') ? 'active' : '' }}" href="{{ route('admin.profile') }}">
+                        <i class="ri-user-settings-line"></i> <span>الملف الشخصي والحساب</span>
+                    </a>
+                </li>
+
+                <!-- System Settings -->
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.settings') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
+                        <i class="ri-settings-4-line"></i> <span>إعدادات النظام والمنشأة</span>
+                    </a>
+                </li>
+
             </ul>
         </div>
         <!-- Container -->

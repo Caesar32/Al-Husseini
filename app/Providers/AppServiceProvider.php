@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 
 use App\Models\Invoice;
+use Illuminate\Database\Eloquent\Model;
 use App\Models\Attendance;
 use App\Models\PurchaseInvoice;
 use App\Observers\InvoiceObserver;
@@ -20,7 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \App\Contracts\SearchServiceInterface::class,
+            \App\Services\SearchService::class
+        );
     }
 
     /**
@@ -28,6 +32,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // ─── حماية صارمة من مشاكل N+1 في بيئة التطوير ───────────────────────────────
+        // يرمي Exception فوري إذا تم الوصول إلى أي علاقة بدون Eager Loading مسبق
+        Model::preventLazyLoading(! app()->isProduction());
+
         // منح المشرف العام (super-admin) حق الوصول الكامل لكافة الصلاحيات تلقائياً
         Gate::before(function ($user, $ability) {
             return $user->hasRole('super-admin') ? true : null;

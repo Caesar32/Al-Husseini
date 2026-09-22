@@ -9,11 +9,13 @@ use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\EmployeeDeduction;
 use App\Models\TechnicianCommission;
+use App\Models\EmployeeLeave;
 use App\Models\Branch;
 use App\Models\User;
 use App\Notifications\PayrollGeneratedNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Exception;
 
 class PayrollService implements PayrollServiceInterface
@@ -59,7 +61,7 @@ class PayrollService implements PayrollServiceInterface
             $payroll->items()->delete();
 
             $startDate = Carbon::createFromDate($year, $month, 1)->startOfMonth();
-            $endDate = $startDate->copy()->endOfMonth();
+            $endDate   = $startDate->copy()->endOfMonth();
             $totalMonthDays = $startDate->daysInMonth;
 
             $employees = Employee::with(['currentSalary'])
@@ -67,71 +69,118 @@ class PayrollService implements PayrollServiceInterface
                 ->where('status', 'active')
                 ->get();
 
-            $totalBasic = 0;
-            $totalAllowances = 0;
-            $totalDeductions = 0;
-            $totalNet = 0;
+            $employeeIds = $employees->pluck('id');
+
+            // ─── جلب كل بيانات الحضور والإجازات والعمولات والجزاءات دفعة واحدة (4 استعلامات فقط بدلاً من 4N) ───
+            $allAttendances = Attendance::whereIn('employee_id', $employeeIds)
+                ->whereBetween('work_date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->get()
+                ->groupBy('employee_id');
+
+            $allLeaves = EmployeeLeave::whereIn('employee_id', $employeeIds)
+                ->where('status', 'approved')
+                ->where(function ($query) use ($startDate, $endDate) {
+                    $query->whereDate('start_date', '<=', $endDate->toDateString())
+                          ->whereDate('end_date', '>=', $startDate->toDateString());
+                })
+                ->get()
+                ->groupBy('employee_id');
+
+            $allCommissions = TechnicianCommission::whereIn('employee_id', $employeeIds)
+                ->where('status', 'approved')
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->get()
+                ->groupBy('employee_id');
+
+            $allDeductions = EmployeeDeduction::whereIn('employee_id', $employeeIds)
+                ->where('status', 'approved')
+                ->whereBetween('deduction_date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->get()
+                ->groupBy('employee_id');
+            // ────────────────────────────────────────────────────────────────────────────────────────────
+
+            $totalBasic       = 0;
+            $totalAllowances  = 0;
+            $totalDeductions  = 0;
+            $totalNet         = 0;
 
             foreach ($employees as $employee) {
                 $salary = $employee->currentSalary;
                 if (!$salary) continue;
 
-                $basic = (float) $salary->basic_salary;
+                $basic      = (float) $salary->basic_salary;
                 $allowances = (float) ($salary->housing_allowance + $salary->transport_allowance + $salary->other_allowances);
-                $dayRate = $basic / $totalMonthDays;
+                $dayRate    = $basic / $totalMonthDays;
                 $hourlyRate = $dayRate / 8; // شفت 8 ساعات عمل
 
-                // 1. حساب الحضور والغياب والتأخير
-                $attendances = Attendance::where('employee_id', $employee->id)
-                    ->whereBetween('work_date', [$startDate->toDateString(), $endDate->toDateString()])
-                    ->get();
+                // 1. حساب الحضور والغياب والإجازات والتأخير (من الذاكرة — بدون استعلام)
+                $attendances = $allAttendances->get($employee->id, collect());
+                $employeeLeaves = $allLeaves->get($employee->id, collect());
 
-                $presentDays = $attendances->where('status', '!=', 'absent')->count();
-                $absentDays = max(0, 26 - $presentDays); // معيار 26 يوم عمل شهري
-                $absenceCost = $absentDays * $dayRate;
+                $paidLeaveDays = 0;
+                $unpaidLeaveDays = 0;
 
-                $totalLateMinutes = $attendances->sum('late_minutes');
+                foreach ($employeeLeaves as $leave) {
+                    $leaveStart = Carbon::parse($leave->start_date)->startOfDay();
+                    $leaveEnd = Carbon::parse($leave->end_date)->startOfDay();
+                    $windowStart = $startDate->copy()->startOfDay();
+                    $windowEnd = $endDate->copy()->startOfDay();
+
+                    $effectiveStart = $leaveStart->greaterThan($windowStart) ? $leaveStart : $windowStart;
+                    $effectiveEnd = $leaveEnd->lessThan($windowEnd) ? $leaveEnd : $windowEnd;
+
+                    if ($effectiveStart->lessThanOrEqualTo($effectiveEnd)) {
+                        $days = (int) $effectiveStart->diffInDays($effectiveEnd) + 1;
+                        if ($leave->leave_type === 'unpaid') {
+                            $unpaidLeaveDays += $days;
+                        } else {
+                            $paidLeaveDays += $days;
+                        }
+                    }
+                }
+
+                $presentDays         = $attendances->where('status', '!=', 'absent')->count();
+                $coveredDays         = $presentDays + $paidLeaveDays;
+                $unexcusedAbsentDays = max(0, 26 - $coveredDays); // معيار 26 يوم عمل شهري
+                $absentDays          = $unexcusedAbsentDays + $unpaidLeaveDays;
+                $absenceCost         = $absentDays * $dayRate;
+
+                $totalLateMinutes  = $attendances->sum('late_minutes');
                 $totalOvertimeHours = (float) $attendances->sum('overtime_hours');
-                $overtimeValue = round($totalOvertimeHours * $hourlyRate * 1.5, 2);
+                $overtimeValue     = round($totalOvertimeHours * $hourlyRate * 1.5, 2);
 
-                // 2. تجميع عمولات الفني إن وجدت
-                $commissions = (float) TechnicianCommission::where('employee_id', $employee->id)
-                    ->where('status', 'approved')
-                    ->whereBetween('created_at', [$startDate, $endDate])
-                    ->sum('commission_amount');
+                // 2. تجميع عمولات الفني (من الذاكرة — بدون استعلام)
+                $commissions = (float) $allCommissions->get($employee->id, collect())->sum('commission_amount');
 
-                // 3. تجميع الجزاءات المعتمدة خلال الشهر
-                $approvedDeductions = (float) EmployeeDeduction::where('employee_id', $employee->id)
-                    ->where('status', 'approved')
-                    ->whereBetween('deduction_date', [$startDate->toDateString(), $endDate->toDateString()])
-                    ->sum('amount');
+                // 3. تجميع الجزاءات المعتمدة (من الذاكرة — بدون استعلام)
+                $approvedDeductions = (float) $allDeductions->get($employee->id, collect())->sum('amount');
 
-                $allDeductions = round($absenceCost + $approvedDeductions, 2);
-                $netSalary = max(0, round(($basic + $allowances + $overtimeValue + $commissions) - $allDeductions, 2));
+                $allDeductionsTotal = round($absenceCost + $approvedDeductions, 2);
+                $netSalary          = max(0, round(($basic + $allowances + $overtimeValue + $commissions) - $allDeductionsTotal, 2));
 
                 PayrollItem::create([
-                    'payroll_id' => $payroll->id,
-                    'employee_id' => $employee->id,
-                    'basic_salary' => $basic,
-                    'total_allowance' => $allowances + $commissions,
-                    'total_deduction' => $allDeductions,
-                    'total_overtime' => $overtimeValue,
-                    'net_salary' => $netSalary,
-                    'absent_days' => $absentDays,
+                    'payroll_id'         => $payroll->id,
+                    'employee_id'        => $employee->id,
+                    'basic_salary'       => $basic,
+                    'total_allowance'    => $allowances + $commissions,
+                    'total_deduction'    => $allDeductionsTotal,
+                    'total_overtime'     => $overtimeValue,
+                    'net_salary'         => $netSalary,
+                    'absent_days'        => $absentDays,
                     'late_minutes_total' => $totalLateMinutes,
                 ]);
 
-                $totalBasic += $basic;
+                $totalBasic      += $basic;
                 $totalAllowances += ($allowances + $commissions);
-                $totalDeductions += $allDeductions;
-                $totalNet += $netSalary;
+                $totalDeductions += $allDeductionsTotal;
+                $totalNet        += $netSalary;
             }
 
             $payroll->update([
-                'total_basic' => $totalBasic,
+                'total_basic'      => $totalBasic,
                 'total_allowances' => $totalAllowances,
                 'total_deductions' => $totalDeductions,
-                'total_net' => $totalNet,
+                'total_net'        => $totalNet,
             ]);
 
             // إشعار المشرف العام بأن المسير جاهز للاعتماد
@@ -153,11 +202,15 @@ class PayrollService implements PayrollServiceInterface
             throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
         }
 
-        $approvedBy = $approvedBy ?? User::first()?->id ?? 1;
+        $approverId = $approvedBy ?? Auth::id();
+
+        if (empty($approverId)) {
+            throw new Exception("يجب تحديد المستخدم المعتمِد — لا يمكن اعتماد مسير الرواتب بدون تسجيل المسؤول.");
+        }
 
         return $payroll->update([
-            'status' => 'approved',
-            'approved_by' => $approvedBy,
+            'status'      => 'approved',
+            'approved_by' => $approverId,
         ]);
     }
 

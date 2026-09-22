@@ -65,21 +65,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
             const basicSalary = emp.current_salary?.basic_salary ? Number(emp.current_salary.basic_salary).toLocaleString('ar-EG') : '—';
             const deptName = emp.job_title?.department?.name || 'الورشة العامة';
-            const titleName = emp.job_title?.title_name || 'موظف';
+            const titleName = emp.job_title?.title || emp.job_title?.title_name || 'موظف';
             const branchName = emp.branch?.name || 'الفرع الرئيسي';
 
             html += `
                 <tr>
                     <td>
                         <div class="d-flex align-items-center">
-                            <div class="avatar-xs me-2">
+                            <div class="avatar-xs flex-shrink-0 me-2">
                                 <span class="avatar-title bg-primary-subtle text-primary rounded-circle fw-bold">
-                                    ${emp.full_name.charAt(0)}
+                                    ${emp.full_name ? emp.full_name.charAt(0) : 'م'}
                                 </span>
                             </div>
-                            <div>
-                                <h6 class="mb-0 fs-14 fw-bold">${emp.full_name}</h6>
-                                <small class="text-muted font-monospace">${emp.employee_code} | ${emp.phone}</small>
+                            <div class="flex-grow-1 overflow-hidden">
+                                <h6 class="mb-0 fs-14 fw-bold text-dark text-truncate">${emp.full_name}</h6>
+                                <small class="text-muted font-monospace text-truncate d-block">${emp.employee_code} | ${emp.phone}</small>
                             </div>
                         </div>
                     </td>
@@ -90,9 +90,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     </td>
                     <td>
                         <span class="badge bg-info-subtle text-info fs-12">
-                            <i class="ri-time-line align-middle me-1"></i>${emp.shift_start_time.substring(0, 5)} - ${emp.shift_end_time.substring(0, 5)}
+                            <i class="ri-time-line align-middle me-1"></i>${emp.shift_start_time ? emp.shift_start_time.substring(0, 5) : '09:00'} - ${emp.shift_end_time ? emp.shift_end_time.substring(0, 5) : '17:00'}
                         </span>
-                        <small class="text-muted d-block fs-11">سماح: ${emp.grace_period_minutes} د</small>
+                        <small class="text-muted d-block fs-11">سماح: ${emp.grace_period_minutes || 15} د</small>
                     </td>
                     <td>
                         <span class="fw-bold fs-14 text-primary">${basicSalary} ج.م</span>
@@ -100,10 +100,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     <td>${statusBadge}</td>
                     <td class="text-center">
                         <div class="dropdown">
-                            <button class="btn btn-soft-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <button class="btn btn-soft-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
                                 <i class="ri-more-fill align-middle"></i>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li><a class="dropdown-item btn-view-profile" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-eye-line me-2 text-primary"></i>عرض الملف التعريفي</a></li>
                                 <li><a class="dropdown-item btn-edit-emp" href="javascript:void(0);" data-id="${emp.id}"><i class="ri-pencil-line me-2 text-warning"></i>تعديل البيانات</a></li>
                                 <li><hr class="dropdown-divider"></li>
@@ -509,7 +509,33 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('gridViewContainer').classList.remove('d-none');
     };
 
+    // Read query params from URL if present (e.g. ?search=EMP-0101)
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlSearch = urlParams.get('search');
+    const urlBranch = urlParams.get('branch_id');
+    const urlStatus = urlParams.get('status');
+    const openProfileId = urlParams.get('open_profile');
+
+    if (urlSearch && document.getElementById('searchEmployeeInput')) {
+        document.getElementById('searchEmployeeInput').value = urlSearch;
+    }
+    if (urlBranch && document.getElementById('branchFilter')) {
+        document.getElementById('branchFilter').value = urlBranch;
+    }
+    if (urlStatus && document.getElementById('statusFilter')) {
+        document.getElementById('statusFilter').value = urlStatus;
+    }
+
     // Initial Load
     fetchEmployees(1);
+
+    if (openProfileId) {
+        setTimeout(() => {
+            const profileBtn = document.querySelector(`.btn-view-profile[data-id="${openProfileId}"]`);
+            if (profileBtn) {
+                profileBtn.click();
+            }
+        }, 600);
+    }
 });
 </script>

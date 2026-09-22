@@ -1,59 +1,115 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# 🏢 نظام مجموعة الحسيني لإدارة الفروع ونقاط البيع والموارد البشرية
+### Al-Husseini ERP & POS Management System
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="https://img.shields.io/badge/Laravel-12.x-FF2D20?style=for-the-badge&logo=laravel&logoColor=white" alt="Laravel 12">
+  <img src="https://img.shields.io/badge/PHP-%5E8.2-777BB4?style=for-the-badge&logo=php&logoColor=white" alt="PHP 8.2+">
+  <img src="https://img.shields.io/badge/Pest_Tests-91_Passed-00D084?style=for-the-badge&logo=pest&logoColor=white" alt="Pest Tests">
+  <img src="https://img.shields.io/badge/Branch-دمياط_الجديدة-0D6EFD?style=for-the-badge" alt="Active Branch">
+  <img src="https://img.shields.io/badge/Search-Spotlight_Ctrl+K-F59E0B?style=for-the-badge" alt="Spotlight Search">
 </p>
 
-## About Laravel
+---
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 📌 عن النظام (About The System)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+**نظام مجموعة الحسيني** هو نظام تخطيط موارد مؤسسي ونقاط بيع متكامل (**ERP & POS**) متخصص في تجارة وخدمات بطاريات السيارات، الزيوت، الفلاتر، وإدارة ورش الصيانة وخدمات الإنقاذ السريع، بالإضافة إلى منظومة كاملة لإدارة الموارد البشرية والشؤون المالية والمخزون.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* **الفرع التشغيلي النشط حالياً:** `فرع دمياط الجديدة` (شارع المحجوب، دمياط الجديدة، محافظة دمياط - كود: `MAIN`).
+* **قابلية التوسع:** النظام مهيأ بالكامل لإدارة الفروع المتعددة (**Multi-Branch Ready**).
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## 🚀 الميزات الرئيسية (Key Modules & Features)
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### 1. شؤون العاملين والموارد البشرية (HR Management)
+* **دليل الموظفين:** ملف شامل لكل موظف، عقود العمل، البدلات، الشفتات ومواعيد الحضور وفترات السماح.
+* **محرك الحضور والانصراف الذكي:**
+  - مكافحة البصمة المزدوجة وفترة تبريد 5 دقائق (Anti-Passback Debounce).
+  - منع تسجيل الحضور المكرر بعد مرور أكثر من 5 دقائق.
+  - احتساب دقائق التأخير التلقائي وتطبيق الجزاءات الإدارية المعتمدة آلياً.
+  - الحفاظ على سلامة التسلسل الزمني وبصمات أيام الإجازات كعمل إضافي (Overtime).
+* **مسيرات الرواتب (Monthly Payroll):**
+  - دورة حياة ثلاثية المراحل: `draft` مسودة -> `approved` اعتماد -> `disbursed` صرف وإغلاق مالي.
+  - استعلامات مجمعة عالية الأداء (Bulk Queries) تمنع بطء الحسابات واستعلامات N+1.
+* **التقارير والإحصائيات التفاعلية (HR Reports):**
+  - فلاتر يومية وشهرية وفترات مخصصة آمنة التوقيت بدون أي انزياح زمني.
+  - رسوم بيانية تفاعلية (ApexCharts) لمعدلات الانضباط وتوزيع الغياب والتأخير.
+  - طباعة كارت الموظف الفردي بشكل مستقل، وتصدير إكسيل عربي معتمد (`UTF-8 BOM`).
 
-## Laravel Sponsors
+### 2. المبيعات ونقاط البيع السريعة (POS & Sales)
+* إصدار فواتير بيع وتركيب فورية.
+* خصم قيمة البطاريات القديمة (الكهنة) وتوجيهها لمخزن الكهنة (`ScrapBatteriesInventory`).
+* تسجيل وتوليد شهادات الضمان الرقمية التلقائية وربطها بسيارة العميل والشاسيه.
+* دفتر أستاذ الحسابات الآجلة والحدود الائتمانية للعملاء (`CreditLedgerEntry`).
+* احتساب وتوزيع عمولات الفنيين على الفواتير المعتمدة.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+### 3. منظومة الفهارس والبحث الشامل (Global Spotlight Search)
+* **اختصار سريع:** فتح نافذة البحث الفوري من أي شاشة عبر `Ctrl + K` أو `Cmd + K`.
+* **مطابقة عربية ذكية (Bidirectional Normalization):** تجاوز أخطاء الهمزات (`أ/إ/آ`) والتاء المربوطة (`ة/ه`) والياء والألف المقصورة (`ي/ى`).
+* **فهارس قواعد بيانات مركبة:** استجابة استعلامات البحث خلال أقل من 15ms.
 
-### Premium Partners
+---
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## 🏛️ المعمارية البرمجية (Architecture & Engineering Standards)
 
-## Contributing
+النظام مبني وفق معمارية برمجية صارمة وعالية الموثوقية:
+* **Service-Layer Pattern & Contracts:** تجريد كامل لمنطق الأعمال داخل `app/Services/Hr/*` ومطابقة العقود في `app/Contracts/Hr/*`.
+* **Database Transactions:** حماية جميع الحركات المالية، الخصومات، والرواتب داخل `DB::transaction`.
+* **N+1 Prevention:** تفعيل `Model::preventLazyLoading(!app()->isProduction())` لمنع أي استعلامات كسلية غير مصرح بها.
+* **Role-Based Access Control:** تحكم دقيق في الصلاحيات باستخدام حزمة `spatie/laravel-permission`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+---
 
-## Code of Conduct
+## 🛠️ متطلبات التشغيل والتثبيت (Quick Start)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### المتطلبات (Prerequisites):
+* PHP >= 8.2 (مع امتدادات: `pdo`, `mbstring`, `openssl`, `tokenizer`, `xml`, `ctype`, `json`, `sqlite3` أو `pdo_mysql`)
+* Composer >= 2.x
+* Node.js & NPM
 
-## Security Vulnerabilities
+### خطوات التشغيل:
+```bash
+# 1. استنساخ المشروع وتثبيت الحزم
+git clone <repository-url>
+cd Al-Husseini
+composer install
+npm install
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+# 2. ملف البيئة وتوليد المفتاح
+cp .env.example .env
+php artisan key:generate
 
-## License
+# 3. ترحيل قاعدة البيانات وتغذية البيانات الأساسية
+php artisan migrate --seed
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+# 4. بناء الأصول وتشغيل خادم التطوير
+npm run build
+# أو في بيئة التطوير المباشر:
+composer run dev
+```
+
+---
+
+## 🧪 حزمة الاختبارات الآلية (Automated Testing)
+
+يحتوي المشروع على حزمة اختبارات شاملة ومكثفة لاختبار سيناريوهات دورة حياة الموظف، حسابات الرواتب، قيود الحضور، والبحث الشامل:
+
+```bash
+# تشغيل كامل حزمة الاختبارات:
+php artisan test
+
+# نتيجة الاختبارات الحالية:
+# Tests:    91 passed (312 assertions)
+# Duration: ~5.6s
+```
+
+---
+
+## 📚 وثائق المشروع الفنية (Technical Documentation)
+
+* [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md): **المرجع التقني الشامل** للنظام (خريطة الكيانات، القواعد الصارمة، الفهارس، ومعايير Eager Loading).
+* [plans/PLAN.md](plans/PLAN.md): خطة العمل والمراحل التنفيذية المتكاملة لمشروع التطوير والترقية.
+
+---
+**حقوق التطوير والتوزيع © 2026 مجموعة الحسيني — جميع الحقوق محفوظة.**

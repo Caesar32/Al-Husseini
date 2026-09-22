@@ -3,7 +3,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-body">
-                <div class="table-responsive">
+                <div class="table-responsive" style="min-height: 380px;">
                     <table class="table align-middle table-nowrap mb-0 table-hover">
                         <thead class="table-light">
                             <tr>

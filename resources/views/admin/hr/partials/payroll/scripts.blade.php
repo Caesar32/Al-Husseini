@@ -302,27 +302,170 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     });
 
-    // Client-side search and branch filter on the table
+    // -------------------------------------------------------------
+    // Universal Arabic Normalization & Fuzzy-Matching Engine
+    // -------------------------------------------------------------
+    function normalizeArabic(text) {
+        if (!text) return '';
+        return text.toString().toLowerCase()
+            .replace(/[\u064B-\u065F\u0670]/g, '') // remove tashkeel/diacritics
+            .replace(/[أإآء]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/[يى]/g, 'ي')
+            .replace(/[\s\-_]+/g, ' ')
+            .trim();
+    }
+
+    function isMatch(target, query) {
+        if (!query) return true;
+        if (!target) return false;
+        const normTarget = normalizeArabic(target);
+        const normQuery = normalizeArabic(query);
+        const rawTarget = target.toString().toLowerCase();
+        const rawQuery = query.toString().toLowerCase();
+
+        if (rawTarget.includes(rawQuery) || normTarget.includes(normQuery)) {
+            return true;
+        }
+
+        // Match without punctuation/dashes (e.g. EMP-0101 vs EMP0101 vs 0101)
+        const strippedTarget = rawTarget.replace(/[\s\-_]+/g, '');
+        const strippedQuery = rawQuery.replace(/[\s\-_]+/g, '');
+        return strippedTarget.includes(strippedQuery) || strippedQuery.includes(strippedTarget);
+    }
+
+    // Client-side search and branch filter on the payroll tables
     const searchInput = document.getElementById('searchPayrollInput');
     const branchFilter = document.getElementById('payrollBranchFilter');
+    const btnClearSearch = document.getElementById('btnClearPayrollSearch');
 
     function filterPayrollRows() {
-        const query = searchInput.value.trim().toLowerCase();
-        const branch = branchFilter.value;
+        const query = (searchInput?.value || '').trim();
+        const branch = branchFilter?.value || 'all';
 
-        document.querySelectorAll('#payrollTableBody tr').forEach(row => {
+        // 1. Filter Employee Monthly Breakdown Table
+        const empRows = document.querySelectorAll('#payrollTableBody tr.payroll-emp-row');
+        let visibleEmpCount = 0;
+
+        empRows.forEach(row => {
             const rowBranch = row.getAttribute('data-branch');
             const rowName = row.getAttribute('data-name') || '';
+            const rowCode = row.getAttribute('data-code') || '';
             const rowRole = row.getAttribute('data-role') || '';
+            const rowDept = row.getAttribute('data-department') || '';
+            const rowPhone = row.getAttribute('data-phone') || '';
 
             const matchesBranch = (branch === 'all' || rowBranch === branch);
-            const matchesQuery = (!query || rowName.includes(query) || rowRole.includes(query));
+            const matchesQuery = !query ||
+                isMatch(rowName, query) ||
+                isMatch(rowCode, query) ||
+                isMatch(rowRole, query) ||
+                isMatch(rowDept, query) ||
+                isMatch(rowPhone, query);
 
-            row.style.display = (matchesBranch && matchesQuery) ? '' : 'none';
+            if (matchesBranch && matchesQuery) {
+                row.style.display = '';
+                visibleEmpCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noEmpResultsRow = document.getElementById('payrollNoResultsRow');
+        if (noEmpResultsRow) {
+            noEmpResultsRow.style.display = (visibleEmpCount === 0 && empRows.length > 0) ? '' : 'none';
+        }
+
+        // 2. Filter Deductions Log Table
+        const dedRows = document.querySelectorAll('#deductionsTableBody tr.deduction-log-row');
+        let visibleDedCount = 0;
+
+        dedRows.forEach(row => {
+            const rowEmp = row.getAttribute('data-employee') || '';
+            const rowCode = row.getAttribute('data-code') || '';
+            const rowId = row.getAttribute('data-id') || '';
+            const rowReason = row.getAttribute('data-reason') || '';
+
+            const matchesQuery = !query ||
+                isMatch(rowEmp, query) ||
+                isMatch(rowCode, query) ||
+                isMatch(rowId, query) ||
+                isMatch(rowReason, query);
+
+            if (matchesQuery) {
+                row.style.display = '';
+                visibleDedCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noDedResultsRow = document.getElementById('deductionNoResultsRow');
+        if (noDedResultsRow) {
+            noDedResultsRow.style.display = (visibleDedCount === 0 && dedRows.length > 0) ? '' : 'none';
+        }
+
+        // 3. Filter Payroll Batches Table by Branch
+        const batchRows = document.querySelectorAll('tr.payroll-batch-row');
+        let visibleBatchCount = 0;
+
+        batchRows.forEach(row => {
+            const rowBranch = row.getAttribute('data-branch');
+            const matchesBranch = (branch === 'all' || rowBranch === branch);
+
+            if (matchesBranch) {
+                row.style.display = '';
+                visibleBatchCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        const noBatchResultsRow = document.getElementById('batchNoResultsRow');
+        if (noBatchResultsRow) {
+            noBatchResultsRow.style.display = (visibleBatchCount === 0 && batchRows.length > 0) ? '' : 'none';
+        }
+    }
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterPayrollRows);
+        searchInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                filterPayrollRows();
+            }
         });
     }
 
-    searchInput.addEventListener('input', filterPayrollRows);
-    branchFilter.addEventListener('change', filterPayrollRows);
+    if (branchFilter) {
+        branchFilter.addEventListener('change', filterPayrollRows);
+    }
+
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', function() {
+            if (searchInput) {
+                searchInput.value = '';
+                filterPayrollRows();
+                searchInput.focus();
+            }
+        });
+    }
+
+    // Check URL parameters on page load (e.g. ?search=EMP-0101&branch_id=1)
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchParam = urlParams.get('search');
+    const branchParam = urlParams.get('branch_id');
+
+    if (searchParam && searchInput) {
+        searchInput.value = searchParam;
+    }
+    if (branchParam && branchFilter) {
+        branchFilter.value = branchParam;
+    }
+
+    // Execute initial filtering if parameters are present
+    if (searchParam || (branchParam && branchParam !== 'all')) {
+        filterPayrollRows();
+    }
 });
 </script>

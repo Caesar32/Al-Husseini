@@ -7,10 +7,12 @@ use App\Models\Employee;
 use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\User;
+use App\Models\EmployeeLeave;
 use App\Notifications\EmployeeLateNotification;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
+use Exception;
 
 class AttendanceService implements AttendanceServiceInterface
 {
@@ -38,11 +40,23 @@ class AttendanceService implements AttendanceServiceInterface
      */
     public function getDailyStats(string $date): array
     {
+        $totalExpected = Employee::active()->count();
+        $present = Attendance::whereDate('work_date', $date)->where('status', 'present')->count();
+        $late = Attendance::whereDate('work_date', $date)->where('status', 'late')->count();
+        $absent = Attendance::whereDate('work_date', $date)->where('status', 'absent')->count();
+        $holiday = Attendance::whereDate('work_date', $date)->where('status', 'holiday')->count();
+        $onLeave = EmployeeLeave::where('status', 'approved')
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->count();
+
         return [
-            'total_expected' => Employee::active()->count(),
-            'present' => Attendance::whereDate('work_date', $date)->where('status', 'present')->count(),
-            'late' => Attendance::whereDate('work_date', $date)->where('status', 'late')->count(),
-            'absent' => Attendance::whereDate('work_date', $date)->where('status', 'absent')->count(),
+            'total_expected' => $totalExpected,
+            'present' => $present,
+            'late' => $late,
+            'absent' => $absent,
+            'holiday' => $holiday,
+            'on_leave' => $onLeave,
         ];
     }
 
@@ -53,7 +67,7 @@ class AttendanceService implements AttendanceServiceInterface
     {
         return [
             'branches' => Branch::where('is_active', true)->get(),
-            'employees' => Employee::active()->with('branch')->get(),
+            'employees' => Employee::active()->with(['branch', 'jobTitle'])->get(),
         ];
     }
 
@@ -82,25 +96,129 @@ class AttendanceService implements AttendanceServiceInterface
                 ]);
             }
 
-            // 0 أو check_in
-            if ($punchState === 0 || $punchState === '0' || $punchState === 'check_in') {
-                if (!$attendance->check_in || $punchTime->lessThan($attendance->check_in)) {
-                    $attendance->check_in = $punchTime;
-                    $this->calculateLateness($attendance, $employee, $punchTime);
+            $isCheckIn = ($punchState === 0 || $punchState === '0' || $punchState === 'check_in');
+            $isCheckOut = ($punchState === 1 || $punchState === '1' || $punchState === 'check_out');
+
+            if (!$isCheckIn && !$isCheckOut) {
+                throw new Exception("نوع البصمة غير صالح، يجب أن يكون حضور أو انصراف.");
+            }
+
+            // فحص ما إذا كان الموظف في إجازة معتمدة لليوم
+            $isOnLeave = $employee->status === 'on_leave' || EmployeeLeave::where('employee_id', $employee->id)
+                ->where('status', 'approved')
+                ->whereDate('start_date', '<=', $workDate)
+                ->whereDate('end_date', '>=', $workDate)
+                ->exists();
+
+            if ($isCheckIn) {
+                // إذا كان الموظف مسجل حضور بالفعل لنفس اليوم
+                if ($attendance && $attendance->check_in) {
+                    $diffInMinutes = abs($punchTime->diffInMinutes($attendance->check_in));
+
+                    // 1. قاعدة فترة التبريد (Debounce 5 دقائق): بصمة مكررة عرضية يتم تجاهلها والحفاظ على الأصلية
+                    if ($diffInMinutes < 5) {
+                        return $attendance;
+                    }
+
+                    // 2. إذا مضت أكثر من 5 دقائق: رفض العملية صراحة
+                    $checkInFormatted = $attendance->check_in->format('h:i A');
+                    throw new Exception("الموظف ({$employee->full_name}) مسجل حضور بالفعل اليوم في تمام الساعة ({$checkInFormatted}). لا يمكن تسجيل حضور مكرر.");
                 }
-            } elseif ($punchState === 1 || $punchState === '1' || $punchState === 'check_out') {
-                if (!$attendance->check_out || $punchTime->greaterThan($attendance->check_out)) {
-                    $attendance->check_out = $punchTime;
+
+                if (!$attendance) {
+                    $attendance = Attendance::create([
+                        'employee_id' => $employee->id,
+                        'work_date' => $workDate,
+                        'status' => $isOnLeave ? 'holiday' : 'present',
+                        'source' => $source,
+                    ]);
+                } else {
+                    $attendance->status = $isOnLeave ? 'holiday' : 'present';
+                    $attendance->source = $source;
+                }
+
+                $attendance->check_in = $punchTime;
+                $this->calculateLateness($attendance, $employee, $punchTime);
+
+                // الموظف في إجازة معتمدة: لا نلغي الإجازة، بل نجعل الحالة holiday
+                if ($isOnLeave) {
+                    $attendance->status = 'holiday';
+                }
+
+            } elseif ($isCheckOut) {
+                // 3. رفض الانصراف بدون تسجيل حضور مسبق
+                if (!$attendance || !$attendance->check_in) {
+                    throw new Exception("لا يمكن تسجيل انصراف لموظف لم يسجل حضوره اليوم ({$employee->full_name}). يرجى تسجيل الحضور أولاً أو مراجعة المشرف.");
+                }
+
+                // 4. رفض الانصراف إذا كان وقته يسبق أو يساوي وقت الحضور
+                if ($punchTime->lessThanOrEqualTo($attendance->check_in)) {
+                    $checkInFormatted = $attendance->check_in->format('h:i A');
+                    $checkOutFormatted = $punchTime->format('h:i A');
+                    throw new Exception("وقت الانصراف ({$checkOutFormatted}) لا يمكن أن يسبق أو يساوي وقت الحضور المسجل ({$checkInFormatted}).");
+                }
+
+                // فترة التبريد للانصراف (Debounce 5 دقائق)
+                if ($attendance->check_out) {
+                    $diffInMinutes = abs($punchTime->diffInMinutes($attendance->check_out));
+                    if ($diffInMinutes < 5) {
+                        return $attendance;
+                    }
+                }
+
+                $attendance->check_out = $punchTime;
+
+                // إذا كان الموظف في إجازة معتمدة، تُحتسب ساعات عمله كعمل إضافي (Overtime)
+                if ($attendance->status === 'holiday' || $isOnLeave) {
+                    $workedHours = round($attendance->check_in->diffInMinutes($punchTime) / 60, 2);
+                    $attendance->overtime_hours = $workedHours;
+                    $attendance->early_leave_minutes = 0;
+                } else {
                     $this->calculateEarlyLeaveAndOvertime($attendance, $employee, $punchTime);
                 }
             }
 
             $attendance->save();
 
-            // إذا كان الموظف متأخراً يتم إرسال إشعار فوري للإدارة
+            // إرسال إشعار فوري في حالة التأخير
             if ($attendance->late_minutes > 0) {
                 $this->notifyAdminsAboutLateness($attendance);
             }
+
+            return $attendance;
+        });
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function markAbsent(int $employeeId, string $date, ?string $reason = null): Attendance
+    {
+        return DB::transaction(function () use ($employeeId, $date, $reason) {
+            $employee = Employee::findOrFail($employeeId);
+
+            $attendance = Attendance::where('employee_id', $employee->id)
+                ->whereDate('work_date', $date)
+                ->first();
+
+            if (!$attendance) {
+                $attendance = Attendance::create([
+                    'employee_id' => $employee->id,
+                    'work_date' => $date,
+                    'status' => 'absent',
+                    'source' => 'manual',
+                ]);
+            } else {
+                $attendance->status = 'absent';
+                $attendance->check_in = null;
+                $attendance->check_out = null;
+                $attendance->late_minutes = 0;
+                $attendance->early_leave_minutes = 0;
+                $attendance->overtime_hours = 0;
+                $attendance->source = 'manual';
+            }
+
+            $attendance->save();
 
             return $attendance;
         });
@@ -118,6 +236,8 @@ class AttendanceService implements AttendanceServiceInterface
             } else {
                 $attendance->late_minutes = 0;
             }
+        } else {
+            $attendance->late_minutes = 0;
         }
     }
 
@@ -125,12 +245,21 @@ class AttendanceService implements AttendanceServiceInterface
     {
         $shiftEnd = Carbon::parse($attendance->work_date->format('Y-m-d') . ' ' . $employee->shift_end_time);
 
+        // إذا كان موعد نهاية الشفت أقل من موعد بدايته (وردية ليلية تعبر منتصف الليل للطوارئ)
+        if (Carbon::parse($employee->shift_end_time)->lessThan(Carbon::parse($employee->shift_start_time))) {
+            $shiftEnd->addDay();
+        }
+
         if ($checkOut->lessThan($shiftEnd)) {
             $attendance->early_leave_minutes = $checkOut->diffInMinutes($shiftEnd);
+            $attendance->overtime_hours = 0;
         } else {
+            $attendance->early_leave_minutes = 0;
             $overtimeMinutes = $shiftEnd->diffInMinutes($checkOut);
             if ($overtimeMinutes >= 30) {
                 $attendance->overtime_hours = round($overtimeMinutes / 60, 2);
+            } else {
+                $attendance->overtime_hours = 0;
             }
         }
     }

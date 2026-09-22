@@ -8,6 +8,10 @@ use App\Http\Controllers\Hr\LeaveController;
 use App\Http\Controllers\Hr\DeductionController;
 use App\Http\Controllers\Hr\PayrollController;
 use App\Http\Controllers\Hr\NotificationController;
+use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\SearchController;
+use App\Http\Controllers\Auth\LockScreenController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,6 +55,23 @@ Route::prefix('admin')->name('admin.')->group(function () {
             return view('admin.dashboard');
         })->name('dashboard')->middleware('can:dashboard.view');
 
+        // البحث الفوري الشامل (Global Spotlight Search)
+        Route::get('/global-search', [SearchController::class, 'globalSearch'])->name('global_search');
+
+        // قفل الشاشة (Lock Screen)
+        Route::get('/lockscreen', [LockScreenController::class, 'show'])->name('lockscreen');
+        Route::post('/lockscreen/unlock', [LockScreenController::class, 'unlock'])->name('lockscreen.unlock');
+
+        // الملف الشخصي (User Profile)
+        Route::get('/profile', [ProfileController::class, 'index'])->name('profile');
+        Route::put('/profile/info', [ProfileController::class, 'updateInfo'])->name('profile.info');
+        Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+        Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+
+        // إعدادات النظام والمنشأة (System Settings)
+        Route::get('/settings', [SettingController::class, 'index'])->name('settings')->middleware('can:settings.manage');
+        Route::post('/settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.manage');
+
         Route::get('/starter', function () {
             return view('admin.starter');
         })->name('starter');
@@ -71,6 +92,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             // الحضور والانصراف
             Route::get('/attendance', [AttendanceController::class, 'index'])->name('attendance')->middleware('can:attendance.view');
             Route::post('/attendance/punch', [AttendanceController::class, 'recordManual'])->name('attendance.punch')->middleware('can:attendance.manual_punch');
+            Route::post('/attendance/mark-absent', [AttendanceController::class, 'markAbsent'])->name('attendance.mark_absent')->middleware('can:attendance.manual_punch');
 
             // الإجازات
             Route::get('/leaves', [LeaveController::class, 'index'])->name('leaves.index')->middleware('can:leaves.manage');

@@ -11,9 +11,13 @@ class PurchaseInvoiceObserver
     public function created(PurchaseInvoice $invoice): void
     {
         DB::transaction(function () use ($invoice) {
+            // ─── Eager Load لمنع N+1 داخل الـ Observer ───────────────────────────
+            $invoice->load(['items.product', 'supplier']);
+            // ──────────────────────────────────────────────────────────────────────
+
             // 1. زيادة رصيد المخزون وتحديث سعر التكلفة للأصناف الموردة
             foreach ($invoice->items as $item) {
-                $product = $item->product;
+                $product = $item->product; // محمّل مسبقاً
                 if ($product) {
                     $product->increment('current_stock', $item->quantity);
                     $product->update(['cost_price' => $item->unit_cost_price]);
@@ -21,7 +25,7 @@ class PurchaseInvoiceObserver
             }
 
             // 2. تحديث حساب المورد ودفتر الأستاذ في حالة الآجل أو السداد الجزئي
-            $supplier = $invoice->supplier;
+            $supplier = $invoice->supplier; // محمّل مسبقاً
             if ($supplier) {
                 $balanceBefore = $supplier->current_balance;
                 $balanceAfter = $balanceBefore + $invoice->remaining_amount;

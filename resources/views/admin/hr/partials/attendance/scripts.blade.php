@@ -67,8 +67,39 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 3. Render Table Rows
+    // -------------------------------------------------------------
+    // Universal Arabic Normalization & Fuzzy-Matching Engine
+    // -------------------------------------------------------------
+    function normalizeArabic(text) {
+        if (!text) return '';
+        return text.toString().toLowerCase()
+            .replace(/[\u064B-\u065F\u0670]/g, '')
+            .replace(/[أإآء]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/[يى]/g, 'ي')
+            .replace(/[\s\-_]+/g, ' ')
+            .trim();
+    }
+
+    function isMatch(target, query) {
+        if (!query) return true;
+        if (!target) return false;
+        const normTarget = normalizeArabic(target);
+        const normQuery = normalizeArabic(query);
+        const rawTarget = target.toString().toLowerCase();
+        const rawQuery = query.toString().toLowerCase();
+
+        if (rawTarget.includes(rawQuery) || normTarget.includes(normQuery)) {
+            return true;
+        }
+
+        const strippedTarget = rawTarget.replace(/[\s\-_]+/g, '');
+        const strippedQuery = rawQuery.replace(/[\s\-_]+/g, '');
+        return strippedTarget.includes(strippedQuery) || strippedQuery.includes(strippedTarget);
+    }
+
     window.renderTable = function() {
-        const searchVal = (document.getElementById('searchEmployeeInput')?.value || '').trim().toLowerCase();
+        const searchVal = (document.getElementById('searchEmployeeInput')?.value || '').trim();
         const tbody = document.getElementById('attendanceTableBody');
         if (!tbody) return;
 
@@ -89,12 +120,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (currentFilterTab === 'absent' && status !== 'absent') return;
             }
 
-            // Search Filter
+            // Search Filter with Arabic Normalization & Multi-field
             if (searchVal) {
-                const matchName = (emp.full_name || '').toLowerCase().includes(searchVal);
-                const matchCode = (emp.employee_code || '').toLowerCase().includes(searchVal);
-                const matchRole = (emp.job_title?.title_name || '').toLowerCase().includes(searchVal);
-                if (!matchName && !matchCode && !matchRole) return;
+                const roleName = emp.job_title?.title || emp.job_title?.title_name || '';
+                const branchName = emp.branch?.name || '';
+                const phone = emp.phone || '';
+
+                const matches = isMatch(emp.full_name, searchVal) ||
+                    isMatch(emp.employee_code, searchVal) ||
+                    isMatch(roleName, searchVal) ||
+                    isMatch(branchName, searchVal) ||
+                    isMatch(phone, searchVal);
+
+                if (!matches) return;
             }
 
             // Badges
@@ -108,12 +146,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 if (punchOut === '-') {
                     directActionBtn = `
-                        <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'check_out')">
-                            <i class="ri-logout-box-r-line"></i> تسجيل انصراف الآن
-                        </button>
+                        <div class="d-inline-flex gap-1">
+                            <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'check_out')">
+                                <i class="ri-logout-box-r-line"></i> تسجيل انصراف
+                            </button>
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-punch-action" onclick="markAbsent('${emp.id}', '${emp.full_name}')" title="تسجيل كغائب">
+                                <i class="ri-user-unfollow-line"></i> غياب
+                            </button>
+                        </div>
                     `;
                 } else {
-                    directActionBtn = `<span class="badge bg-light text-muted border px-2 py-1 fs-12"><i class="ri-check-double-line text-success me-1"></i>أتم الوردية وانصرف</span>`;
+                    directActionBtn = `
+                        <div class="d-inline-flex align-items-center gap-1">
+                            <span class="badge bg-light text-muted border px-2 py-1 fs-12"><i class="ri-check-double-line text-success me-1"></i>أتم الوردية</span>
+                            <button type="button" class="btn btn-sm btn-soft-danger btn-punch-action" onclick="markAbsent('${emp.id}', '${emp.full_name}')" title="إلغاء الحضور وتسجيل غياب">
+                                <i class="ri-user-unfollow-line"></i> غياب
+                            </button>
+                        </div>
+                    `;
                 }
             } else if (status === 'late') {
                 statusBadge = '<span class="badge bg-warning text-dark fs-12 px-3 py-1 fw-bold shadow-sm"><i class="ri-alarm-warning-line me-1"></i>متأخر</span>';
@@ -129,12 +179,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button type="button" class="btn btn-sm btn-danger btn-punch-action" onclick="openDeductionModal('${emp.id}')" title="تطبيق خصم فوري على التأخير">
                             <i class="ri-scissors-cut-line"></i> خصم تأخير
                         </button>
+                        <button type="button" class="btn btn-sm btn-soft-danger btn-punch-action" onclick="markAbsent('${emp.id}', '${emp.full_name}')" title="تسجيل كغائب">
+                            <i class="ri-user-unfollow-line"></i> غياب
+                        </button>
                     </div>
                 `;
+            } else if (status === 'holiday') {
+                statusBadge = '<span class="badge bg-purple text-white fs-12 px-3 py-1 fw-bold shadow-sm" style="background-color: #8b5cf6;"><i class="ri-calendar-check-line me-1"></i>عمل في يوم إجازة (أوفر تايم)</span>';
+                latenessBadge = `<span class="badge bg-purple-subtle text-purple fs-11 fw-bold">+${att?.overtime_hours || 0} س إضافي</span>`;
+                directActionBtn = punchOut === '-' ? `
+                    <button type="button" class="btn btn-sm btn-outline-primary btn-punch-action" onclick="punchDirect('${emp.id}', 'check_out')">
+                        <i class="ri-logout-box-r-line"></i> انصراف إضافي
+                    </button>
+                ` : `<span class="badge bg-light text-muted border px-2 py-1 fs-12">أتم العمل الإضافي</span>`;
             } else if (emp.status === 'on_leave') {
                 statusBadge = '<span class="badge bg-info-subtle text-info fs-12 px-3 py-1 fw-bold"><i class="ri-flight-takeoff-line me-1"></i>إجازة رسمية</span>';
                 latenessBadge = '<span class="text-muted fs-11">إجازة معتمدة</span>';
-                directActionBtn = `<span class="badge bg-light text-muted border px-2 py-1 fs-12">لا توجد إجراءات</span>`;
+                directActionBtn = `
+                    <button type="button" class="btn btn-sm btn-outline-warning btn-punch-action" onclick="punchDirect('${emp.id}', 'check_in')" title="تسجيل حضور كعمل إضافي دون إلغاء الإجازة">
+                        <i class="ri-briefcase-line"></i> حضور كإضافي
+                    </button>
+                `;
             } else {
                 statusBadge = '<span class="badge bg-danger-subtle text-danger fs-12 px-3 py-1 fw-bold"><i class="ri-close-circle-line me-1"></i>لم يسجل بصمته</span>';
                 latenessBadge = '<span class="text-danger fw-bold fs-11">غير حاضر بالمركز</span>';
@@ -422,9 +487,84 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
 
+    // Mark Absent (Admin Action)
+    window.markAbsent = function(employeeId, employeeName) {
+        const selectedDate = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
+
+        Swal.fire({
+            title: `تسجيل غياب: ${employeeName}`,
+            text: 'هل أنت متأكد من تسجيل الموظف كغائب لليوم وإلغاء أي بصمة مسجلة؟',
+            icon: 'warning',
+            input: 'text',
+            inputPlaceholder: 'سبب تسجيل الغياب (اختياري)...',
+            showCancelButton: true,
+            confirmButtonText: 'نعم، تسجيل غياب',
+            cancelButtonText: 'تراجع',
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            showLoaderOnConfirm: true,
+            preConfirm: (reason) => {
+                return fetch('/admin/hr/attendance/mark-absent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify({
+                        employee_id: employeeId,
+                        date: selectedDate,
+                        reason: reason
+                    })
+                })
+                .then(async res => {
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message || 'تعذر تسجيل الغياب.');
+                    return data;
+                })
+                .catch(err => {
+                    Swal.showValidationMessage(err.message);
+                });
+            }
+        }).then(result => {
+            if (result.isConfirmed && result.value) {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'تم تسجيل الغياب',
+                    text: `تم تسجيل الموظف (${employeeName}) كغائب لليوم بنجاح.`,
+                    timer: 2000,
+                    timerProgressBar: true
+                });
+                fetchAttendance();
+            }
+        });
+    };
+
     // Date filter change
-    document.getElementById('attendanceDateFilter').addEventListener('change', fetchAttendance);
-    document.getElementById('searchEmployeeInput').addEventListener('input', renderTable);
+    document.getElementById('attendanceDateFilter')?.addEventListener('change', fetchAttendance);
+    document.getElementById('searchEmployeeInput')?.addEventListener('input', renderTable);
+    document.getElementById('searchEmployeeInput')?.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            renderTable();
+        }
+    });
+
+    // Read URL query parameters on load (e.g. ?search=EMP-0101&status=late)
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchParam = urlParams.get('search');
+    const statusParam = urlParams.get('status');
+
+    if (searchParam) {
+        const searchEl = document.getElementById('searchEmployeeInput');
+        if (searchEl) searchEl.value = searchParam;
+    }
+    if (statusParam && ['all', 'present', 'late', 'absent'].includes(statusParam)) {
+        currentFilterTab = statusParam;
+        document.querySelectorAll('.filter-tab-pill').forEach(btn => btn.classList.remove('active'));
+        const tabEl = document.getElementById(`tab-${statusParam}`);
+        if (tabEl) tabEl.classList.add('active');
+    }
 
     // Initial Load
     fetchAttendance();

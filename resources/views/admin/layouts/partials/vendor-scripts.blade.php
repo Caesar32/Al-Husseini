@@ -11,9 +11,13 @@
 
 <!-- Al-Husseini Core Stores (Available to all views) -->
 <script src="{{ asset('assets/js/sales-store.js') }}"></script>
+<script src="{{ asset('assets/js/hr-store.js') }}"></script>
 
 <!-- App js -->
 <script src="{{ asset('assets/js/app.js') }}"></script>
+
+<!-- Global Spotlight Search Engine -->
+<script src="{{ asset('assets/js/global-spotlight-search.js') }}"></script>
 
 @yield('script')
 @stack('scripts')

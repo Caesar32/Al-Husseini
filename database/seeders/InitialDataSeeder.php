@@ -16,18 +16,11 @@ class InitialDataSeeder extends Seeder
 {
     public function run(): void
     {
-        // 1. الفروع
-        $mainBranch = Branch::firstOrCreate(['code' => 'MAIN'], [
-            'name' => 'الفرع الرئيسي - طنطا',
-            'phone' => '0403333333',
-            'address' => 'شارع الجيش، طنطا، محافظة الغربية',
-            'is_active' => true,
-        ]);
-
-        $mahallaBranch = Branch::firstOrCreate(['code' => 'MAH'], [
-            'name' => 'فرع المحلة الكبرى',
-            'phone' => '0402222222',
-            'address' => 'شارع البحر، المحلة الكبرى',
+        // 1. الفروع (فرع دمياط الجديدة - الفرع الحالي الفعلي للمجموعة)
+        $mainBranch = Branch::updateOrCreate(['code' => 'MAIN'], [
+            'name' => 'فرع دمياط الجديدة',
+            'phone' => '0572400000',
+            'address' => 'شارع المحجوب، دمياط الجديدة',
             'is_active' => true,
         ]);
 
@@ -120,7 +113,7 @@ class InitialDataSeeder extends Seeder
         ]);
 
         $emp3 = Employee::firstOrCreate(['employee_code' => 'EMP-003'], [
-            'branch_id' => $mahallaBranch->id,
+            'branch_id' => $mainBranch->id,
             'job_title_id' => $cashierTitle->id,
             'user_id' => $accountantUser->id,
             'full_name' => 'محمد كمال رضوان',

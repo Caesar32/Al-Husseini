@@ -28,12 +28,21 @@ class EmployeeService implements EmployeeServiceInterface
         }
 
         if (!empty($filters['search'])) {
-            $s = $filters['search'];
-            $query->where(function ($q) use ($s) {
-                $q->where('full_name', 'like', "%{$s}%")
-                  ->orWhere('employee_code', 'like', "%{$s}%")
+            $s = trim($filters['search']);
+            $vClean = preg_replace('/[أإآ]/u', 'ا', $s);
+            $vClean = preg_replace('/ة/u', 'ه', $vClean);
+            $vClean = preg_replace('/[يى]/u', 'ي', $vClean);
+            $variants = array_unique(array_filter([$s, $vClean]));
+
+            $query->where(function ($q) use ($variants, $s) {
+                foreach ($variants as $v) {
+                    $q->orWhere('full_name', 'like', "%{$v}%");
+                }
+                $q->orWhere('employee_code', 'like', "%{$s}%")
                   ->orWhere('phone', 'like', "%{$s}%")
-                  ->orWhere('national_id', 'like', "%{$s}%");
+                  ->orWhere('national_id', 'like', "%{$s}%")
+                  ->orWhereHas('jobTitle', fn($jq) => $jq->where('title', 'like', "%{$s}%"))
+                  ->orWhereHas('jobTitle.department', fn($dq) => $dq->where('name', 'like', "%{$s}%"));
             });
         }
 

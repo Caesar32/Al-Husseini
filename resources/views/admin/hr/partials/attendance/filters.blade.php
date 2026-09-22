@@ -25,7 +25,7 @@
             <input type="date" class="form-control" id="attendanceDateFilter" value="{{ $date ?? date('Y-m-d') }}" style="max-width: 160px;">
             <div class="input-group">
                 <span class="input-group-text bg-light border-end-0"><i class="ri-search-line text-muted"></i></span>
-                <input type="text" class="form-control border-start-0" id="searchEmployeeInput" placeholder="ابحث باسم الموظف أو الفني...">
+                <input type="text" class="form-control border-start-0" id="searchEmployeeInput" placeholder="ابحث بالاسم، كود الموظف، الوظيفة، أو الهاتف..." value="{{ request('search', '') }}">
                 <button class="btn btn-light border" type="button" onclick="clearSearch()" title="مسح البحث">
                     <i class="ri-close-line"></i>
                 </button>

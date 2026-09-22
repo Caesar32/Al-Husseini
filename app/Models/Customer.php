@@ -42,7 +42,17 @@ class Customer extends Model
 
     public function creditLedgers(): HasMany
     {
-        return $this->hasMany(CreditLedgerEntry::class)->orderByDesc('id');
+        // ملاحظة: لا تضع orderBy داخل تعريف العلاقة لتجنب تعارض Eager Loading
+        // استخدم ->orderByDesc('id') عند الاستدعاء مباشرة أو عبر getLatestCreditLedgers()
+        return $this->hasMany(CreditLedgerEntry::class);
+    }
+
+    /**
+     * آخر حركات دفتر الأستاذ (الاستخدام: $customer->getLatestCreditLedgers())
+     */
+    public function getLatestCreditLedgers(int $limit = 20)
+    {
+        return $this->creditLedgers()->orderByDesc('id')->limit($limit)->get();
     }
 
     public function warranties(): HasMany

@@ -40,9 +40,12 @@ test('late punch after grace period calculates exact lateness minutes and marks 
 
 test('check-out before shift end calculates early leave minutes', function () {
     $emp = Employee::first();
-    // Shift end: 17:00 -> Punch out at 16:30 (30 mins early leave)
-    $punchTime = Carbon::parse('2026-09-21 16:30:00');
+    $date = '2026-09-21';
+    // Check-in first at 09:00
+    $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
 
+    // Shift end: 17:00 -> Punch out at 16:30 (30 mins early leave)
+    $punchTime = Carbon::parse("{$date} 16:30:00");
     $att = $this->service->recordPunch($emp->id, $punchTime, 'check_out');
 
     expect($att->early_leave_minutes)->toBe(30);
@@ -50,12 +53,65 @@ test('check-out before shift end calculates early leave minutes', function () {
 
 test('check-out after shift end calculates overtime hours when 30 mins or more', function () {
     $emp = Employee::first();
-    // Shift end: 17:00 -> Punch out at 18:30 (90 mins = 1.5 hours overtime)
-    $punchTime = Carbon::parse('2026-09-21 18:30:00');
+    $date = '2026-09-21';
+    // Check-in first at 09:00
+    $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
 
+    // Shift end: 17:00 -> Punch out at 18:30 (90 mins = 1.5 hours overtime)
+    $punchTime = Carbon::parse("{$date} 18:30:00");
     $att = $this->service->recordPunch($emp->id, $punchTime, 'check_out');
 
     expect((float)$att->overtime_hours)->toBe(1.5);
+});
+
+test('duplicate check-in within 5 minutes is debounced and maintains original check-in time', function () {
+    $emp = Employee::first();
+    $date = '2026-09-21';
+
+    $firstPunch = $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
+    $secondPunch = $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:02:30"), 'check_in');
+
+    expect($firstPunch->id)->toBe($secondPunch->id)
+        ->and($secondPunch->check_in->format('H:i:s'))->toBe('09:00:00');
+});
+
+test('duplicate check-in after 5 minutes throws exception preventing duplicate check-in', function () {
+    $emp = Employee::first();
+    $date = '2026-09-21';
+
+    $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
+
+    expect(fn() => $this->service->recordPunch($emp->id, Carbon::parse("{$date} 10:30:00"), 'check_in'))
+        ->toThrow(Exception::class, 'مسجل حضور بالفعل اليوم');
+});
+
+test('check-out without check-in throws exception', function () {
+    $emp = Employee::first();
+    $date = '2026-09-21';
+
+    expect(fn() => $this->service->recordPunch($emp->id, Carbon::parse("{$date} 17:00:00"), 'check_out'))
+        ->toThrow(Exception::class, 'لا يمكن تسجيل انصراف لموظف لم يسجل حضوره اليوم');
+});
+
+test('check-out before check-in time throws exception', function () {
+    $emp = Employee::first();
+    $date = '2026-09-21';
+
+    $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
+
+    expect(fn() => $this->service->recordPunch($emp->id, Carbon::parse("{$date} 08:30:00"), 'check_out'))
+        ->toThrow(Exception::class, 'لا يمكن أن يسبق أو يساوي وقت الحضور المسجل');
+});
+
+test('admin markAbsent resets punch times and sets status to absent', function () {
+    $emp = Employee::first();
+    $date = '2026-09-21';
+
+    $this->service->recordPunch($emp->id, Carbon::parse("{$date} 09:00:00"), 'check_in');
+    $absentRecord = $this->service->markAbsent($emp->id, $date, 'لم يستكمل العمل');
+
+    expect($absentRecord->status)->toBe('absent')
+        ->and($absentRecord->check_in)->toBeNull();
 });
 
 test('service returns daily attendance records and stats accurately', function () {

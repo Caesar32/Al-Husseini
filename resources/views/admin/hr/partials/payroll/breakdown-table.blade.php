@@ -33,8 +33,16 @@
                                     $allow = (float) (($emp->currentSalary?->housing_allowance ?? 0) + ($emp->currentSalary?->transport_allowance ?? 0) + ($emp->currentSalary?->other_allowances ?? 0));
                                     $empDeds = $recentDeductions->where('employee_id', $emp->id)->where('status', 'approved')->sum('amount');
                                     $net = max(0, ($base + $allow) - $empDeds);
+                                    $jobTitle = $emp->jobTitle?->title ?? $emp->jobTitle?->title_name ?? '';
+                                    $deptName = $emp->jobTitle?->department?->name ?? '';
                                 @endphp
-                                <tr data-branch="{{ $emp->branch_id }}" data-name="{{ strtolower($emp->full_name) }}" data-role="{{ strtolower($emp->jobTitle?->title_name ?? '') }}">
+                                <tr class="payroll-emp-row"
+                                    data-branch="{{ $emp->branch_id }}"
+                                    data-name="{{ $emp->full_name }}"
+                                    data-code="{{ $emp->employee_code }}"
+                                    data-role="{{ $jobTitle }}"
+                                    data-department="{{ $deptName }}"
+                                    data-phone="{{ $emp->phone ?? '' }}">
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <div class="avatar-xs me-2">
@@ -90,6 +98,12 @@
                             @empty
                                 <tr><td colspan="8" class="text-center py-4 text-muted">لا يوجد موظفون مسجلون في النظام</td></tr>
                             @endforelse
+                            <tr id="payrollNoResultsRow" style="display: none;">
+                                <td colspan="8" class="text-center py-5 text-muted fs-14">
+                                    <i class="ri-user-search-line fs-28 d-block mb-2 text-warning"></i>
+                                    لا توجد استحقاقات مطابقة لمعايير البحث المحددة
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

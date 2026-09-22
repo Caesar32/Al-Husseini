@@ -84,6 +84,25 @@
             opacity: 1 !important;
             visibility: visible !important;
         }
+        body.modal-open .modal {
+            position: static !important;
+            overflow: visible !important;
+        }
+        body.modal-open .modal-dialog {
+            max-width: 100% !important;
+            margin: 0 !important;
+        }
+        body.modal-open .modal-content {
+            border: none !important;
+            box-shadow: none !important;
+        }
+        body.modal-open .modal-header .btn-close,
+        body.modal-open .modal-footer {
+            display: none !important;
+        }
+        body.modal-open .main-content > .page-content > .container-fluid > *:not(#employeeDetailModal) {
+            display: none !important;
+        }
     }
 
     .print-header, .print-footer {

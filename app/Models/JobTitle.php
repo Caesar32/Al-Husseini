@@ -17,12 +17,19 @@ class JobTitle extends Model
         'max_salary',
     ];
 
+    protected $appends = ['title_name'];
+
     protected function casts(): array
     {
         return [
             'min_salary' => 'decimal:2',
             'max_salary' => 'decimal:2',
         ];
+    }
+
+    public function getTitleNameAttribute(): string
+    {
+        return $this->title ?? '';
     }
 
     public function department(): BelongsTo

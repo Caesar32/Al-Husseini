@@ -12,6 +12,8 @@ beforeEach(function () {
     $this->seed(\Database\Seeders\RolesAndPermissionsSeeder::class);
     $this->seed(\Database\Seeders\InitialDataSeeder::class);
     $this->service = app(PayrollServiceInterface::class);
+    $this->admin = User::first();
+    auth()->login($this->admin);
 });
 
 test('service generates monthly payroll draft with items for active branch employees', function () {
@@ -71,4 +73,13 @@ test('service prevents disbursing a draft payroll before approval', function () 
 
     expect(fn() => $this->service->disbursePayroll($payroll))
         ->toThrow(Exception::class, 'يجب اعتماد مسير الرواتب أولاً قبل الصرف.');
+});
+
+test('service prevents approving payroll without authenticated or specified approver', function () {
+    auth()->logout();
+    $branch = Branch::first();
+    $payroll = $this->service->generateMonthlyPayroll($branch->id, 2026, 9);
+
+    expect(fn() => $this->service->approvePayroll($payroll))
+        ->toThrow(Exception::class, 'يجب تحديد المستخدم المعتمِد — لا يمكن اعتماد مسير الرواتب بدون تسجيل المسؤول.');
 });

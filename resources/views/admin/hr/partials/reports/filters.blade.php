@@ -133,7 +133,10 @@
                     <div class="col-md-4">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light"><i class="ri-user-search-line"></i></span>
-                            <input type="text" class="form-control" id="search-employee" placeholder="بحث باسم الموظف أو الكود..." oninput="applyFilters()">
+                            <input type="text" class="form-control" id="search-employee" placeholder="بحث باسم الموظف أو الكود..." value="{{ request('search', '') }}" oninput="applyFilters()">
+                            <button class="btn btn-light border" type="button" onclick="clearReportSearch()" title="مسح البحث">
+                                <i class="ri-close-line"></i>
+                            </button>
                         </div>
                     </div>
 

@@ -6,7 +6,7 @@
                 <div class="row g-3 align-items-center">
                     <div class="col-lg-4 col-md-6">
                         <div class="search-box">
-                            <input type="text" class="form-control" id="searchEmployeeInput" placeholder="بحث بالاسم أو الكود أو رقم الهاتف...">
+                            <input type="text" class="form-control" id="searchEmployeeInput" placeholder="بحث بالاسم أو الكود أو رقم الهاتف..." value="{{ request('search', '') }}">
                             <i class="ri-search-line search-icon"></i>
                         </div>
                     </div>
@@ -15,7 +15,7 @@
                         <select class="form-select" id="branchFilter">
                             <option value="">جميع فروع المركز</option>
                             @foreach($branches as $branch)
-                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                                <option value="{{ $branch->id }}" {{ request('branch_id') == $branch->id ? 'selected' : '' }}>{{ $branch->name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -23,9 +23,9 @@
                     <div class="col-lg-2 col-md-6">
                         <select class="form-select" id="statusFilter">
                             <option value="">جميع الحالات</option>
-                            <option value="active">على رأس العمل</option>
-                            <option value="on_leave">في إجازة</option>
-                            <option value="suspended">موقوف</option>
+                            <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>على رأس العمل</option>
+                            <option value="on_leave" {{ request('status') === 'on_leave' ? 'selected' : '' }}>في إجازة</option>
+                            <option value="suspended" {{ request('status') === 'suspended' ? 'selected' : '' }}>موقوف</option>
                         </select>
                     </div>
 

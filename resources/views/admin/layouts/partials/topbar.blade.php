@@ -37,13 +37,13 @@
                     </span>
                 </button>
 
-                <!-- App Search-->
-                <form class="app-search d-none d-md-block">
+                <!-- App Search (Global Spotlight Search) -->
+                <form class="app-search d-none d-md-block" onsubmit="return false;">
                     <div class="position-relative">
-                        <input type="text" class="form-control" placeholder="بحث..." autocomplete="off" id="search-options" value="">
+                        <input type="text" class="form-control" placeholder="بحث شامل... (Ctrl + K)" autocomplete="off" id="search-options" value="">
                         <span class="mdi mdi-magnify search-widget-icon"></span>
-                        <span class="mdi mdi-close-circle search-widget-icon search-widget-icon-close d-none" id="search-close-options"></span>
-                        <div class="dropdown-menu dropdown-menu-lg" id="search-dropdown"></div>
+                        <span class="mdi mdi-close-circle search-widget-icon search-widget-icon-close d-none" id="search-close-options" style="cursor: pointer;" title="مسح"></span>
+                        <div class="dropdown-menu dropdown-menu-lg shadow-lg border-0" id="search-dropdown" style="width: 480px; max-height: 480px; overflow-y: auto;"></div>
                     </div>
                 </form>
             </div>
@@ -54,15 +54,16 @@
                     <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle" id="page-header-search-dropdown" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                         <i class="bx bx-search fs-22"></i>
                     </button>
-                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0" aria-labelledby="page-header-search-dropdown">
-                        <form class="p-3">
+                    <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0 shadow-lg border-0" aria-labelledby="page-header-search-dropdown" style="min-width: 320px;">
+                        <form class="p-3" onsubmit="return false;">
                             <div class="form-group m-0">
                                 <div class="input-group">
-                                    <input type="text" class="form-control" placeholder="Search ..." aria-label="Recipient's username">
-                                    <button class="btn btn-primary" type="submit"><i class="mdi mdi-magnify"></i></button>
+                                    <input type="text" class="form-control" id="search-options-mobile" placeholder="بحث شامل في النظام...">
+                                    <button class="btn btn-primary" type="button"><i class="mdi mdi-magnify"></i></button>
                                 </div>
                             </div>
                         </form>
+                        <div id="search-dropdown-mobile" class="p-1" style="max-height: 380px; overflow-y: auto;"></div>
                     </div>
                 </div>
 
@@ -152,8 +153,9 @@
                     </button>
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">مرحباً {{ auth()->user()->name ?? 'بك' }}!</h6>
-                        <a class="dropdown-item" href="javascript:void(0);"><i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الملف الشخصي</span></a>
-                        <a class="dropdown-item" href="javascript:void(0);"><i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الإعدادات</span></a>
+                        <a class="dropdown-item" href="{{ route('admin.profile') }}"><i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الملف الشخصي</span></a>
+                        <a class="dropdown-item" href="{{ route('admin.settings') }}"><i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> <span class="align-middle">إعدادات النظام</span></a>
+                        <a class="dropdown-item" href="{{ route('admin.lockscreen') }}"><i class="mdi mdi-lock text-muted fs-16 align-middle me-1"></i> <span class="align-middle">قفل الشاشة</span></a>
                         <div class="dropdown-divider"></div>
                         <form action="{{ route('admin.logout') }}" method="POST" class="m-0 p-0">
                             @csrf

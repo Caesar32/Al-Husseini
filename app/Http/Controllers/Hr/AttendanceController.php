@@ -66,4 +66,33 @@ class AttendanceController extends Controller
             ], 422);
         }
     }
+
+    public function markAbsent(Request $request): JsonResponse
+    {
+        $request->validate([
+            'employee_id' => ['required', 'exists:employees,id'],
+            'date' => ['nullable', 'date'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $date = $request->get('date', today()->toDateString());
+            $attendance = $this->attendanceService->markAbsent(
+                (int) $request->employee_id,
+                $date,
+                $request->reason
+            );
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم تسجيل الموظف كغائب بنجاح.',
+                'attendance' => $attendance->load('employee'),
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
 }

@@ -37,8 +37,26 @@
             printGenDate.textContent = today.toLocaleDateString('ar-EG', { dateStyle: 'full' });
         }
 
-        // Load initial daily report
-        loadReport();
+        // Check URL parameters on page load (e.g. ?search=EMP-0101&department=المبيعات)
+        const urlParams = new URLSearchParams(window.location.search);
+        const searchParam = urlParams.get('search');
+        const deptParam = urlParams.get('department') || urlParams.get('dept');
+        const modeParam = urlParams.get('mode');
+
+        if (searchParam) {
+            const sInput = document.getElementById('search-employee');
+            if (sInput) sInput.value = searchParam;
+        }
+        if (deptParam) {
+            const dSelect = document.getElementById('filter-department');
+            if (dSelect) dSelect.value = deptParam;
+        }
+        if (modeParam && ['daily', 'monthly', 'custom'].includes(modeParam)) {
+            setReportMode(modeParam);
+        } else {
+            // Load initial daily report
+            loadReport();
+        }
 
         // Listen for external updates
         window.addEventListener('alhusseini-hr-updated', function () {
@@ -77,15 +95,23 @@
     function navigateDay(offset) {
         const input = document.getElementById('input-daily-date');
         if (!input.value) return;
-        const curr = new Date(input.value);
+        const parts = input.value.split('-').map(Number);
+        const curr = new Date(parts[0], parts[1] - 1, parts[2]);
         curr.setDate(curr.getDate() + offset);
-        input.value = curr.toISOString().split('T')[0];
+        const nextY = curr.getFullYear();
+        const nextM = String(curr.getMonth() + 1).padStart(2, '0');
+        const nextD = String(curr.getDate()).padStart(2, '0');
+        input.value = `${nextY}-${nextM}-${nextD}`;
         loadReport();
     }
 
     function setTodayDate() {
         const input = document.getElementById('input-daily-date');
-        input.value = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const y = today.getFullYear();
+        const m = String(today.getMonth() + 1).padStart(2, '0');
+        const d = String(today.getDate()).padStart(2, '0');
+        input.value = `${y}-${m}-${d}`;
         loadReport();
     }
 
@@ -96,24 +122,32 @@
         let printPeriodText = '';
 
         if (currentMode === 'daily') {
-            const targetDate = document.getElementById('input-daily-date').value;
+            const targetDate = document.getElementById('input-daily-date')?.value || new Date().toISOString().split('T')[0];
             currentReportData = window.AlHusseiniHR.getDailyReport(targetDate);
             
-            const dateObj = new Date(targetDate);
+            const parts = targetDate.split('-').map(Number);
+            const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
             const dateArabic = dateObj.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             periodTitle = `تقرير يوم: ${dateArabic}`;
             printPeriodText = `كشف يوم: ${targetDate} (${dateArabic})`;
         } else if (currentMode === 'monthly') {
-            const m = parseInt(document.getElementById('select-month').value);
-            const y = parseInt(document.getElementById('select-year').value);
+            const m = parseInt(document.getElementById('select-month')?.value || (new Date().getMonth() + 1));
+            const y = parseInt(document.getElementById('select-year')?.value || new Date().getFullYear());
             currentReportData = window.AlHusseiniHR.getMonthlyReport(y, m);
             
             const monthNames = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
             periodTitle = `تقرير شهر: ${monthNames[m]} ${y}`;
             printPeriodText = `كشف شهر: ${monthNames[m]} ${y} (من ${currentReportData.startDate} إلى ${currentReportData.endDate})`;
         } else {
-            const start = document.getElementById('input-range-start').value;
-            const end = document.getElementById('input-range-end').value;
+            let start = document.getElementById('input-range-start')?.value;
+            let end = document.getElementById('input-range-end')?.value;
+            if (start && end && start > end) {
+                const temp = start;
+                start = end;
+                end = temp;
+                document.getElementById('input-range-start').value = start;
+                document.getElementById('input-range-end').value = end;
+            }
             currentReportData = window.AlHusseiniHR.getRangeReport(start, end);
             periodTitle = `تقرير الفترة: من ${start} إلى ${end}`;
             printPeriodText = `الفترة من ${start} إلى ${end}`;
@@ -287,11 +321,51 @@
         }
     }
 
+    // -------------------------------------------------------------
+    // Universal Arabic Normalization & Fuzzy-Matching Engine
+    // -------------------------------------------------------------
+    function normalizeArabic(text) {
+        if (!text) return '';
+        return text.toString().toLowerCase()
+            .replace(/[\u064B-\u065F\u0670]/g, '')
+            .replace(/[أإآء]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/[يى]/g, 'ي')
+            .replace(/[\s\-_]+/g, ' ')
+            .trim();
+    }
+
+    function isMatch(target, query) {
+        if (!query) return true;
+        if (!target) return false;
+        const normTarget = normalizeArabic(target);
+        const normQuery = normalizeArabic(query);
+        const rawTarget = target.toString().toLowerCase();
+        const rawQuery = query.toString().toLowerCase();
+
+        if (rawTarget.includes(rawQuery) || normTarget.includes(normQuery)) {
+            return true;
+        }
+
+        const strippedTarget = rawTarget.replace(/[\s\-_]+/g, '');
+        const strippedQuery = rawQuery.replace(/[\s\-_]+/g, '');
+        return strippedTarget.includes(strippedQuery) || strippedQuery.includes(strippedTarget);
+    }
+
+    window.clearReportSearch = function() {
+        const input = document.getElementById('search-employee');
+        if (input) {
+            input.value = '';
+            applyFilters();
+            input.focus();
+        }
+    };
+
     function applyFilters() {
         if (!currentReportData) return;
 
-        const deptFilter = document.getElementById('filter-department').value.toLowerCase();
-        const searchKeyword = document.getElementById('search-employee').value.trim().toLowerCase();
+        const deptFilter = (document.getElementById('filter-department')?.value || '').trim();
+        const searchKeyword = (document.getElementById('search-employee')?.value || '').trim();
 
         // 1. Filter Attendance Detailed Records
         let attendanceList = [];
@@ -316,11 +390,12 @@
 
         // Apply Dept & Search Filters to Attendance List
         const filteredAttendance = attendanceList.filter(item => {
-            const matchesDept = !deptFilter || item.employee.department.toLowerCase().includes(deptFilter);
+            const matchesDept = !deptFilter || isMatch(item.employee.department, deptFilter);
             const matchesSearch = !searchKeyword ||
-                item.employee.name.toLowerCase().includes(searchKeyword) ||
-                item.employee.id.toLowerCase().includes(searchKeyword) ||
-                item.employee.role.toLowerCase().includes(searchKeyword);
+                isMatch(item.employee.name, searchKeyword) ||
+                isMatch(item.employee.id, searchKeyword) ||
+                isMatch(item.employee.role, searchKeyword) ||
+                isMatch(item.employee.department, searchKeyword);
             return matchesDept && matchesSearch;
         });
 
@@ -341,11 +416,12 @@
         })) : currentReportData.staffReport;
 
         const filteredStaff = staffList.filter(item => {
-            const matchesDept = !deptFilter || item.employee.department.toLowerCase().includes(deptFilter);
+            const matchesDept = !deptFilter || isMatch(item.employee.department, deptFilter);
             const matchesSearch = !searchKeyword ||
-                item.employee.name.toLowerCase().includes(searchKeyword) ||
-                item.employee.id.toLowerCase().includes(searchKeyword) ||
-                item.employee.role.toLowerCase().includes(searchKeyword);
+                isMatch(item.employee.name, searchKeyword) ||
+                isMatch(item.employee.id, searchKeyword) ||
+                isMatch(item.employee.role, searchKeyword) ||
+                isMatch(item.employee.department, searchKeyword);
             return matchesDept && matchesSearch;
         });
 
@@ -356,11 +432,11 @@
         const filteredDeductions = deductionsList.filter(ded => {
             const emp = window.AlHusseiniHR.getEmployeeById(ded.employeeId);
             if (!emp) return true;
-            const matchesDept = !deptFilter || emp.department.toLowerCase().includes(deptFilter);
+            const matchesDept = !deptFilter || isMatch(emp.department, deptFilter);
             const matchesSearch = !searchKeyword ||
-                emp.name.toLowerCase().includes(searchKeyword) ||
-                emp.id.toLowerCase().includes(searchKeyword) ||
-                ded.reason.toLowerCase().includes(searchKeyword);
+                isMatch(emp.name, searchKeyword) ||
+                isMatch(emp.id, searchKeyword) ||
+                isMatch(ded.reason, searchKeyword);
             return matchesDept && matchesSearch;
         });
 

@@ -20,9 +20,13 @@
                                 <th class="text-center">إلغاء الخصم</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="deductionsTableBody">
                             @forelse($recentDeductions as $ded)
-                                <tr>
+                                <tr class="deduction-log-row"
+                                    data-employee="{{ $ded->employee?->full_name }}"
+                                    data-code="{{ $ded->employee?->employee_code }}"
+                                    data-id="DED-{{ $ded->id }}"
+                                    data-reason="{{ $ded->reason }}">
                                     <td><span class="badge bg-light text-body font-monospace">DED-{{ $ded->id }}</span></td>
                                     <td><span class="fw-bold">{{ $ded->employee?->full_name }}</span></td>
                                     <td><span class="badge bg-danger-subtle text-danger fw-bold font-monospace">-{{ number_format($ded->amount) }} ج.م</span></td>
@@ -48,6 +52,12 @@
                             @empty
                                 <tr><td colspan="7" class="text-center py-3 text-muted">لا توجد خصومات مسجلة حتى الآن</td></tr>
                             @endforelse
+                            <tr id="deductionNoResultsRow" style="display: none;">
+                                <td colspan="7" class="text-center py-3 text-muted fs-13">
+                                    <i class="ri-file-search-line fs-20 d-block mb-1 text-muted"></i>
+                                    لا توجد قرارات خصم مطابقة للبحث
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>

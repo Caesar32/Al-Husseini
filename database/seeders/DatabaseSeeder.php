@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             InitialDataSeeder::class,
             HrFactorySeeder::class,
+            SettingsSeeder::class,
         ]);
     }
 }
