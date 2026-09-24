@@ -52,6 +52,11 @@ class PurchaseInvoice extends Model
         return $this->belongsTo(User::class, 'received_by');
     }
 
+    public function receivedBy(): BelongsTo
+    {
+        return $this->receivedByUser();
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(PurchaseInvoiceItem::class);

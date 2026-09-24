@@ -109,6 +109,8 @@ php artisan test
 ## 📚 وثائق المشروع الفنية (Technical Documentation)
 
 * [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md): **المرجع التقني الشامل** للنظام (خريطة الكيانات، القواعد الصارمة، الفهارس، ومعايير Eager Loading).
+* [docs/SALES_AND_PURCHASES_SPEC.md](docs/SALES_AND_PURCHASES_SPEC.md): **وثيقة المعمارية الهندسية وقواعد الأعمال:** قطاع المبيعات ونقاط البيع والتوريدات والموردين المتعددين والكهنة والضمانات.
+* [docs/SALES_PURCHASES_SCENARIOS.md](docs/SALES_PURCHASES_SCENARIOS.md): **موسوعة السيناريوهات التشغيلية والحالات الحدية:** حالات التوريد، الكاشير، الكهنة، الضمان، وتزامن المخزون.
 * [plans/PLAN.md](plans/PLAN.md): خطة العمل والمراحل التنفيذية المتكاملة لمشروع التطوير والترقية.
 
 ---

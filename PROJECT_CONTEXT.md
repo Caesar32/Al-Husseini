@@ -102,8 +102,13 @@
 
 ### د. المشتريات والموردين (Purchases & Suppliers)
 * `suppliers`: الموردون، السجل، وحسابات الديون.
+* `supplier_products`: الكتالوج المشترك بين المنتجات والموردين المتعددين مع كود الصنف وأسعار التوريد.
 * `purchase_invoices` & `purchase_invoice_items`: فواتير التوريدات والمخزون.
-* `supplier_ledger_entries`: حركات قيود الموردين وسندات الصرف.
+* `supplier_ledger_entries`: حركات قيود الموردين وسندات الصرف بنظام الرصيد المفتوح (Open Balance).
+
+> [!TIP]
+> للاطلاع على التفاصيل المعمارية الكاملة لقطاع المبيعات والموردين والمتوسط المرجح والكهنة: راجع [docs/SALES_AND_PURCHASES_SPEC.md](docs/SALES_AND_PURCHASES_SPEC.md).
+> وللاطلاع على موسوعة السيناريوهات التشغيلية والحالات الحدية (Edge Cases): راجع [docs/SALES_PURCHASES_SCENARIOS.md](docs/SALES_PURCHASES_SCENARIOS.md).
 
 ---
 

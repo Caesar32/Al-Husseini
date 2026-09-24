@@ -60,6 +60,11 @@ class Customer extends Model
         return $this->hasMany(Warranty::class);
     }
 
+    public function warrantyClaims(): HasMany
+    {
+        return $this->hasMany(WarrantyClaim::class);
+    }
+
     public function scopeInDebt(Builder $query): void
     {
         $query->where('current_credit_balance', '>', 0);

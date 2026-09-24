@@ -15,12 +15,36 @@ class PurchaseInvoiceObserver
             $invoice->load(['items.product', 'supplier']);
             // ──────────────────────────────────────────────────────────────────────
 
-            // 1. زيادة رصيد المخزون وتحديث سعر التكلفة للأصناف الموردة
+            // 1. زيادة رصيد المخزون وحساب المتوسط المرجح (WAC) وتحديث كتالوج المورد
             foreach ($invoice->items as $item) {
                 $product = $item->product; // محمّل مسبقاً
                 if ($product) {
-                    $product->increment('current_stock', $item->quantity);
-                    $product->update(['cost_price' => $item->unit_cost_price]);
+                    $oldStock = max(0, (int) $product->current_stock);
+                    $oldCost = (float) $product->cost_price;
+                    $receivedQty = (int) $item->quantity;
+                    $receivedCost = (float) $item->unit_cost_price;
+
+                    $newStock = $oldStock + $receivedQty;
+                    $newCostPrice = $newStock > 0
+                        ? (($oldStock * $oldCost) + ($receivedQty * $receivedCost)) / $newStock
+                        : $receivedCost;
+
+                    $product->update([
+                        'current_stock' => $newStock,
+                        'cost_price' => round($newCostPrice, 2),
+                    ]);
+
+                    // تحديث أو إنشاء سجل كتالوج المورد
+                    \App\Models\SupplierProduct::updateOrCreate(
+                        [
+                            'supplier_id' => $invoice->supplier_id,
+                            'product_id'  => $product->id,
+                        ],
+                        [
+                            'last_purchase_price' => $receivedCost,
+                            'is_primary_supplier' => true,
+                        ]
+                    );
                 }
             }
 

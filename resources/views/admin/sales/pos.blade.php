@@ -234,7 +234,7 @@
                         </div>
 
                         <div class="col-md-4 col-7">
-                            <div class="px-2 py-1 bg-white rounded border d-flex justify-content-between align-items-center fs-11">
+                            <div class="px-2 py-1 bg-body rounded border d-flex justify-content-between align-items-center fs-11">
                                 <span class="text-muted"><i class="ri-car-line me-1"></i>المركبة:</span>
                                 <span class="fw-bold text-dark text-truncate" id="posCarDetailsDisplay">سيارة غير محددة</span>
                             </div>
@@ -252,7 +252,7 @@
                 </div>
 
                 <!-- 2. Category Tabs & Search Bar (Aligned with Dashboard Theme) -->
-                <div class="p-2 px-3 border-bottom bg-white">
+                <div class="p-2 px-3 border-bottom bg-body">
                     <div class="row g-2 align-items-center mb-1">
                         <!-- Category Navigation -->
                         <div class="col-xl-7 col-12">
@@ -323,7 +323,7 @@
                 </div>
 
                 <!-- Bottom Calculations & Dues Terminal -->
-                <div class="p-3 bg-white border-top flex-shrink-0">
+                <div class="p-3 bg-body border-top flex-shrink-0">
                     
                     <!-- Old Battery Trade-in Scrap Switch -->
                     <div class="p-2 bg-success-subtle rounded border border-success-subtle mb-2" id="tradeInContainer">
@@ -398,7 +398,7 @@
                         <div class="row g-1 align-items-center">
                             <div class="col-6">
                                 <div class="input-group input-group-sm">
-                                    <span class="input-group-text bg-white fs-10">المستلم:</span>
+                                    <span class="input-group-text bg-body fs-10">المستلم:</span>
                                     <input type="number" class="form-control font-monospace fw-bold" id="cashReceivedInput" placeholder="0" oninput="calculateCashChange()">
                                 </div>
                             </div>
@@ -1056,25 +1056,32 @@ function submitFullInvoice() {
         return;
     }
 
-    const custId = document.getElementById('posCustomerSelect').value;
+    const selectEl = document.getElementById('posCustomerSelect');
+    const custId = selectEl.value;
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    const customerVehicleId = selectedOption?.dataset?.vehicleId ? parseInt(selectedOption.dataset.vehicleId) : null;
+
     let custName = 'عميل نقدي مباشر';
     let custPhone = '-';
     let carModel = 'ملاكي';
     let carPlate = '-';
 
     if (custId !== 'CUST-CASH') {
-        const cust = window.AlHusseiniSales.getCustomerById(custId);
+        const cust = window.AlHusseiniSales ? window.AlHusseiniSales.getCustomerById(custId) : null;
         if (cust) {
             custName = cust.name;
             custPhone = cust.phone;
             carModel = cust.carModel;
             carPlate = cust.carPlate;
+        } else if (selectedOption) {
+            custName = selectedOption.text.split('—')[0].trim();
         }
     }
 
     const subtotal = cart.reduce((sum, it) => sum + (it.product.priceNew * it.qty), 0);
     const hasBattery = cart.some(it => it.product.category === 'بطاريات');
-    const scrapDiscount = (hasBattery && document.getElementById('tradeInCheck').checked) ?
+    const hasScrapTradeIn = hasBattery && document.getElementById('tradeInCheck').checked;
+    const scrapDiscount = hasScrapTradeIn ?
         cart.filter(it => it.product.category === 'بطاريات').reduce((sum, it) => sum + (it.product.scrapValue * it.qty), 0) : 0;
     const totalAmount = Math.max(0, subtotal - scrapDiscount);
 
@@ -1098,57 +1105,194 @@ function submitFullInvoice() {
         }
         const depositVal = Number(document.getElementById('creditDepositInput').value) || 0;
         paidAmount = Math.min(totalAmount, Math.max(0, depositVal));
-        remainingCredit = totalAmount - paidAmount;
+        remainingCredit = Math.max(0, totalAmount - paidAmount);
     }
 
-    const invoiceItems = cart.map(it => ({
-        productId: it.product.id,
-        barcode: it.product.barcode || '',
-        brand: it.product.brand,
-        name: it.product.name,
-        category: it.product.category,
-        amp: it.product.amp || it.product.unit || '',
-        unitPrice: it.product.priceNew,
-        qty: it.qty,
-        hasTradeIn: it.product.category === 'بطاريات' && document.getElementById('tradeInCheck').checked,
-        scrapDiscount: it.product.scrapValue || 0,
-        finalPrice: it.product.priceNew * it.qty
-    }));
+    // Build backend payments array
+    let paymentsPayload = [];
+    if (currentPaymentMethod === 'credit') {
+        if (paidAmount > 0) {
+            paymentsPayload.push({ method: 'cash', amount: paidAmount });
+        }
+        if (remainingCredit > 0) {
+            paymentsPayload.push({ method: 'credit', amount: remainingCredit });
+        }
+        if (paymentsPayload.length === 0) {
+            paymentsPayload.push({ method: 'credit', amount: totalAmount });
+        }
+    } else {
+        paymentsPayload.push({
+            method: (currentPaymentMethod === 'instapay' ? 'bank_transfer' : currentPaymentMethod),
+            amount: totalAmount
+        });
+    }
 
-    const invoiceData = {
-        customerId: custId === 'CUST-CASH' ? null : custId,
-        customerName: custName,
-        customerPhone: custPhone,
-        carModel: carModel,
-        carPlate: carPlate,
-        items: invoiceItems,
-        subtotal: subtotal,
-        scrapDiscountTotal: scrapDiscount,
-        extraDiscount: 0,
-        totalAmount: totalAmount,
-        paymentMethod: currentPaymentMethod,
-        paidAmount: paidAmount,
-        remainingCredit: remainingCredit,
-        creditDueDate: currentPaymentMethod === 'credit' ? '2026-10-05' : null,
-        sellerName: 'إبراهيم حسن (كبير البائعين)',
-        notes: currentPaymentMethod === 'credit' ? 'مبيعات بالآجل مع دفعة مقدمة' : 'مبيعات فورية بالمركز'
+    const numericCustomerId = (custId !== 'CUST-CASH' && !isNaN(parseInt(custId))) ? parseInt(custId) : null;
+
+    const payload = {
+        customer_id: numericCustomerId,
+        customer_vehicle_id: customerVehicleId,
+        items: cart.map((it, idx) => ({
+            product_id: !isNaN(parseInt(it.product.id)) ? parseInt(it.product.id) : 1,
+            quantity: it.qty,
+            unit_price: it.product.priceNew,
+            battery_serial: (it.product.category === 'بطاريات' || it.product.is_battery) 
+                ? (it.batterySerial || `BAT-${Date.now().toString().slice(-6)}-${idx + 1}`) 
+                : null
+        })),
+        has_scrap: hasScrapTradeIn,
+        scrap_capacity_ah: hasScrapTradeIn ? 70 : null,
+        scrap_count: hasScrapTradeIn ? 1 : null,
+        discount_amount: 0,
+        tax_amount: 0,
+        payments: paymentsPayload,
+        notes: currentPaymentMethod === 'credit' ? 'مبيعات بالآجل من شاشة الكاشير' : 'مبيعات فورية بالمركز'
     };
 
-    const newInv = window.AlHusseiniSales.createInvoice(invoiceData);
+    // UI Loading state
+    const submitBtn = document.querySelector('button[onclick="submitFullInvoice()"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري إصدار الفاتورة...';
+    }
 
-    playBeep(1200, 0.2);
+    const postInvoice = (invoicePayload) => {
+        return fetch("{{ route('admin.pos.store') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify(invoicePayload)
+        });
+    };
 
-    // Show Printable Official Invoice
-    renderPrintableInvoice(newInv);
-    const printModal = new bootstrap.Modal(document.getElementById('invoicePrintModal'));
-    printModal.show();
+    postInvoice(payload)
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            // Check if manager override needed for credit limit
+            if (data.errors && data.errors.manager_override_code) {
+                const { value: managerPin } = await Swal.fire({
+                    title: 'مطلوب إذن المدير لتجاوز حد الائتمان',
+                    text: data.errors.manager_override_code[0] || 'المديونية تتجاوز سقف ائتمان العميل. يرجى إدخال PIN المدير للموافقة.',
+                    input: 'password',
+                    inputPlaceholder: 'أدخل PIN المدير (الافتراضي 9999)',
+                    showCancelButton: true,
+                    confirmButtonText: 'تأكيد التجاوز والمتابعة',
+                    cancelButtonText: 'إلغاء'
+                });
+                if (managerPin) {
+                    payload.manager_override_code = managerPin;
+                    const retryRes = await postInvoice(payload);
+                    const retryData = await retryRes.json();
+                    if (retryRes.ok && retryData.success) {
+                        return retryData;
+                    }
+                    throw new Error(retryData.message || 'فشل اعتماد كود المدير.');
+                }
+            }
+            const errDetail = data.errors ? Object.values(data.errors).flat().join('<br>') : data.message;
+            throw new Error(errDetail || 'حدث خطأ أثناء اعتماد الفاتورة على الخادم.');
+        }
+        return data;
+    })
+    .then(data => {
+        playBeep(1200, 0.2);
 
-    // Reset Cart
-    cart = [];
-    document.getElementById('tradeInCheck').checked = false;
-    document.getElementById('cashReceivedInput').value = '';
-    renderCart();
-    renderCatalog();
+        // Fallback local invoice sync
+        const invoiceItems = cart.map(it => ({
+            productId: it.product.id,
+            barcode: it.product.barcode || '',
+            brand: it.product.brand,
+            name: it.product.name,
+            category: it.product.category,
+            amp: it.product.amp || it.product.unit || '',
+            unitPrice: it.product.priceNew,
+            qty: it.qty,
+            hasTradeIn: hasScrapTradeIn,
+            scrapDiscount: it.product.scrapValue || 0,
+            finalPrice: it.product.priceNew * it.qty
+        }));
+
+        const localInvData = {
+            id: data.invoice_id,
+            invoiceNo: data.invoice_number || 'INV-TEMP',
+            customerId: custId === 'CUST-CASH' ? null : custId,
+            customerName: custName,
+            customerPhone: custPhone,
+            carModel: carModel,
+            carPlate: carPlate,
+            items: invoiceItems,
+            subtotal: subtotal,
+            scrapDiscountTotal: scrapDiscount,
+            extraDiscount: 0,
+            totalAmount: totalAmount,
+            paymentMethod: currentPaymentMethod,
+            paidAmount: paidAmount,
+            remainingCredit: remainingCredit,
+            creditDueDate: currentPaymentMethod === 'credit' ? '2026-10-05' : null,
+            sellerName: 'كاشير الفرع',
+            notes: payload.notes
+        };
+
+        const newInv = window.AlHusseiniSales ? window.AlHusseiniSales.createInvoice(localInvData) : localInvData;
+        newInv.invoiceNo = data.invoice_number || newInv.invoiceNo;
+
+        // Show Printable Official Invoice
+        renderPrintableInvoice(newInv);
+        const printModal = new bootstrap.Modal(document.getElementById('invoicePrintModal'));
+        printModal.show();
+
+        Swal.fire({
+            icon: 'success',
+            title: 'تم إصدار الفاتورة وتثبيتها بنجاح!',
+            html: `
+                <div class="p-2 mb-2 bg-light rounded text-center">
+                    <strong class="text-primary font-monospace fs-16">${data.invoice_number}</strong>
+                    <div class="text-muted fs-12 mt-1">تم حفظ العملية في قاعدة البيانات وخصم الكميات من المخزون فورياً.</div>
+                </div>
+                <div class="d-flex justify-content-center flex-wrap gap-2 mt-3">
+                    <a href="${data.receipt_url}" target="_blank" class="btn btn-sm btn-primary">
+                        <i class="ri-printer-line me-1"></i> طباعة إيصال كاشير
+                    </a>
+                    <a href="${data.warranty_cert_url}" target="_blank" class="btn btn-sm btn-info text-white">
+                        <i class="ri-shield-check-line me-1"></i> شهادة الضمان
+                    </a>
+                    <a href="/admin/invoices/${data.invoice_id}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                        <i class="ri-file-list-3-line me-1"></i> تفاصيل الفاتورة
+                    </a>
+                </div>
+            `,
+            showConfirmButton: true,
+            confirmButtonText: 'حسناً - بدء فاتورة جديدة',
+            confirmButtonColor: '#0ab39c'
+        });
+
+        // Reset Cart
+        cart = [];
+        document.getElementById('tradeInCheck').checked = false;
+        document.getElementById('cashReceivedInput').value = '';
+        renderCart();
+        renderCatalog();
+    })
+    .catch(err => {
+        console.error('POS Checkout Error:', err);
+        Swal.fire({
+            icon: 'error',
+            title: 'تعذر إتمام الفاتورة',
+            html: err.message,
+            confirmButtonText: 'موافق'
+        });
+    })
+    .finally(() => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    });
 }
 
 function renderPrintableInvoice(inv) {

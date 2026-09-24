@@ -554,15 +554,49 @@ function submitCreditPayment(e) {
     const receivedBy = document.getElementById('payReceiverSelect').value;
     const notes = document.getElementById('payNotesInput').value.trim();
 
-    const result = window.AlHusseiniSales.recordCreditPayment({
-        customerId: custId,
-        amount: amount,
-        method: method,
-        receivedBy: receivedBy,
-        notes: notes
-    });
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري التسجيل...';
+    }
 
-    if (result.success) {
+    const numericCustomerId = !isNaN(parseInt(custId)) ? parseInt(custId) : null;
+
+    // Send payment to backend
+    fetch("{{ route('admin.credit.settle') }}", {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            customer_id: numericCustomerId,
+            amount: amount,
+            payment_method: method === 'instapay' ? 'bank_transfer' : method,
+            notes: notes
+        })
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+            throw new Error(data.message || 'فشل تسجيل التحصيل من الخادم.');
+        }
+        return data;
+    })
+    .then(data => {
+        // Sync local mock storage if available
+        if (window.AlHusseiniSales && window.AlHusseiniSales.recordCreditPayment) {
+            window.AlHusseiniSales.recordCreditPayment({
+                customerId: custId,
+                amount: amount,
+                method: method,
+                receivedBy: receivedBy,
+                notes: notes
+            });
+        }
+
         const modalEl = document.getElementById('recordPaymentModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
@@ -570,19 +604,60 @@ function submitCreditPayment(e) {
         Swal.fire({
             icon: 'success',
             title: 'تم تسجيل سند التحصيل بنجاح!',
-            html: `تم تحصيل مبلغ <strong>${amount} ج.م</strong> من العميل بنجاح وتم تحديث رصيد الآجل المتبقي فورياً.`,
-            confirmButtonText: 'ممتاز',
+            html: `
+                <div class="p-2 mb-2 bg-light rounded text-center">
+                    <strong class="text-success font-monospace fs-16">${data.message}</strong>
+                    ${data.receipt_number ? `<div class="text-muted fs-12 mt-1">رقم سند القبض: <span class="font-monospace fw-bold">${data.receipt_number}</span></div>` : ''}
+                    <div class="text-dark fs-13 mt-1">الرصيد المتبقي الجديد: <strong class="font-monospace text-danger">${Number(data.new_balance || 0).toLocaleString('ar-EG')} ج.م</strong></div>
+                </div>
+            `,
+            confirmButtonText: 'حسناً',
             confirmButtonColor: '#198754'
+        }).then(() => {
+            renderCreditDashboard();
         });
+    })
+    .catch(err => {
+        console.warn('API Credit Settlement fallback:', err);
+        // Fallback to local if offline or mock-only customer
+        if (window.AlHusseiniSales && window.AlHusseiniSales.recordCreditPayment) {
+            const result = window.AlHusseiniSales.recordCreditPayment({
+                customerId: custId,
+                amount: amount,
+                method: method,
+                receivedBy: receivedBy,
+                notes: notes
+            });
 
-        renderCreditDashboard();
-    } else {
-        Swal.fire('خطأ', result.error || 'حدث خطأ أثناء السداد', 'error');
-    }
+            if (result.success) {
+                const modalEl = document.getElementById('recordPaymentModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'تم تسجيل سند التحصيل بنجاح!',
+                    html: `تم تحصيل مبلغ <strong>${amount} ج.م</strong> وتحديث الرصيد فورياً.`,
+                    confirmButtonText: 'ممتاز',
+                    confirmButtonColor: '#198754'
+                });
+
+                renderCreditDashboard();
+                return;
+            }
+        }
+        Swal.fire('خطأ في التحصيل', err.message || 'حدث خطأ أثناء السداد', 'error');
+    })
+    .finally(() => {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    });
 }
 
 function openStatementModal(custId) {
-    const cust = window.AlHusseiniSales.getCustomerById(custId);
+    const cust = window.AlHusseiniSales ? window.AlHusseiniSales.getCustomerById(custId) : null;
     if (!cust) return;
 
     const invoices = window.AlHusseiniSales.getInvoices().filter(i => i.customerId === custId);
@@ -593,7 +668,7 @@ function openStatementModal(custId) {
     const modalBody = document.getElementById('statementModalBody');
     modalBody.innerHTML = `
         <div class="p-3 bg-light rounded border mb-3">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <h5 class="fw-bold mb-1 text-dark">${cust.name}</h5>
                     <p class="text-muted mb-0 fs-12">${cust.carModel} - لوحة: <strong>${cust.carPlate}</strong> | هاتف: ${cust.phone}</p>
@@ -601,6 +676,7 @@ function openStatementModal(custId) {
                 <div class="text-end">
                     <span class="fs-12 text-muted d-block">الرصيد المتبقي على الآجل:</span>
                     <h4 class="text-danger fw-extrabold mb-0 font-monospace">${window.AlHusseiniSales.formatCurrency(cust.creditBalance)}</h4>
+                    ${!isNaN(parseInt(custId)) ? `<a href="/admin/credit/${custId}/statement" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="ri-file-list-3-line me-1"></i> كشف الحساب التفصيلي المعتمد</a>` : ''}
                 </div>
             </div>
         </div>

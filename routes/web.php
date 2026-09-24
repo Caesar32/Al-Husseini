@@ -11,6 +11,14 @@ use App\Http\Controllers\Hr\NotificationController;
 use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\SearchController;
+use App\Http\Controllers\Admin\SupplierController;
+use App\Http\Controllers\Admin\PurchaseInvoiceController;
+use App\Http\Controllers\Admin\PosController;
+use App\Http\Controllers\Admin\SalesInvoiceController;
+use App\Http\Controllers\Admin\WarrantyController;
+use App\Http\Controllers\Admin\ScrapInventoryController;
+use App\Http\Controllers\Admin\CreditCustomerController;
+use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Auth\LockScreenController;
 
 /*
@@ -51,9 +59,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
     // مسارات لوحة التحكم المحمية بالكامل (Authenticated Admin Routes)
     Route::middleware('auth')->group(function () {
 
-        Route::get('/', function () {
-            return view('admin.dashboard');
-        })->name('dashboard')->middleware('can:dashboard.view');
+        Route::get('/', [DashboardController::class, 'index'])->name('dashboard')->middleware('can:dashboard.view');
 
         // البحث الفوري الشامل (Global Spotlight Search)
         Route::get('/global-search', [SearchController::class, 'globalSearch'])->name('global_search');
@@ -122,24 +128,52 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.readAll')->middleware('can:notifications.view');
         });
 
-        // المبيعات ونقاط البيع والعملاء والمنتجات (Sales & Operations)
+        // قطاع الموردين والتوريدات
+        Route::resource('suppliers', SupplierController::class);
+        Route::get('suppliers/{supplier}/ledger', [SupplierController::class, 'ledger'])->name('suppliers.ledger')->middleware('can:suppliers.view');
+        Route::post('suppliers/{supplier}/payments', [SupplierController::class, 'recordPayment'])->name('suppliers.payments')->middleware('can:purchases.settle_payment');
+
+        // فواتير المشتريات والتوريد
+        Route::resource('purchases', PurchaseInvoiceController::class)->except(['edit', 'update', 'destroy']);
+        Route::get('purchases/{purchase}/print', [PurchaseInvoiceController::class, 'print'])->name('purchases.print')->middleware('can:purchases.view');
+
+        // نقطة البيع ومبيعات الكاشير
+        Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware('can:pos.access');
+        Route::post('pos', [PosController::class, 'store'])->name('pos.store')->middleware('can:pos.access');
+        Route::get('pos/{invoice}/receipt', [PosController::class, 'receipt'])->name('pos.receipt')->middleware('can:invoices.print');
+        Route::get('pos/{invoice}/warranty', [PosController::class, 'warrantyCert'])->name('pos.warranty_cert')->middleware('can:warranties.view');
+
+        // فواتير المبيعات وسجل العمليات
+        Route::get('invoices', [SalesInvoiceController::class, 'index'])->name('invoices.index')->middleware('can:invoices.view');
+        Route::get('invoices/{invoice}', [SalesInvoiceController::class, 'show'])->name('invoices.show')->middleware('can:invoices.view');
+        Route::post('invoices/{invoice}/return', [SalesInvoiceController::class, 'processReturn'])->name('invoices.return')->middleware('can:invoices.cancel');
+
+        // الضمانات والبطاريات التالفة
+        Route::get('warranties', [WarrantyController::class, 'index'])->name('warranties.index')->middleware('can:warranties.view');
+        Route::get('warranties/verify', [WarrantyController::class, 'verify'])->name('warranties.verify')->middleware('can:warranties.view');
+        Route::post('warranties/claims', [WarrantyController::class, 'storeClaim'])->name('warranties.claims.store')->middleware('can:warranties.claim');
+        Route::post('warranties/claims/{claim}/settle', [WarrantyController::class, 'settleSupplier'])->name('warranties.claims.settle')->middleware('can:warranties.approve_replace');
+
+        // مخزن الكهنة وتجارة الرصاص
+        Route::get('scrap-inventory', [ScrapInventoryController::class, 'index'])->name('scrap.index')->middleware('can:scrap.view');
+        Route::post('scrap-inventory/sell-batch', [ScrapInventoryController::class, 'sellBatch'])->name('scrap.sell_batch')->middleware('can:scrap.transfer');
+        Route::put('scrap-inventory/tiers', [ScrapInventoryController::class, 'updateTiers'])->name('scrap.update_tiers')->middleware('can:settings.manage');
+
+        // إدارة عملاء الآجل والمديونيات
+        Route::get('credit', [CreditCustomerController::class, 'index'])->name('credit.index')->middleware('can:credit.view');
+        Route::post('credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
+        Route::get('credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
+
+        // التوافق مع المسارات السابقة (Backwards Compatibility Route Aliases)
         Route::prefix('sales')->name('sales.')->group(function () {
-            Route::get('/pos', function () {
-                return view('admin.sales.pos');
-            })->name('pos')->middleware('can:pos.access');
-
-            Route::get('/invoices', function () {
-                return view('admin.sales.invoices');
-            })->name('invoices')->middleware('can:invoices.view');
-
-            Route::get('/credit', function () {
-                return view('admin.sales.credit');
-            })->name('credit')->middleware('can:credit.view');
-
+            Route::get('/pos', [PosController::class, 'index'])->name('pos')->middleware('can:pos.access');
+            Route::get('/invoices', [SalesInvoiceController::class, 'index'])->name('invoices')->middleware('can:invoices.view');
+            Route::get('/credit', [CreditCustomerController::class, 'index'])->name('credit')->middleware('can:credit.view');
+            Route::post('/credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
+            Route::get('/credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
             Route::get('/customers', function () {
                 return view('admin.sales.customers');
             })->name('customers')->middleware('can:customers.view');
-
             Route::get('/products', function () {
                 return view('admin.sales.products');
             })->name('products')->middleware('can:products.view');

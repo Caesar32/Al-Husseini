@@ -22,45 +22,105 @@
 @yield('script')
 @stack('scripts')
 
-<!-- Theme Icon & Sidebar State Sync (Non-conflicting) -->
+<!-- Theme Icon & Sidebar State Sync (Bulletproof & Immediate) -->
 <script>
 (function () {
-    // 1. Theme Icon Synchronization (Dark / Light Mode)
-    function syncThemeIcon() {
-        var currentTheme = document.documentElement.getAttribute('data-bs-theme') || 'light';
-        var isDark = currentTheme === 'dark';
-        var modeIcons = document.querySelectorAll('.light-dark-mode i');
-        modeIcons.forEach(function (icon) {
-            if (isDark) {
-                icon.className = 'bx bx-sun fs-22';
-            } else {
-                icon.className = 'bx bx-moon fs-22';
-            }
+    // 1. Theme State Helper
+    function getStoredTheme() {
+        return localStorage.getItem('data-bs-theme') || sessionStorage.getItem('data-bs-theme') || document.documentElement.getAttribute('data-bs-theme') || 'light';
+    }
+
+    // 2. Synchronize all theme icons across the DOM
+    function syncThemeUI(theme) {
+        var isDark = theme === 'dark';
+        var icons = document.querySelectorAll('.light-dark-mode i, #light-dark-mode-toggle i');
+        icons.forEach(function (icon) {
+            icon.className = isDark ? 'bx bx-sun fs-22' : 'bx bx-moon fs-22';
+        });
+
+        // Also sync customizer radio if present
+        var radio = document.querySelector('input[name="data-bs-theme"][value="' + theme + '"]');
+        if (radio) {
+            radio.checked = true;
+        }
+    }
+
+    // 3. Centralized theme applicator
+    window.applyThemeMode = function (targetTheme) {
+        var theme = targetTheme || (document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'light' : 'dark');
+        
+        document.documentElement.setAttribute('data-bs-theme', theme);
+        document.documentElement.setAttribute('data-topbar', theme === 'dark' ? 'dark' : 'light');
+
+        try {
+            localStorage.setItem('data-bs-theme', theme);
+            sessionStorage.setItem('data-bs-theme', theme);
+        } catch (err) {}
+
+        syncThemeUI(theme);
+
+        // Notify charts and responsive components
+        window.dispatchEvent(new Event('resize'));
+        window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme: theme } }));
+    };
+
+    // 4. Setup clean toggle listeners (replaces elements to discard conflicting legacy listeners from app.js)
+    function attachThemeToggleListener() {
+        var buttons = document.querySelectorAll('.light-dark-mode, #light-dark-mode-toggle');
+        buttons.forEach(function (btn) {
+            // Clone node without existing listeners
+            var cleanBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(cleanBtn, btn);
+
+            cleanBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+                var current = document.documentElement.getAttribute('data-bs-theme') || 'light';
+                var next = current === 'dark' ? 'light' : 'dark';
+                window.applyThemeMode(next);
+            }, true); // Capture phase ensures execution before bubbling
         });
     }
 
-    // Run on initial load
+    // 5. Initial Run
+    var initialTheme = getStoredTheme();
+    document.documentElement.setAttribute('data-bs-theme', initialTheme);
+    syncThemeUI(initialTheme);
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', syncThemeIcon);
+        document.addEventListener('DOMContentLoaded', function () {
+            attachThemeToggleListener();
+            syncThemeUI(document.documentElement.getAttribute('data-bs-theme'));
+        });
     } else {
-        syncThemeIcon();
+        attachThemeToggleListener();
     }
 
-    // 2. Observe changes to data-bs-theme and data-sidebar-size on <html>
+    // Re-verify after full window load (when app.js has completed)
+    window.addEventListener('load', function () {
+        attachThemeToggleListener();
+        syncThemeUI(document.documentElement.getAttribute('data-bs-theme'));
+    });
+
+    // 6. MutationObserver for external changes (like sidebar size)
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (mutation.attributeName === 'data-bs-theme') {
-                syncThemeIcon();
-                var theme = document.documentElement.getAttribute('data-bs-theme');
-                if (theme) {
-                    sessionStorage.setItem('data-bs-theme', theme);
-                    localStorage.setItem('data-bs-theme', theme);
-                }
+                var current = document.documentElement.getAttribute('data-bs-theme');
+                syncThemeUI(current);
+                try {
+                    localStorage.setItem('data-bs-theme', current);
+                    sessionStorage.setItem('data-bs-theme', current);
+                } catch (e) {}
             }
             if (mutation.attributeName === 'data-sidebar-size') {
                 var size = document.documentElement.getAttribute('data-sidebar-size');
                 if (size) {
-                    sessionStorage.setItem('data-sidebar-size', size);
+                    try {
+                        sessionStorage.setItem('data-sidebar-size', size);
+                    } catch (e) {}
                 }
             }
         });

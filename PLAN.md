@@ -37,4 +37,21 @@
    - تغطية المعادلات الحسابية والمسارات باختبارات Pest وضبط إعدادات الإنتاج والـ Caching.
 
 ---
-للاطلاع على المخطط الفني الكامل بكل تفاصيل الجداول والأكواد البرمجية: افتح الملف [plans/PLAN.md](plans/PLAN.md).
+
+### 📦 خطط التنفيذ الفنية التفصيلية حسب القطاعات:
+
+1. **نظام الموارد البشرية والرواتب (HR & Payroll System):**
+   👉 **[plans/hr_system/README.md](plans/hr_system/README.md)** *(مكتمل بنسبة 100% ومختبر بـ 91 اختباراً ناجحاً)*
+
+2. **نظام المبيعات ونقاط البيع والتوريدات والموردين (Sales, POS & Multi-Supplier):**
+   👉 **[plans/sales_and_purchases/README.md](plans/sales_and_purchases/README.md)** *(خطة هندسية معتمدة مقسمة إلى 7 مراحل تفصيلية)*
+   - **المرحلة 1:** [الهيكل وقواعد البيانات والـ Seeders](plans/sales_and_purchases/PHASE_01_DATABASE_SCHEMA_MIGRATIONS.md)
+   - **المرحلة 2:** [النماذج والعلاقات والمراقبين](plans/sales_and_purchases/PHASE_02_MODELS_RELATIONS_OBSERVERS.md)
+   - **المرحلة 3:** [طلبات التحقق وقواعد الأمان الصارمة](plans/sales_and_purchases/PHASE_03_FORM_REQUESTS_VALIDATION.md)
+   - **المرحلة 4:** [محرك الخدمات والمعادلات المحاسبية (WAC)](plans/sales_and_purchases/PHASE_04_SERVICES_BUSINESS_LOGIC.md)
+   - **المرحلة 5:** [المتحكمات والمسارات ومصفوفة الصلاحيات](plans/sales_and_purchases/PHASE_05_CONTROLLERS_ROUTES_PERMISSIONS.md)
+   - **المرحلة 6:** [واجهات Blade والطباعة المزدوجة ومخزن الكهنة](plans/sales_and_purchases/PHASE_06_UI_BLADE_COMPONENTS_PRINTING.md)
+   - **المرحلة 7:** [حزمة اختبارات Pest المؤتمتة والشاملة](plans/sales_and_purchases/PHASE_07_TESTING_VERIFICATION.md)
+
+---
+للاطلاع على المخطط الفني الشامل لكامل التطبيق: افتح الملف [plans/PLAN.md](plans/PLAN.md).

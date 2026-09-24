@@ -20,6 +20,14 @@ class DatabaseSeeder extends Seeder
             InitialDataSeeder::class,
             HrFactorySeeder::class,
             SettingsSeeder::class,
+            ScrapPricingTiersSeeder::class,
+            SupplierProductsSeeder::class,
         ]);
+
+        if (!app()->environment('testing')) {
+            $this->call([
+                SalesAndPosDataSeeder::class,
+            ]);
+        }
     }
 }

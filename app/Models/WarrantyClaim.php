@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class WarrantyClaim extends Model
 {
     protected $fillable = [
+        'claim_number',
         'warranty_id',
+        'customer_id',
+        'branch_id',
+        'defective_battery_serial',
         'technician_id',
         'claim_date',
         'battery_voltage_tested',
@@ -16,6 +20,14 @@ class WarrantyClaim extends Model
         'issue_description',
         'decision',
         'replacement_invoice_id',
+        'replacement_product_id',
+        'replacement_battery_serial',
+        'supplier_id',
+        'supplier_resolution',
+        'received_by_user_id',
+        'settled_by_user_id',
+        'received_at',
+        'resolved_at',
     ];
 
     protected function casts(): array
@@ -24,12 +36,24 @@ class WarrantyClaim extends Model
             'claim_date' => 'date',
             'battery_voltage_tested' => 'decimal:2',
             'cca_tested' => 'decimal:1',
+            'received_at' => 'datetime',
+            'resolved_at' => 'datetime',
         ];
     }
 
     public function warranty(): BelongsTo
     {
         return $this->belongsTo(Warranty::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
     }
 
     public function technician(): BelongsTo
@@ -40,5 +64,25 @@ class WarrantyClaim extends Model
     public function replacementInvoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class, 'replacement_invoice_id');
+    }
+
+    public function replacementProduct(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'replacement_product_id');
+    }
+
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function receivedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'received_by_user_id');
+    }
+
+    public function settledByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'settled_by_user_id');
     }
 }

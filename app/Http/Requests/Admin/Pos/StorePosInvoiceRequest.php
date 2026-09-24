@@ -1,0 +1,241 @@
+<?php
+
+namespace App\Http\Requests\Admin\Pos;
+
+use App\Models\Customer;
+use App\Models\Product;
+use App\Models\ScrapPricingTier;
+use App\Models\User;
+use App\Models\Warranty;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Validator;
+
+class StorePosInvoiceRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            'branch_id'             => ['nullable', 'exists:branches,id'],
+            'customer_id'           => ['nullable', 'exists:customers,id'],
+            'customer_vehicle_id'   => ['nullable', 'exists:customer_vehicles,id'],
+            'technician_id'         => ['nullable', 'exists:employees,id'],
+
+            // Items
+            'items'                 => ['required', 'array', 'min:1'],
+            'items.*.product_id'    => ['required', 'exists:products,id'],
+            'items.*.quantity'      => ['required', 'integer', 'min:1'],
+            'items.*.unit_price'    => ['nullable', 'numeric', 'min:0'],
+            'items.*.battery_serial'=> ['nullable', 'string', 'max:100'],
+
+            // Scrap trade-in
+            'has_scrap'             => ['sometimes', 'boolean'],
+            'scrap_capacity_ah'     => ['nullable', 'required_if:has_scrap,true', 'integer', 'min:30', 'max:250'],
+            'scrap_count'           => ['nullable', 'required_if:has_scrap,true', 'integer', 'min:1'],
+
+            // Discounts & Tax
+            'discount_amount'       => ['nullable', 'numeric', 'min:0'],
+            'tax_amount'            => ['nullable', 'numeric', 'min:0'],
+
+            // Split Payments
+            'payments'              => ['required', 'array', 'min:1'],
+            'payments.*.method'     => ['required', 'in:cash,card,bank_transfer,credit'],
+            'payments.*.amount'     => ['required', 'numeric', 'min:0.01'],
+            'payments.*.reference'  => ['nullable', 'string', 'max:100'],
+
+            // Manager Override Code for Credit Limit Exceed
+            'manager_override_code' => ['nullable', 'string'],
+            'notes'                 => ['nullable', 'string', 'max:500'],
+        ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function ($validator) {
+            $items = $this->input('items', []);
+            if (!is_array($items) || empty($items)) {
+                return;
+            }
+
+            // 1. Validate Product stock and Battery Serials
+            $productIds = collect($items)->pluck('product_id')->filter()->unique()->values()->all();
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
+
+            $batterySerials = [];
+            $subtotal = 0.0;
+
+            foreach ($items as $index => $item) {
+                $productId = $item['product_id'] ?? null;
+                $qty = (int) ($item['quantity'] ?? 1);
+                $product = $products->get($productId);
+
+                if (!$product) {
+                    continue;
+                }
+
+                // Check stock
+                if ($product->current_stock < $qty) {
+                    $validator->errors()->add(
+                        "items.{$index}.quantity",
+                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$qty}."
+                    );
+                }
+
+                // Unit price
+                $price = isset($item['unit_price']) && is_numeric($item['unit_price'])
+                    ? (float) $item['unit_price']
+                    : (float) $product->retail_price;
+                $subtotal += ($price * $qty);
+
+                // Battery Serial Validation
+                if ($product->is_battery) {
+                    $serial = trim((string) ($item['battery_serial'] ?? ''));
+                    if ($serial === '') {
+                        $validator->errors()->add(
+                            "items.{$index}.battery_serial",
+                            "السيريال مطلوب إجبارياً للبطارية ({$product->name})."
+                        );
+                    } else {
+                        // Check if serial duplicated within this order
+                        if (in_array($serial, $batterySerials, true)) {
+                            $validator->errors()->add(
+                                "items.{$index}.battery_serial",
+                                "سيريال البطارية ({$serial}) مكرر في بنود نفس الفاتورة."
+                            );
+                        } else {
+                            $batterySerials[] = $serial;
+                        }
+
+                        // Check if serial already exists in active warranties
+                        if (Warranty::where('serial_number', $serial)->exists()) {
+                            $validator->errors()->add(
+                                "items.{$index}.battery_serial",
+                                "سيريال البطارية ({$serial}) مسجل في النظام مسبقاً ولديه شهادة ضمان سابقة."
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 2. Validate Scrap Deduction
+            $scrapDeduction = 0.0;
+            if ($this->boolean('has_scrap')) {
+                $ah = (int) $this->input('scrap_capacity_ah');
+                $count = (int) $this->input('scrap_count', 1);
+                $tier = ScrapPricingTier::findPriceForCapacity($ah);
+
+                if (!$tier) {
+                    $validator->errors()->add('scrap_capacity_ah', "لا توجد شريحة تسعير كهنة معتمدة لسعة {$ah} أمبير.");
+                } else {
+                    $scrapDeduction = (float) $tier->default_scrap_price * $count;
+                }
+            }
+
+            // 3. Validate Final Amount vs Payments Sum
+            $discount = (float) $this->input('discount_amount', 0);
+            $tax = (float) $this->input('tax_amount', 0);
+            $finalAmount = max(0, ($subtotal + $tax) - $discount - $scrapDeduction);
+
+            $payments = $this->input('payments', []);
+            $totalPayments = 0.0;
+            $creditAmount = 0.0;
+
+            foreach ($payments as $payment) {
+                $amount = (float) ($payment['amount'] ?? 0);
+                $totalPayments += $amount;
+                if (($payment['method'] ?? '') === 'credit') {
+                    $creditAmount += $amount;
+                }
+            }
+
+            if (abs($totalPayments - $finalAmount) > 0.05) {
+                $validator->errors()->add(
+                    'payments',
+                    sprintf(
+                        'إجمالي مبالغ الدفعات المجزأة (%s ج.م) لا يتطابق مع صافي الفاتورة الإجمالي بعد خصم الكهنة (%s ج.م).',
+                        number_format($totalPayments, 2),
+                        number_format($finalAmount, 2)
+                    )
+                );
+            }
+
+            // 4. Validate Credit Limit & Manager Override
+            if ($creditAmount > 0) {
+                $customerId = $this->input('customer_id');
+                if (!$customerId) {
+                    $validator->errors()->add('payments', 'لا يمكن استخدام طريقة الدفع بالآجل لعميل نقدي عابر غير مسجل.');
+                    return;
+                }
+
+                $customer = Customer::find($customerId);
+                if ($customer) {
+                    $newBalance = (float) $customer->current_credit_balance + $creditAmount;
+                    $creditLimit = (float) $customer->credit_limit;
+
+                    if ($newBalance > $creditLimit) {
+                        // Manager override code is mandatory
+                        $overrideCode = (string) $this->input('manager_override_code');
+                        if (!$this->isManagerOverrideValid($overrideCode)) {
+                            $validator->errors()->add(
+                                'manager_override_code',
+                                sprintf(
+                                    'الرصيد الآجل المطلوب (%s ج.م) سيتجاوز سقف ائتمان العميل (%s ج.م). الرصيد الحالي: %s ج.م. يلزم إدخال كود موافقة المدير للاستثناء.',
+                                    number_format($newBalance, 2),
+                                    number_format($creditLimit, 2),
+                                    number_format((float) $customer->current_credit_balance, 2)
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    protected function isManagerOverrideValid(?string $code): bool
+    {
+        if (empty($code)) {
+            return false;
+        }
+
+        // 1. Check fixed system override pin if configured
+        $configuredCode = (string) config('app.manager_override_code', '9999');
+        if ($code === $configuredCode) {
+            return true;
+        }
+
+        // 2. Check if code matches password of any user with admin or manager role
+        $managers = User::whereHas('roles', function ($query) {
+            $query->whereIn('name', ['admin', 'manager', 'branch_manager']);
+        })->get();
+
+        foreach ($managers as $manager) {
+            if (Hash::check($code, $manager->password)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function messages(): array
+    {
+        return [
+            'items.required'                    => 'يجب إضافة منتج واحد على الأقل في الفاتورة.',
+            'items.*.product_id.required'       => 'يرجى اختيار المنتج.',
+            'items.*.quantity.required'         => 'الكمية مطلوبة.',
+            'items.*.quantity.min'              => 'الكمية يجب أن تكون 1 على الأقل.',
+            'scrap_capacity_ah.required_if'     => 'يرجى تحديد سعة بطارية الكهنة بالأمبير (Ah).',
+            'scrap_count.required_if'           => 'يرجى تحديد عدد بطاريات الكهنة المستلمة.',
+            'payments.required'                 => 'يجب تحديد طريقة الدفع وتوزيع المبالغ.',
+            'payments.*.method.required'        => 'طريقة الدفع مطلوبة.',
+            'payments.*.amount.required'        => 'مبلغ الدفعة مطلوب.',
+            'payments.*.amount.min'             => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر.',
+        ];
+    }
+}

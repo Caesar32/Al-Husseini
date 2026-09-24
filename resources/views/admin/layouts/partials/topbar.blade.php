@@ -6,11 +6,11 @@
                 <div class="navbar-brand-box horizontal-logo">
                     <a href="{{ route('admin.dashboard') }}" class="logo logo-dark">
                         <span class="logo-sm">
-                            <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
+                            <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                         </span>
                         <span class="logo-lg">
                             <span class="d-inline-flex align-items-center gap-2">
-                                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
+                                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                                 <span class="fw-bold fs-17 text-dark">الحسيني <span class="text-primary fs-13">Al-Husseini</span></span>
                             </span>
                         </span>
@@ -18,11 +18,11 @@
 
                     <a href="{{ route('admin.dashboard') }}" class="logo logo-light">
                         <span class="logo-sm">
-                            <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
+                            <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                         </span>
                         <span class="logo-lg">
                             <span class="d-inline-flex align-items-center gap-2">
-                                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-circle shadow-sm">
+                                <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="30" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                                 <span class="fw-bold fs-17 text-white">الحسيني <span class="text-warning fs-13">Al-Husseini</span></span>
                             </span>
                         </span>
@@ -98,8 +98,8 @@
                 </div>
 
                 <!-- Light / Dark Mode -->
-                <div class="ms-1 header-item d-none d-sm-flex">
-                    <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle light-dark-mode">
+                <div class="ms-1 header-item d-flex">
+                    <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle light-dark-mode" id="light-dark-mode-toggle" title="تبديل الوضع الليلي / الفاتح" aria-label="تبديل الوضع الليلي / الفاتح">
                         <i class='bx bx-moon fs-22'></i>
                     </button>
                 </div>

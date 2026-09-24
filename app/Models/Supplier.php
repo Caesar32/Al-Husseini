@@ -41,7 +41,20 @@ class Supplier extends Model
 
     public function ledgerEntries(): HasMany
     {
-        return $this->hasMany(SupplierLedgerEntry::class)->orderByDesc('id');
+        return $this->hasMany(SupplierLedgerEntry::class);
+    }
+
+    public function products(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Product::class, 'supplier_products')
+            ->using(SupplierProduct::class)
+            ->withPivot(['id', 'supplier_sku', 'last_purchase_price', 'min_order_qty', 'lead_time_days', 'is_primary_supplier'])
+            ->withTimestamps();
+    }
+
+    public function warrantyClaims(): HasMany
+    {
+        return $this->hasMany(WarrantyClaim::class);
     }
 
     public function scopeActive(Builder $query): void

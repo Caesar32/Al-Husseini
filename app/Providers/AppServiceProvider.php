@@ -4,13 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-use App\Models\Invoice;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Attendance;
-use App\Models\PurchaseInvoice;
-use App\Observers\InvoiceObserver;
 use App\Observers\AttendanceObserver;
-use App\Observers\PurchaseInvoiceObserver;
 
 use Illuminate\Support\Facades\Gate;
 
@@ -41,8 +37,12 @@ class AppServiceProvider extends ServiceProvider
             return $user->hasRole('super-admin') ? true : null;
         });
 
-        Invoice::observe(InvoiceObserver::class);
+        // NOTE: Invoice لا يحتاج Observer - منطق خصم المخزون والضمانات والآجل وعمولة الفني
+        // محكوم بالكامل داخل PosOrderService::processPosSale() مع Invoice::withoutEvents()
+        // لضمان Atomicity الكاملة وتجنب التكرار المحاسبي.
+        // NOTE: PurchaseInvoice لا يحتاج Observer - منطق WAC والمخزون والأستاذ محكوم
+        // بالكامل داخل PurchaseService::createDirectPurchase() لضمان Atomicity وتجنب التكرار.
         Attendance::observe(AttendanceObserver::class);
-        PurchaseInvoice::observe(PurchaseInvoiceObserver::class);
+        \App\Models\WarrantyClaim::observe(\App\Observers\WarrantyClaimObserver::class);
     }
 }

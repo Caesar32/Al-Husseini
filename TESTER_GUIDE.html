@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>وثيقة الجودة البرمجية المعتمدة | دليل فحص واختبار الأنظمة (QA Master Manual)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --primary-light: #eff6ff;
+            --secondary: #0f766e;
+            --secondary-light: #f0fdfa;
+            --dark: #0f172a;
+            --gray-700: #334155;
+            --gray-500: #64748b;
+            --gray-200: #e2e8f0;
+            --gray-100: #f8fafc;
+            --danger: #b91c1c;
+            --danger-light: #fef2f2;
+            --success: #15803d;
+            --success-light: #f0fdf4;
+            --warning: #b45309;
+            --warning-light: #fffbeb;
+            --border: #cbd5e1;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Cairo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #525659;
+            color: var(--dark);
+            line-height: 1.7;
+            padding: 30px 15px;
+            direction: rtl;
+        }
+
+        .document-container {
+            max-width: 960px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 60px 70px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            border-radius: 4px;
+        }
+
+        /* الطباعة على نمط Microsoft Word */
+        @media print {
+            body {
+                background: transparent;
+                padding: 0;
+            }
+            .document-container {
+                max-width: 100%;
+                box-shadow: none;
+                padding: 20mm;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .page-break {
+                page-break-before: always;
+            }
+        }
+
+        .action-bar {
+            max-width: 960px;
+            margin: 0 auto 15px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-print {
+            background-color: #2563eb;
+            color: #ffffff;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 6px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+
+        .btn-print:hover {
+            background-color: #1d4ed8;
+        }
+
+        .doc-badge {
+            background: #e2e8f0;
+            color: #334155;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* ترويسة الغلاف */
+        .header-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 25px;
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 15px;
+        }
+
+        .header-table td {
+            vertical-align: middle;
+            padding: 10px 5px;
+        }
+
+        .org-name {
+            font-size: 24px;
+            font-weight: 900;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+
+        .org-sub {
+            font-size: 13px;
+            color: var(--gray-500);
+            font-weight: 600;
+        }
+
+        .doc-title-block {
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary-light), #ffffff);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 25px 20px;
+            margin-bottom: 30px;
+        }
+
+        .doc-title-block h1 {
+            color: var(--primary);
+            font-size: 24px;
+            font-weight: 900;
+            margin-bottom: 8px;
+        }
+
+        .doc-title-block p {
+            color: var(--gray-700);
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        /* الجداول الرسمية */
+        table.formal-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0 30px 0;
+            font-size: 13.5px;
+            background: #ffffff;
+        }
+
+        table.formal-table th, table.formal-table td {
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            text-align: right;
+        }
+
+        table.formal-table th {
+            background-color: #f1f5f9;
+            color: var(--dark);
+            font-weight: 800;
+            font-size: 13.5px;
+            border-bottom: 2px solid #94a3b8;
+        }
+
+        table.formal-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+
+        /* العناوين والفقرات */
+        h2.section-title {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--primary);
+            border-right: 5px solid var(--primary);
+            padding-right: 12px;
+            margin: 35px 0 15px 0;
+            background: #f8fafc;
+            padding-top: 6px;
+            padding-bottom: 6px;
+        }
+
+        h3.sub-title {
+            font-size: 15.5px;
+            font-weight: 700;
+            color: var(--secondary);
+            margin: 22px 0 10px 0;
+        }
+
+        p, li {
+            font-size: 14px;
+            color: #334155;
+            text-align: justify;
+        }
+
+        ul, ol {
+            padding-right: 25px;
+            margin-bottom: 15px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        /* صناديق التنبيه (Callouts) */
+        .callout {
+            border-radius: 6px;
+            padding: 15px 18px;
+            margin: 18px 0;
+            font-size: 13.5px;
+            border-right: 4px solid;
+        }
+
+        .callout-info {
+            background: var(--primary-light);
+            border-color: #3b82f6;
+            color: #1e40af;
+        }
+
+        .callout-danger {
+            background: var(--danger-light);
+            border-color: var(--danger);
+            color: #991b1b;
+        }
+
+        .callout-success {
+            background: var(--success-light);
+            border-color: var(--success);
+            color: #166534;
+        }
+
+        .badge-priority {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .priority-critical {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #f87171;
+        }
+
+        .priority-high {
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+
+        /* التوقيعات */
+        .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 20px;
+            margin-top: 40px;
+            padding-top: 25px;
+            border-top: 2px dashed #cbd5e1;
+            text-align: center;
+        }
+
+        .signature-box {
+            border: 1px solid var(--border);
+            padding: 15px;
+            border-radius: 6px;
+            background: #f8fafc;
+        }
+
+        .signature-box .role {
+            font-size: 12px;
+            color: var(--gray-500);
+            font-weight: 700;
+        }
+
+        .signature-box .name {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--dark);
+            margin: 8px 0;
+        }
+
+        .signature-box .status {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--success);
+        }
+
+        code {
+            background: #f1f5f9;
+            color: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: Consolas, monospace;
+            font-size: 12.5px;
+            border: 1px solid #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="action-bar no-print">
+        <span class="doc-badge">نسخة منسقة بصرياً للطباعة وتصدير PDF أو الفتح في Word</span>
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة المستند / حفظ بصيغة PDF</button>
+    </div>
+
+    <div class="document-container">
+
+        <!-- ترويسة الغلاف الرسمية -->
+        <table class="header-table">
+            <tr>
+                <td style="width: 70%;">
+                    <div class="org-name">مجموعة الحسيني للسيارات والتجارة</div>
+                    <div class="org-sub">إدارة هندسة النظم وتوكيد جودة البرمجيات (Software QA Dept)</div>
+                </td>
+                <td style="width: 30%; text-align: left;">
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">كود الوثيقة: QA-DOC-2026-V2</div>
+                    <div style="font-size: 12px; font-weight: 700; color: #64748b;">التاريخ: 24 سبتمبر 2026</div>
+                    <div style="font-size: 12px; font-weight: 800; color: #15803d;">الحالة: معتمد للنشر الداخلي</div>
+                </td>
+            </tr>
+        </table>
+
+        <!-- عنوان المستند الرئيسي -->
+        <div class="doc-title-block">
+            <h1>دليل الفحص واختبار الأنظمة المعتمد (QA & Tester Master Manual)</h1>
+            <p>المرجع التشغيلي والمحاسبي الموحد لفحص واختبار نظام ERP & POS لمجموعة الحسيني</p>
+        </div>
+
+        <!-- 1.0 ملخص المنظومة -->
+        <h2 class="section-title">1.0 ملخص المنظومة ونطاق العمل (System Context & Scope)</h2>
+        <p>نظام إدارة مجموعة الحسيني هو حل مؤسسي متكامل لنقاط البيع السريعة وتخطيط الموارد (<strong>ERP & POS</strong>) مصمم لخدمات وتجارة <strong>بطاريات السيارات، الزيوت، الفلاتر، ورش الصيانة الكهربائية، والإنقاذ السريع</strong>. يعمل النظام حالياً في <strong>فرع دمياط الجديدة (شارع المحجوب - كود: MAIN)</strong> مع جاهزية معمارية كاملة لدعم الفروع المتعددة.</p>
+
+        <!-- 2.0 بيئة الفحص وحسابات التجربة -->
+        <h2 class="section-title">2.0 إعداد بيئة الفحص وحسابات التجربة (Test Personas)</h2>
+        <div class="callout callout-info">
+            <strong>أمر تصفير وتحضير البيانات التجريبية:</strong> قم بتشغيل <code>php artisan migrate:fresh --seed</code> لضمان مطابقة بيئة الاختبار مع المعايير القياسية.
+        </div>
+
+        <table class="formal-table">
+            <thead>
+                <tr>
+                    <th>الشخصية الاختبارية</th>
+                    <th>البريد الإلكتروني</th>
+                    <th>كلمة المرور</th>
+                    <th>الدور المعتمد</th>
+                    <th>النطاق الوظيفي للفحص</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>مدير النظام (Super Admin)</strong></td>
+                    <td><code>admin@alhusseini.com</code></td>
+                    <td><code>12345678</code></td>
+                    <td>دور super-admin</td>
+                    <td>وصول مطلق وشامل لكافة الشاشات والصلاحيات ومسيرات الرواتب.</td>
+                </tr>
+                <tr>
+                    <td><strong>المحاسب والكاشير</strong></td>
+                    <td><code>accountant@alhusseini.com</code></td>
+                    <td><code>12345678</code></td>
+                    <td>دور accountant</td>
+                    <td>نقطة البيع (POS)، فواتير التوريد، كشوف الحسابات، وسندات الصرف والقبض.</td>
+                </tr>
+                <tr>
+                    <td><strong>مدير الفرع المعتمد</strong></td>
+                    <td>حساب تجريبي / المدير</td>
+                    <td><code>12345678</code></td>
+                    <td>دور branch_manager</td>
+                    <td>فحص شاشات اعتماد الرواتب، وتفويض تجاوز سقف ائتمان العملاء.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p><strong>كود اعتماد وتفويض المدير لتجاوز سقف الائتمان (Manager Override):</strong> الكود المعتمد في بيئة الفحص هو: <code>mgr_override_99</code> أو <code>9999</code>.</p>
+
+        <!-- 3.0 الدستور المحاسبي والتشغيلي للنظام -->
+        <h2 class="section-title">3.0 الدستور المحاسبي والتشغيلي للنظام (Business Invariants)</h2>
+
+        <h3 class="sub-title">3.1 معادلة البيع والخصم الإجباري للكهنة (Scrap Zero-Tampering Policy)</h3>
+        <p>يُحظر تماماً على الكاشير كتابة قيمة خصم البطارية القديمة يدوياً. تُجلب القيمة آلياً من جدول شرائح الأمبير (<code>scrap_pricing_tiers</code>):</p>
+        <ul>
+            <li>سعة 40Ah إلى 55Ah = <strong>450.00 ج.م</strong>.</li>
+            <li>سعة 60Ah إلى 70Ah = <strong>600.00 ج.م</strong>.</li>
+            <li>سعة 74Ah إلى 80Ah = <strong>750.00 ج.م</strong>.</li>
+            <li>سعة 90Ah إلى 100Ah = <strong>1,000.00 ج.م</strong>.</li>
+            <li><strong>معادلة احتساب رصاص الكهنة:</strong> $\text{وزن الرصاص بالكيلو} = \text{سعة الأمبير} \times 0.17$ (بطارية 70Ah = 11.9 كجم رصاص).</li>
+        </ul>
+
+        <h3 class="sub-title">3.2 معادلة المتوسط المرجح لإعادة تقييم المخزون (WAC Engine)</h3>
+        <p>مع كل شحنة توريد جديدة من أي مورد، تُعاد حوسبة تكلفة وحدة المنتج فوراً:</p>
+        <div style="text-align: center; background: #f8fafc; padding: 12px; border: 1px dashed #cbd5e1; margin: 10px 0; font-weight: 700;">
+            $\text{WAC الجديد} = \frac{(\text{الرصيد المتبقي بالمخزن} \times \text{سعر التكلفة الحالي}) + (\text{الكمية الواردة} \times \text{سعر الشراء الجديد})}{\text{إجمالي الرصيد بعد التوريد}}$
+        </div>
+
+        <h3 class="sub-title">3.3 لوائح البصمة والجزاءات التلقائية (Strict Attendance)</h3>
+        <ul>
+            <li><strong>فترة السماح:</strong> 15 دقيقة بعد بداية الشفت بدون أي دقائق تأخير.</li>
+            <li><strong>فترة التبريد (5-Min Anti-Passback):</strong> أي بصمة ثانية خلال أقل من 5 دقائق تُهمل تماماً ويثبت وقت الحضور الأول.</li>
+            <li><strong>منع الحضور المكرر:</strong> أي بصمة بعد 5 دقائق تُرفض صراحة.</li>
+            <li><strong>الجزاء الآلي (تأخير > 30 دقيقة):</strong> توليد خصم تلقائي بقيمة <strong>ربع يوم عمل</strong>: $\text{الخصم} = \frac{\text{الراتب الأساسي}}{30} \times 0.25$.</li>
+        </ul>
+
+        <!-- 4.0 جدول سيناريوهات الاختبار -->
+        <h2 class="section-title">4.0 مصفوفة سيناريوهات الاختبار التفصيلية (Test Cases Matrix)</h2>
+
+        <table class="formal-table">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">كود الحالة</th>
+                    <th style="width: 25%;">الشاشة والعملية</th>
+                    <th style="width: 33%;">خطوات الإجراء والبيانات</th>
+                    <th style="width: 20%;">النتيجة المتوقعة</th>
+                    <th style="width: 10%;">الأولوية</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>TC-POS-01</strong></td>
+                    <td>شاشة نقطة البيع<br><code>/admin/pos</code></td>
+                    <td>بيع بطارية نقداً بسعر 3200 ج.م وإدخال سيريال جديد <code>CHL-TEST-001</code>.</td>
+                    <td>خصم المخزون فورياً، إصدار ضمان ساري لمدة 12 شهراً، وحالة الفاتورة paid.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-POS-02</strong></td>
+                    <td>شاشة نقطة البيع<br><code>/admin/pos</code></td>
+                    <td>سداد فاتورة بدفع مجزأ غير متطابق (1000 كاش + 1000 فيزا + 500 آجل لصافي 3000).</td>
+                    <td>رفض الحفظ برسالة: إجمالي مبالغ الدفع لا يتطابق مع صافي الفاتورة.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-POS-03</strong></td>
+                    <td>شاشة نقطة البيع<br><code>/admin/pos</code></td>
+                    <td>تفعيل استبدال بطارية كهنة 70Ah واختيار فني صيانة.</td>
+                    <td>خصم 600 ج.م آلياً، إيداع بطارية بمخزن الكهنة (11.9 كجم رصاص)، واستحقاق 25 ج.م للفني.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-POS-04</strong></td>
+                    <td>شاشة نقطة البيع<br><code>/admin/pos</code></td>
+                    <td>بيع آجل يتجاوز سقف الائتمان بدون كود المدير ثم بكود <code>mgr_override_99</code>.</td>
+                    <td>المنع في الأولى، والنجاح وإتمام الفاتورة وتحديث الأستاذ في الثانية.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-PUR-01</strong></td>
+                    <td>فواتير المشتريات<br><code>/admin/purchases/create</code></td>
+                    <td>توريد 10 قطع بسعر 2600 ج.م لصنف رصيده 10 وتكلفته 2000 ج.م.</td>
+                    <td>الرصيد يصبح 20، والتكلفة تتحدث آلياً إلى <strong>2300.00 ج.م</strong> بالضبط.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-WAR-01</strong></td>
+                    <td>فحص الضمان<br><code>/admin/warranties/verify</code></td>
+                    <td>فحص سيريال بطارية سارية، ثم سيريال غير مسجل.</td>
+                    <td>ظهور كارت الضمان الأخضر في الأولى، ورسالة تفيد بعدم وجود ضمان في الثانية.</td>
+                    <td><span class="badge-priority priority-high">P2 عالية</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-HR-01</strong></td>
+                    <td>الحضور والانصراف<br><code>/admin/hr/attendance</code></td>
+                    <td>بصمة حضور في 09:00 وبصمة ثانية لنفس الموظف في 09:02 (تبريد 5 دقائق).</td>
+                    <td>قبول البصمة الأولى وتجاهل الثانية مع تثبيت وقت الحضور الأول.</td>
+                    <td><span class="badge-priority priority-high">P2 عالية</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-HR-03</strong></td>
+                    <td>الحضور والانصراف<br><code>/admin/hr/attendance</code></td>
+                    <td>تسجيل بصمة حضور لموظف في 09:40 (تأخير 40 دقيقة).</td>
+                    <td>تسجيل الحالة late وتوليد جزاء آلي بخصم ربع يوم عمل بسجل الخصومات.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+                <tr>
+                    <td><strong>TC-HR-05</strong></td>
+                    <td>مسير الرواتب<br><code>/admin/hr/payroll</code></td>
+                    <td>توليد مسير الشهر، اعتماده إدارياً، ثم صرفه مالياً.</td>
+                    <td>تجميع الاستحقاقات والخصومات بدقة، وتجميد المسير بعد الصرف نهائياً.</td>
+                    <td><span class="badge-priority priority-critical">P1 حرجة</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- 5.0 الخطوط الحمراء والأخطاء الحرجة -->
+        <h2 class="section-title">5.0 الخطوط الحمراء والأخطاء الحرجة (Red Flags)</h2>
+        <div class="callout callout-danger">
+            <strong>أخطاء برمجية حرجة توجب إيقاف الفحص وفتح بلاغ فوري (Blocker Defect):</strong>
+            <ul style="margin-top: 8px;">
+                <li>ظهور شاشة <code>LazyLoadingViolationException</code> (استدعاء علاقة بدون Eager Loading).</li>
+                <li>هبوط رصيد أي منتج في المخزن لقيمة سالبة (فشل القفل التشاؤمي).</li>
+                <li>إمكانية كتابة وتعديل سعر الكهنة يدوياً من واجهة الكاشير دون الالتزام بجدول الأمبير.</li>
+                <li>هبوط صافي راتب الموظف لأي قيمة سالبة تحت الصفر.</li>
+                <li>تجاوز 5 محاولات خاطئة لفك قفل الشاشة دون تطبيق الحظر المؤقت (Rate Limiting).</li>
+            </ul>
+        </div>
+
+    </div>
+
+</body>
+</html>

@@ -8,7 +8,9 @@ use App\Models\Customer;
 use App\Models\CustomerVehicle;
 use App\Models\Product;
 use App\Models\Invoice;
+use App\Models\PurchaseInvoice;
 use App\Models\Warranty;
+use App\Models\WarrantyClaim;
 use App\Models\Supplier;
 
 class SearchService implements SearchServiceInterface
@@ -38,6 +40,8 @@ class SearchService implements SearchServiceInterface
         $invoices  = $this->searchInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection);
         $warranties = $this->searchWarranties($term, $variants, $cleanPhoneOrCode, $limitPerSection);
         $suppliers = $this->searchSuppliers($term, $variants, $cleanPhoneOrCode, $limitPerSection);
+        $purchaseInvoices = $this->searchPurchaseInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection);
+        $warrantyClaims = $this->searchWarrantyClaims($term, $variants, $cleanPhoneOrCode, $limitPerSection);
 
         $sections = array_filter([
             'employees' => [
@@ -81,6 +85,18 @@ class SearchService implements SearchServiceInterface
                 'icon' => 'ri-truck-line',
                 'count' => count($suppliers),
                 'items' => $suppliers,
+            ],
+            'purchase_invoices' => [
+                'title' => 'فواتير المشتريات والتوريدات',
+                'icon' => 'ri-shopping-cart-2-line',
+                'count' => count($purchaseInvoices),
+                'items' => $purchaseInvoices,
+            ],
+            'warranty_claims' => [
+                'title' => 'مطالبات وتذاكر استبدال الضمان',
+                'icon' => 'ri-alarm-warning-line',
+                'count' => count($warrantyClaims),
+                'items' => $warrantyClaims,
             ],
         ], fn($section) => $section['count'] > 0);
 
@@ -221,7 +237,10 @@ class SearchService implements SearchServiceInterface
                 }
                 $q->orWhere('sku', 'like', "%{$term}%")
                   ->orWhere('barcode', 'like', "%{$term}%")
-                  ->orWhere('capacity_ah', 'like', "%{$term}%");
+                  ->orWhere('capacity_ah', 'like', "%{$term}%")
+                  ->orWhereHas('suppliers', function ($sq) use ($term) {
+                      $sq->where('supplier_sku', 'like', "%{$term}%");
+                  });
             })
             ->limit($limit)
             ->get();
@@ -348,6 +367,85 @@ class SearchService implements SearchServiceInterface
                 'badge_class' => $sup->is_active ? 'badge bg-success-subtle text-success' : 'badge bg-danger-subtle text-danger',
                 'url' => route('admin.dashboard'),
                 'icon' => 'ri-truck-line',
+            ];
+        })->toArray();
+    }
+
+    /**
+     * البحث في فواتير المشتريات والتوريد
+     */
+    protected function searchPurchaseInvoices(string $term, array $variants, string $clean, int $limit): array
+    {
+        $invoices = PurchaseInvoice::with('supplier')
+            ->where(function ($q) use ($term, $variants) {
+                $q->where('invoice_number', 'like', "%{$term}%")
+                  ->orWhereHas('supplier', function ($sq) use ($variants) {
+                      foreach ($variants as $v) {
+                          $sq->orWhere('company_name', 'like', "%{$v}%")
+                            ->orWhere('name', 'like', "%{$v}%");
+                      }
+                  });
+            })
+            ->latest('id')
+            ->limit($limit)
+            ->get();
+
+        return $invoices->map(function ($inv) {
+            $badgeColor = match ($inv->payment_status) {
+                'paid' => 'badge bg-success-subtle text-success',
+                'partially_paid' => 'badge bg-warning-subtle text-warning',
+                'unpaid' => 'badge bg-danger-subtle text-danger',
+                default => 'badge bg-secondary-subtle text-secondary',
+            };
+
+            return [
+                'id' => $inv->id,
+                'title' => "فاتورة مشتريات: {$inv->invoice_number}",
+                'subtitle' => "المورد: " . ($inv->supplier?->company_name ?? 'غير محدد') . " | القيمة: " . number_format($inv->final_amount, 2) . " ج.م",
+                'badge' => $inv->payment_status === 'paid' ? 'مسددة' : ($inv->payment_status === 'partially_paid' ? 'سداد جزئي' : 'غير مسددة'),
+                'badge_class' => $badgeColor,
+                'url' => route('admin.dashboard'),
+                'icon' => 'ri-shopping-cart-2-line',
+            ];
+        })->toArray();
+    }
+
+    /**
+     * البحث في تذاكر ومطالبات الضمان
+     */
+    protected function searchWarrantyClaims(string $term, array $variants, string $clean, int $limit): array
+    {
+        $claims = WarrantyClaim::with(['customer', 'replacementProduct'])
+            ->where(function ($q) use ($term, $variants) {
+                $q->where('claim_number', 'like', "%{$term}%")
+                  ->orWhere('defective_battery_serial', 'like', "%{$term}%")
+                  ->orWhere('replacement_battery_serial', 'like', "%{$term}%")
+                  ->orWhereHas('customer', function ($cq) use ($variants) {
+                      foreach ($variants as $v) {
+                          $cq->orWhere('name', 'like', "%{$v}%");
+                      }
+                  });
+            })
+            ->latest('id')
+            ->limit($limit)
+            ->get();
+
+        return $claims->map(function ($claim) {
+            $badgeColor = match ($claim->decision) {
+                'replaced' => 'badge bg-success-subtle text-success',
+                'rejected' => 'badge bg-danger-subtle text-danger',
+                'repaired', 'recharged' => 'badge bg-info-subtle text-info',
+                default => 'badge bg-warning-subtle text-warning',
+            };
+
+            return [
+                'id' => $claim->id,
+                'title' => "تذكرة ضمان: " . ($claim->claim_number ?? "#{$claim->id}"),
+                'subtitle' => "العميل: " . ($claim->customer?->name ?? 'غير محدد') . " | سيريالات: {$claim->defective_battery_serial}",
+                'badge' => $claim->decision === 'replaced' ? 'استبدال فوري' : $claim->decision,
+                'badge_class' => $badgeColor,
+                'url' => route('admin.dashboard'),
+                'icon' => 'ri-alarm-warning-line',
             ];
         })->toArray();
     }

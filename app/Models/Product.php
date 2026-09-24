@@ -55,6 +55,29 @@ class Product extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
+    public function purchaseInvoiceItems(): HasMany
+    {
+        return $this->hasMany(PurchaseInvoiceItem::class);
+    }
+
+    public function suppliers(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Supplier::class, 'supplier_products')
+            ->using(SupplierProduct::class)
+            ->withPivot(['id', 'supplier_sku', 'last_purchase_price', 'min_order_qty', 'lead_time_days', 'is_primary_supplier'])
+            ->withTimestamps();
+    }
+
+    public function primarySupplier(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->suppliers()->wherePivot('is_primary_supplier', true);
+    }
+
+    public function warrantyClaims(): HasMany
+    {
+        return $this->hasMany(WarrantyClaim::class, 'replacement_product_id');
+    }
+
     public function scopeBatteriesOnly(Builder $query): void
     {
         $query->where('is_battery', true);

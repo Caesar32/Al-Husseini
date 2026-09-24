@@ -42,4 +42,9 @@ class ScrapBatteriesInventory extends Model
     {
         return $this->belongsTo(Employee::class, 'received_by');
     }
+
+    public function receivedBy(): BelongsTo
+    {
+        return $this->receivedByEmployee();
+    }
 }
