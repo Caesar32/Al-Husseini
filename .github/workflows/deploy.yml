@@ -82,7 +82,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: 65002
           script: |
             mkdir -p "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
 
@@ -92,7 +92,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: 65002
           source: "release_${{ github.sha }}.tar.gz"
           target: "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
 
@@ -106,7 +106,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: 65002
           envs: RELEASE_SHA,TARGET_PATH,RUN_MIGRATIONS
           script_stop: true
           script: |
