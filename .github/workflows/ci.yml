@@ -59,7 +59,9 @@ jobs:
       - name: Prepare Test Environment
         run: |
           cp .env.example .env
+          touch database/database.sqlite
           php artisan key:generate
+          php artisan migrate --force
 
       - name: Validate Laravel Cache Commands
         run: |
