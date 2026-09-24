@@ -65,7 +65,10 @@ jobs:
             --exclude='storage/framework/sessions/*' \
             --exclude='storage/framework/views/*' \
             --exclude='public/uploads/*' \
-            -czf release_${{ github.sha }}.tar.gz .
+            --exclude='*.tar.gz' \
+            --warning=no-file-changed \
+            -czf /tmp/release_${{ github.sha }}.tar.gz .
+          mv /tmp/release_${{ github.sha }}.tar.gz ./release_${{ github.sha }}.tar.gz
 
       - name: Ensure Remote Upload Directory Exists
         uses: appleboy/ssh-action@v1.2.0
