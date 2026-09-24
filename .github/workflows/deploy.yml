@@ -65,9 +65,9 @@ jobs:
             --exclude='storage/framework/sessions/*' \
             --exclude='storage/framework/views/*' \
             --exclude='public/uploads/*' \
-            --exclude='*.tar.gz' \
             --warning=no-file-changed \
-            -czf release_${{ github.sha }}.tar.gz .
+            -czf /tmp/release_${{ github.sha }}.tar.gz .
+          mv /tmp/release_${{ github.sha }}.tar.gz ./release_${{ github.sha }}.tar.gz
 
       - name: Debug SSH Connection
         uses: appleboy/ssh-action@v1.2.0
