@@ -70,33 +70,19 @@ jobs:
             -czf /tmp/release_${{ github.sha }}.tar.gz .
           mv /tmp/release_${{ github.sha }}.tar.gz ./release_${{ github.sha }}.tar.gz
 
-      - name: Prepare Clean SSH Key File
-        env:
-          SSH_KEY_DATA: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          python3 -c '
-          import os
-          key = os.environ.get("SSH_KEY_DATA", "").strip()
-          key = key.replace("\r\n", "\n").replace("\r", "\n")
-          if "-----BEGIN" in key and "\n" not in key.strip():
-              parts = key.split("-----")
-              if len(parts) >= 5:
-                  header = "-----" + parts[1] + "-----"
-                  body = parts[2].strip().replace(" ", "\n")
-                  footer = "-----" + parts[3] + "-----"
-                  key = header + "\n" + body + "\n" + footer
-          with open("/tmp/deploy_key", "w") as f:
-              f.write(key.strip() + "\n")
-          '
-          chmod 600 /tmp/deploy_key
+      # ----------------------------------------------------------------
+      # SSH uses the SECRET content directly (key:) — NOT key_path.
+      # Make sure SSH_PRIVATE_KEY contains the full PEM key including
+      # the BEGIN / END header lines, stored as a GitHub Secret.
+      # ----------------------------------------------------------------
 
       - name: Ensure Remote Upload Directory Exists
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key_path: /tmp/deploy_key
-          port: 65002
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
             mkdir -p "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
 
@@ -105,8 +91,8 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key_path: /tmp/deploy_key
-          port: 65002
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           source: "release_${{ github.sha }}.tar.gz"
           target: "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
 
@@ -119,8 +105,8 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key_path: /tmp/deploy_key
-          port: 65002
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           envs: RELEASE_SHA,TARGET_PATH,RUN_MIGRATIONS
           script_stop: true
           script: |
