@@ -67,12 +67,20 @@ jobs:
             --exclude='public/uploads/*' \
             --exclude='*.tar.gz' \
             --warning=no-file-changed \
-            -czf /tmp/release_${{ github.sha }}.tar.gz .
-          mv /tmp/release_${{ github.sha }}.tar.gz ./release_${{ github.sha }}.tar.gz
+            -czf release_${{ github.sha }}.tar.gz .
 
-      # ----------------------------------------------------------------
-      # SSH_PRIVATE_KEY must contain the full PEM private key content.
-      # ----------------------------------------------------------------
+      - name: Debug SSH Connection
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 65002
+          debug: true
+          script: |
+            echo "✅ SSH connection successful!"
+            whoami
+            echo $HOME
 
       - name: Ensure Remote Upload Directory Exists
         uses: appleboy/ssh-action@v1.2.0
@@ -120,7 +128,6 @@ jobs:
             echo "📁 Target Directory: ${TARGET_DIR}"
             echo "=========================================================="
 
-            # Cleanup trap
             cleanup() {
               echo "🧹 Cleaning up temporary deployment files..."
               rm -rf "${TMP_DIR}"
@@ -128,11 +135,9 @@ jobs:
             }
             trap cleanup EXIT
 
-            # Detect PHP binary (shared hosting may use php8.2, php82, etc.)
             PHP_BIN=$(command -v php8.2 2>/dev/null || command -v php82 2>/dev/null || command -v php 2>/dev/null || echo "php")
             echo "Using PHP: $($PHP_BIN -r 'echo PHP_VERSION;' 2>/dev/null || echo 'unknown')"
 
-            # 1. Directory Structure Preparation
             echo "==> [1/9] Ensuring persistent storage directories..."
             mkdir -p "${TMP_DIR}"
             mkdir -p "${TARGET_DIR}/storage/app/public"
@@ -143,20 +148,16 @@ jobs:
             mkdir -p "${TARGET_DIR}/public/uploads/avatars"
             mkdir -p "${TARGET_DIR}/bootstrap/cache"
 
-            # 2. Extract Archive
             echo "==> [2/9] Extracting release package..."
             tar -xzf "${ARCHIVE}" -C "${TMP_DIR}"
 
-            # 3. Maintenance Mode
-            echo "==> [3/9] Putting application into maintenance mode..."
+            echo "==> [3/9] Maintenance mode..."
             if [ -f "${TARGET_DIR}/artisan" ]; then
               $PHP_BIN "${TARGET_DIR}/artisan" down --retry=60 || true
             fi
 
-            # 4. Sync Files (rsync preferred, cp fallback for shared hosting)
             echo "==> [4/9] Synchronizing release files..."
             if command -v rsync &>/dev/null; then
-              echo "Using rsync..."
               rsync -a --delete \
                 --exclude='.env' \
                 --exclude='.deploy_upload/' \
@@ -177,23 +178,16 @@ jobs:
               mkdir -p "${TARGET_DIR}/public/uploads/avatars"
             fi
 
-            # 5. Safety Checks
             echo "==> [5/9] Safety verifications..."
             if [ ! -f "${TARGET_DIR}/.env" ]; then
               echo "❌ CRITICAL: .env file is missing!"
               exit 1
             fi
-            if [ ! -d "${TARGET_DIR}/public/uploads" ]; then
-              echo "❌ CRITICAL: public/uploads directory is missing!"
-              exit 1
-            fi
 
-            # 6. Permissions
             echo "==> [6/9] Configuring permissions..."
             chmod -R 775 "${TARGET_DIR}/storage" "${TARGET_DIR}/bootstrap/cache" "${TARGET_DIR}/public/uploads"
             $PHP_BIN "${TARGET_DIR}/artisan" storage:link --force || true
 
-            # 7. Migrations
             if [ "${RUN_MIGRATIONS}" = "true" ]; then
               echo "==> [7/9] Running database migrations..."
               $PHP_BIN "${TARGET_DIR}/artisan" migrate --force
@@ -201,14 +195,12 @@ jobs:
               echo "==> [7/9] Migrations skipped."
             fi
 
-            # 8. Cache Warm-up
             echo "==> [8/9] Rebuilding production caches..."
             $PHP_BIN "${TARGET_DIR}/artisan" optimize:clear
             $PHP_BIN "${TARGET_DIR}/artisan" config:cache
             $PHP_BIN "${TARGET_DIR}/artisan" route:cache
             $PHP_BIN "${TARGET_DIR}/artisan" view:cache
 
-            # 9. Bring Online
             echo "==> [9/9] Bringing application online..."
             $PHP_BIN "${TARGET_DIR}/artisan" up
 
