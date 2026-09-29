@@ -120,7 +120,10 @@ document.addEventListener('DOMContentLoaded', function() {
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
                             'X-CSRF-TOKEN': csrfToken
-                        }
+                        },
+                        body: JSON.stringify({
+                            confirm_debt_review: hasDebt
+                        })
                     })
                     .then(async r => {
                         const data = await r.json();
