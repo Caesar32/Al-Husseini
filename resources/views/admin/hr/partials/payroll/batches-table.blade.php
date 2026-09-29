@@ -34,11 +34,12 @@
                                         $rowBasic = round((float) $p->items->sum('basic_salary'), 2);
                                         $rowAllowances = round((float) $p->items->sum('total_allowance'), 2);
                                         $rowDeductions = round((float) $p->items->sum('total_deduction'), 2);
-                                        $rowNet = round((float) $p->items->sum('net_salary'), 2);
+                                        $rowStoredNet = round((float) $p->items->sum('net_salary'), 2);
                                         $rowCarriedDebt = round((float) $p->items->sum('carried_debt'), 2);
                                         $rowExpectedNet = round($rowBasic + $rowAllowances - $rowDeductions + $rowCarriedDebt, 2);
-                                        $rowConsistent = abs($rowNet - $rowExpectedNet) < 0.01;
-                                        $rowHasZeroWithComponents = abs($rowNet) < 0.01 && ($rowBasic + $rowAllowances > 0 || $rowDeductions > 0);
+                                        $rowNet = $rowExpectedNet;
+                                        $rowConsistent = abs($rowStoredNet - $rowExpectedNet) < 0.01;
+                                        $rowHasZeroWithComponents = abs($rowStoredNet) < 0.01 && abs($rowExpectedNet) > 0.01;
                                         $rowNeedsReview = !$rowConsistent || $rowHasZeroWithComponents;
                                     @endphp
                                     <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}" data-has-debt="{{ $p->items->contains(fn($item) => (float) $item->carried_debt > 0) ? '1' : '0' }}" data-needs-review="{{ $rowNeedsReview ? '1' : '0' }}">
