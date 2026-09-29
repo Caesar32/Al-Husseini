@@ -64,7 +64,7 @@
                                         <small class="text-muted d-block fs-11">{{ $emp->jobTitle?->title_name }}</small>
                                     </td>
                                     <td><span class="fw-bold fs-13 text-dark">{{ number_format($base) }} ج.م</span></td>
-                                    <td><span class="fw-bold fs-13 text-info">+{{ number_format($allow) }} ج.م</span></td>
+                                    <td><span class="fw-bold fs-13 text-info">{{ number_format($allow) }} ج.م</span></td>
                                     <td>
                                         @if($empDeds > 0)
                                             <span class="badge bg-danger-subtle text-danger fs-12 fw-bold font-monospace">-{{ number_format($empDeds) }} ج.م</span>
