@@ -221,6 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const allow = Number(this.getAttribute('data-allow') || 0);
             const ded = Number(this.getAttribute('data-ded') || 0);
             const net = Number(this.getAttribute('data-net') || 0);
+            const shortfall = Number(this.getAttribute('data-shortfall') || 0);
 
             document.getElementById('payslipPrintArea').innerHTML = `
                 <div class="border p-4 rounded-3 bg-white">
@@ -285,9 +286,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         </tbody>
                     </table>
 
-                    <div class="p-3 bg-success-subtle rounded text-center mb-4">
+                    ${shortfall > 0 ? `
+                    <div class="alert alert-warning text-start mb-4">
+                        <strong><i class="ri-error-warning-line me-1"></i> يتطلب مراجعة قبل الصرف</strong>
+                        <div class="mt-1">الخصومات تجاوزت إجمالي الدخل بمبلغ <strong>${shortfall.toLocaleString('ar-EG')} جنيه مصري</strong>. تم تسجيل العجز كرصيد مستحق على الموظف ولا يُفقد عند إظهار صافي الراتب.</div>
+                    </div>` : ''}
+                    <div class="${shortfall > 0 ? 'p-3 bg-warning-subtle' : 'p-3 bg-success-subtle'} rounded text-center mb-4">
                         <span class="text-muted fs-13 d-block mb-1">صافي الراتب المستحق للصرف النهائي:</span>
-                        <h3 class="fw-extrabold text-success mb-0">${net.toLocaleString('ar-EG')} جنيه مصري</h3>
+                        <h3 class="fw-extrabold ${shortfall > 0 ? 'text-warning' : 'text-success'} mb-0">${net.toLocaleString('ar-EG')} جنيه مصري</h3>
+                        ${shortfall > 0 ? `<div class="text-danger fs-12 mt-2">الرصيد المرحّل المستحق: ${shortfall.toLocaleString('ar-EG')} جنيه مصري</div>` : ''}
                     </div>
 
                     <div class="row pt-4 text-center fs-12 text-muted border-top">
