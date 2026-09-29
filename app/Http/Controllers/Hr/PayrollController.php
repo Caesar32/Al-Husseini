@@ -72,10 +72,14 @@ class PayrollController extends Controller
         return view('admin.hr.payroll_show', ['payroll' => $detailedPayroll]);
     }
 
-    public function approve(Payroll $payroll): JsonResponse
+    public function approve(Request $request, Payroll $payroll): JsonResponse
     {
         try {
-            $this->payrollService->approvePayroll($payroll, Auth::id());
+            $this->payrollService->approvePayroll(
+                $payroll,
+                Auth::id(),
+                $request->boolean('confirm_debt_review')
+            );
 
             return response()->json([
                 'success' => true,
