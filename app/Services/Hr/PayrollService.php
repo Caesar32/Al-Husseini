@@ -10,6 +10,7 @@ use App\Models\Attendance;
 use App\Models\EmployeeDeduction;
 use App\Models\TechnicianCommission;
 use App\Models\EmployeeLeave;
+use App\Models\EmployeePayrollDebt;
 use App\Models\Branch;
 use App\Models\User;
 use App\Notifications\PayrollGeneratedNotification;
@@ -97,6 +98,13 @@ class PayrollService implements PayrollServiceInterface
                 ->whereBetween('deduction_date', [$startDate->toDateString(), $endDate->toDateString()])
                 ->get()
                 ->groupBy('employee_id');
+
+            // Outstanding payroll debts are carried forward and can only be
+            // recovered from a positive amount available after current deductions.
+            $outstandingDebts = EmployeePayrollDebt::whereIn('employee_id', $employeeIds)
+                ->whereNull('settled_at')
+                ->get()
+                ->groupBy('employee_id');
             // ────────────────────────────────────────────────────────────────────────────────────────────
 
             $totalBasic       = 0;
@@ -155,20 +163,49 @@ class PayrollService implements PayrollServiceInterface
                 // 3. تجميع الجزاءات المعتمدة (من الذاكرة — بدون استعلام)
                 $approvedDeductions = (float) $allDeductions->get($employee->id, collect())->sum('amount');
 
-                $allDeductionsTotal = round($absenceCost + $approvedDeductions, 2);
-                $netSalary          = max(0, round(($basic + $allowances + $overtimeValue + $commissions) - $allDeductionsTotal, 2));
+                $grossSalary = round($basic + $allowances + $overtimeValue + $commissions, 2);
+                $currentDeductions = round($absenceCost + $approvedDeductions, 2);
+                $availableAfterCurrentDeductions = round($grossSalary - $currentDeductions, 2);
 
-                PayrollItem::create([
+                $employeeDebt = round(
+                    $outstandingDebts->get($employee->id, collect())
+                        ->sum(fn ($debt) => max(0, (float) $debt->original_amount - (float) $debt->paid_amount)),
+                    2
+                );
+
+                $debtRepayment = $employeeDebt > 0
+                    ? min(max(0, $availableAfterCurrentDeductions), $employeeDebt)
+                    : 0;
+
+                // If current deductions exceed gross earnings, preserve the
+                // unrecovered balance as an employee debt instead of losing it.
+                $currentShortfall = max(0, round(-$availableAfterCurrentDeductions, 2));
+                $carriedDebt = $currentShortfall;
+                $netSalary = round(max(0, $availableAfterCurrentDeductions - $debtRepayment), 2);
+                $allDeductionsTotal = round($currentDeductions + $debtRepayment, 2);
+
+                $payrollItem = PayrollItem::create([
                     'payroll_id'         => $payroll->id,
                     'employee_id'        => $employee->id,
                     'basic_salary'       => $basic,
                     'total_allowance'    => $allowances + $commissions,
                     'total_deduction'    => $allDeductionsTotal,
+                    'debt_repayment'     => $debtRepayment,
+                    'carried_debt'       => $carriedDebt,
                     'total_overtime'     => $overtimeValue,
                     'net_salary'         => $netSalary,
                     'absent_days'        => $absentDays,
                     'late_minutes_total' => $totalLateMinutes,
                 ]);
+
+                if ($carriedDebt > 0) {
+                    EmployeePayrollDebt::create([
+                        'employee_id' => $employee->id,
+                        'source_payroll_item_id' => $payrollItem->id,
+                        'original_amount' => $carriedDebt,
+                        'paid_amount' => 0,
+                    ]);
+                }
 
                 $totalBasic      += $basic;
                 $totalAllowances += ($allowances + $commissions);
@@ -183,6 +220,13 @@ class PayrollService implements PayrollServiceInterface
                 'total_net'        => $totalNet,
             ]);
 
+            // Keep the batch in draft whenever an employee has an unrecovered
+            // payroll balance. The review is explicit; the system must not
+            // silently present a zero net as ready for disbursement.
+            if ($payroll->items()->where('carried_debt', '>', 0)->exists()) {
+                $payroll->update(['status' => 'draft']);
+            }
+
             // إشعار المشرف العام بأن المسير جاهز للاعتماد
             $superAdmins = User::role('super-admin')->get();
             foreach ($superAdmins as $superAdmin) {
@@ -196,10 +240,16 @@ class PayrollService implements PayrollServiceInterface
     /**
      * {@inheritDoc}
      */
-    public function approvePayroll(Payroll $payroll, ?int $approvedBy = null): bool
+    public function approvePayroll(Payroll $payroll, ?int $approvedBy = null, bool $confirmDebtReview = false): bool
     {
         if ($payroll->status !== 'draft') {
             throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
+        }
+
+        $hasUnrecoveredDebt = $payroll->items()->where('carried_debt', '>', 0)->exists();
+
+        if ($hasUnrecoveredDebt && !$confirmDebtReview) {
+            throw new Exception("يوجد موظفون لديهم أرصدة رواتب غير مستردة. يجب مراجعة الرصيد المرحّل والتأكيد قبل اعتماد المسير.");
         }
 
         $approverId = $approvedBy ?? Auth::id();
@@ -219,14 +269,61 @@ class PayrollService implements PayrollServiceInterface
      */
     public function disbursePayroll(Payroll $payroll): bool
     {
-        if ($payroll->status !== 'approved') {
-            throw new Exception("يجب اعتماد مسير الرواتب أولاً قبل الصرف.");
-        }
+        return DB::transaction(function () use ($payroll) {
+            $payroll = Payroll::query()->lockForUpdate()->findOrFail($payroll->id);
 
-        return $payroll->update([
-            'status' => 'disbursed',
-            'disbursed_at' => now(),
-        ]);
+            if ($payroll->status !== 'approved') {
+                throw new Exception("يجب اعتماد مسير الرواتب أولاً قبل الصرف.");
+            }
+
+            $items = $payroll->items()->lockForUpdate()->get();
+
+            foreach ($items as $item) {
+                $remainingRepayment = (float) $item->debt_repayment;
+
+                if ($remainingRepayment <= 0) {
+                    continue;
+                }
+
+                $debts = EmployeePayrollDebt::where('employee_id', $item->employee_id)
+                    ->whereNull('settled_at')
+                    ->lockForUpdate()
+                    ->orderBy('id')
+                    ->get();
+
+                foreach ($debts as $debt) {
+                    if ($remainingRepayment <= 0) {
+                        break;
+                    }
+
+                    $remainingDebt = max(0, (float) $debt->original_amount - (float) $debt->paid_amount);
+                    $payment = min($remainingRepayment, $remainingDebt);
+
+                    if ($payment <= 0) {
+                        continue;
+                    }
+
+                    $debt->paid_amount = round((float) $debt->paid_amount + $payment, 2);
+
+                    if ((float) $debt->paid_amount >= (float) $debt->original_amount) {
+                        $debt->paid_amount = $debt->original_amount;
+                        $debt->settled_at = now();
+                    }
+
+                    $debt->save();
+                    $remainingRepayment = round($remainingRepayment - $payment, 2);
+                }
+
+                if ($remainingRepayment > 0.01) {
+                    throw new Exception("تعذر مطابقة كامل سداد دين الرواتب للموظف رقم {$item->employee_id}. لم يتم صرف المسير.");
+                }
+            }
+
+            return $payroll->update([
+                'status' => 'disbursed',
+                'disbursed_at' => now(),
+            ]);
+        });
     }
 
     /**
