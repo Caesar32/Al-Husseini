@@ -27,6 +27,8 @@ class PosOrderService implements PosOrderServiceInterface
                 'cashier:id,name',
                 'technician:id,full_name',
                 'payments',
+                'items.product',
+                'branch:id,name',
             ]);
 
         if (!empty($filters['search'])) {
@@ -107,13 +109,20 @@ class PosOrderService implements PosOrderServiceInterface
                 ];
             }
 
-            // 2. Strict Scrap Calculation (No cashier tampering)
+            // 2. Flexible Scrap Calculation (Supports manual custom price per battery, total scrap deduction, or tier fallback)
             $scrapDeduction = 0.0;
             $hasScrap = !empty($data['has_scrap']);
             if ($hasScrap) {
-                $scrapAh = (int) ($data['scrap_capacity_ah'] ?? 0);
-                $scrapCount = (int) ($data['scrap_count'] ?? 1);
-                $scrapDeduction = $this->calculateScrapDeduction($scrapAh, $scrapCount);
+                $scrapAh = (int) ($data['scrap_capacity_ah'] ?? 70);
+                $scrapCount = max(1, (int) ($data['scrap_count'] ?? 1));
+
+                if (isset($data['scrap_deduction_amount']) && is_numeric($data['scrap_deduction_amount'])) {
+                    $scrapDeduction = round((float) $data['scrap_deduction_amount'], 2);
+                } elseif (isset($data['scrap_price_override']) && is_numeric($data['scrap_price_override'])) {
+                    $scrapDeduction = round((float) $data['scrap_price_override'] * $scrapCount, 2);
+                } else {
+                    $scrapDeduction = $this->calculateScrapDeduction($scrapAh, $scrapCount);
+                }
             }
 
             $discountAmount = (float) ($data['discount_amount'] ?? 0);
@@ -149,6 +158,10 @@ class PosOrderService implements PosOrderServiceInterface
                         number_format($finalAmount, 2)
                     )
                 );
+            }
+
+            if (empty($data['technician_id'])) {
+                throw new \DomainException('يجب اختيار الفني / العامل المسؤول عن التركيب.');
             }
 
             $customerId = $data['customer_id'] ?? null;
@@ -301,18 +314,6 @@ class PosOrderService implements PosOrderServiceInterface
                 }
             }
 
-            // 9. Assign Technician Commission if technician was selected
-            if (!empty($data['technician_id']) && $totalBatteriesSold > 0) {
-                $commissionPerBattery = 25.00; // Standard 25 EGP per battery installation
-                $totalCommission = round($commissionPerBattery * $totalBatteriesSold, 2);
-
-                TechnicianCommission::create([
-                    'employee_id'       => $data['technician_id'],
-                    'invoice_id'        => $invoice->id,
-                    'commission_amount' => $totalCommission,
-                    'status'            => 'pending',
-                ]);
-            }
 
             return $invoice->fresh([
                 'items.product',

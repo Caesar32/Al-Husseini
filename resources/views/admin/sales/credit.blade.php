@@ -24,6 +24,55 @@
         color: var(--vz-success);
     }
 
+    /* ============================================================== */
+    /* Dark Mode Overrides for Credit & Receivables Page              */
+    /* ============================================================== */
+    [data-bs-theme="dark"] .credit-stat-card {
+        background-color: #212529 !important;
+        border: 1px solid #32383e !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+    }
+    [data-bs-theme="dark"] .credit-stat-card:hover {
+        box-shadow: 0 10px 24px rgba(0,0,0,0.35) !important;
+    }
+    [data-bs-theme="dark"] .table-light,
+    [data-bs-theme="dark"] .table-light th {
+        background-color: #212529 !important;
+        color: #ced4da !important;
+        border-color: #32383e !important;
+    }
+    [data-bs-theme="dark"] .text-dark {
+        color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .bg-light {
+        background-color: #212529 !important;
+        border-color: #32383e !important;
+    }
+    [data-bs-theme="dark"] .quick-pay-preset {
+        background-color: #1e2226;
+        color: #3cd188;
+        border: 1px solid #198754;
+    }
+    [data-bs-theme="dark"] .quick-pay-preset:hover {
+        background-color: #198754;
+        color: #ffffff;
+    }
+    [data-bs-theme="dark"] .modal-content {
+        background-color: #212529 !important;
+        border-color: #383f45 !important;
+        color: #ced4da !important;
+    }
+    [data-bs-theme="dark"] .modal-footer.bg-light {
+        background-color: #1a1d21 !important;
+        border-top-color: #32383e !important;
+    }
+    [data-bs-theme="dark"] .modal-content .form-control,
+    [data-bs-theme="dark"] .modal-content .form-select {
+        background-color: #1e2226 !important;
+        border-color: #383f45 !important;
+        color: #f8f9fa !important;
+    }
+
     @media print {
         .app-menu, .topbar, .footer, .btn, .no-print, .credit-controls { display: none !important; }
         .main-content { margin: 0 !important; padding: 0 !important; }
@@ -569,7 +618,7 @@ function submitCreditPayment(e) {
         headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            'X-CSRF-TOKEN': (typeof window.getCsrfToken === 'function' ? window.getCsrfToken() : '{{ csrf_token() }}')
         },
         body: JSON.stringify({
             customer_id: numericCustomerId,

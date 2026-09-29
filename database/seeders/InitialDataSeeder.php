@@ -73,7 +73,18 @@ class InitialDataSeeder extends Seeder
             $accountantUser->assignRole('accountant');
         }
 
-        // 7. موظفون تجريبيون
+        // 7. حساب الكاشير للتجربة
+        $cashierUser = User::updateOrCreate(['email' => 'cashier@alhusseini.com'], [
+            'name' => 'أحمد سمير - كاشير المبيعات',
+            'password' => Hash::make('12345678'),
+            'branch_id' => $mainBranch->id,
+            'is_active' => true,
+        ]);
+        if (!$cashierUser->hasRole('cashier')) {
+            $cashierUser->assignRole('cashier');
+        }
+
+        // 8. موظفون تجريبيون
         $emp1 = Employee::firstOrCreate(['employee_code' => 'EMP-001'], [
             'branch_id' => $mainBranch->id,
             'job_title_id' => $techTitle->id,

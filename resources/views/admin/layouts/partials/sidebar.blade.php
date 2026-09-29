@@ -185,10 +185,32 @@
                     </a>
                 </li>
 
+                @can('roles.manage')
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.roles.*') ? 'active' : '' }}" href="{{ route('admin.roles.index') }}">
+                        <i class="ri-shield-keyhole-line"></i> <span>الأدوار والصلاحيات</span>
+                    </a>
+                </li>
+                @endcan
+
+                @can('users.manage')
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}">
+                        <i class="ri-team-line"></i> <span>المستخدمين والحسابات</span>
+                    </a>
+                </li>
+                @endcan
+
                 @can('settings.manage')
                 <li class="nav-item">
                     <a class="nav-link menu-link {{ request()->routeIs('admin.settings*') ? 'active' : '' }}" href="{{ route('admin.settings') }}">
                         <i class="ri-settings-4-line"></i> <span>إعدادات النظام والمنشأة</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link menu-link {{ request()->routeIs('admin.diagnostics*') ? 'active' : '' }}" href="{{ route('admin.diagnostics.index') }}">
+                        <i class="ri-pulse-line text-success"></i> <span>فحص وتشخيص النظام الحي</span>
+                        <span class="badge bg-success-subtle text-success fs-10 ms-auto fw-bold px-2 py-1">Diagnostic</span>
                     </a>
                 </li>
                 @endcan

@@ -179,11 +179,10 @@ test('pos order service processes sale with scrap trade-in, stock decrement, war
         ->and((float) $scrap->scrap_value)->toBe(800.00)
         ->and($scrap->status)->toBe('in_stock');
 
-    // 5. Verify technician commission created (25 EGP)
+    // 5. Verify technician assigned to invoice as mandatory and no 25 EGP commission created
+    expect($invoice->technician_id)->toBe($technician->id);
     $commission = \App\Models\TechnicianCommission::where('invoice_id', $invoice->id)->first();
-    expect($commission)->not->toBeNull()
-        ->and($commission->employee_id)->toBe($technician->id)
-        ->and((float) $commission->commission_amount)->toBe(25.00);
+    expect($commission)->toBeNull();
 });
 
 test('warranty service verifies serial, processes instant replacement and settles with supplier', function () {

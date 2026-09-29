@@ -111,3 +111,12 @@ test('user without permissions is forbidden 403 from accessing restricted routes
     $this->get(route('admin.hr.payroll'))->assertStatus(403);
     $this->get(route('admin.hr.leaves.index'))->assertStatus(403);
 });
+
+test('refresh csrf keep alive endpoint returns active status and valid token', function () {
+    $response = $this->get(route('refresh_csrf'));
+    $response->assertStatus(200);
+    $response->assertJsonStructure(['csrf_token', 'status']);
+    expect($response->json('status'))->toBe('active');
+    expect($response->json('csrf_token'))->not->toBeEmpty();
+});
+

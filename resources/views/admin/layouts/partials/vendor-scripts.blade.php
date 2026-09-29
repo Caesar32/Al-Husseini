@@ -159,3 +159,47 @@ window.showHrToast = function(title, message, type) {
 <!-- Al-Husseini Real-Time Admin Notifications -->
 <script src="{{ asset('assets/js/admin-notifications.js') }}"></script>
 
+<!-- CSRF & Session Keep-Alive for Long Running Center Shifts -->
+<script>
+(function() {
+    window.getCsrfToken = function() {
+        return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '{{ csrf_token() }}';
+    };
+
+    function refreshCsrfToken() {
+        fetch("{{ route('refresh_csrf') }}", {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+            if (data && data.csrf_token) {
+                const metaToken = document.querySelector('meta[name="csrf-token"]');
+                if (metaToken) {
+                    metaToken.setAttribute('content', data.csrf_token);
+                }
+                document.querySelectorAll('input[name="_token"]').forEach(function(input) {
+                    input.value = data.csrf_token;
+                });
+            }
+        })
+        .catch(function(err) {
+            // silent catch on network hiccups
+        });
+    }
+
+    // Refresh every 15 minutes to guarantee session stays active all day
+    setInterval(refreshCsrfToken, 15 * 60 * 1000);
+
+    // Refresh automatically when tab is focused / restored
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            refreshCsrfToken();
+        }
+    });
+})();
+</script>
+

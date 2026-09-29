@@ -99,33 +99,49 @@ class RolesAndPermissionsSeeder extends Seeder
         $superAdminRole = Role::findOrCreate('super-admin', 'web');
         $superAdminRole->syncPermissions(Permission::all());
 
-        // 4. إنشاء دور المحاسب / الكاشير (Accountant / Cashier) - صلاحيات محددة فقط
+        // 4. إنشاء دور المحاسب (Accountant) - صلاحيات مالية ومبيعات
         $accountantRole = Role::findOrCreate('accountant', 'web');
         $accountantRole->syncPermissions([
-            // الكاشير والمبيعات
+            // المبيعات والتحصيل
             'pos.access',
             'invoices.view',
             'invoices.create',
             'invoices.print',
-            
-            // إدارة العملاء والتحصيل
             'customers.view',
             'customers.create',
             'credit.view',
-            'credit.settle', // تحصيل دفعات من مديونيات العملاء
+            'credit.settle',
 
-            // المخزون (عرض فقط + استلام بطاريات الكهنة)
+            // المخزون والتوريد
             'products.view',
             'scrap.view',
+            'purchases.view',
+            'purchases.settle_payment',
+            'suppliers.view',
 
-            // فحص سريان الضمانات
+            // الضمانات
             'warranties.view',
 
-            // تقارير المبيعات اليومية
+            // التقارير
+            'reports.financial',
             'reports.sales',
         ]);
 
-        // 5. إنشاء دور مدير الفرع (Branch Manager)
+        // 5. إنشاء دور الكاشير المستقل (Cashier) - موجه لشاشة نقطة البيع فقط
+        $cashierRole = Role::findOrCreate('cashier', 'web');
+        $cashierRole->syncPermissions([
+            'pos.access',
+            'invoices.view',
+            'invoices.create',
+            'invoices.print',
+            'customers.view',
+            'customers.create',
+            'products.view',
+            'scrap.view',
+            'warranties.view',
+        ]);
+
+        // 6. إنشاء دور مدير الفرع (Branch Manager)
         $branchManagerRole = Role::findOrCreate('branch-manager', 'web');
         $branchManagerRole->syncPermissions([
             'pos.access',

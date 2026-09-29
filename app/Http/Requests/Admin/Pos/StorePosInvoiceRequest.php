@@ -24,7 +24,7 @@ class StorePosInvoiceRequest extends FormRequest
             'branch_id'             => ['nullable', 'exists:branches,id'],
             'customer_id'           => ['nullable', 'exists:customers,id'],
             'customer_vehicle_id'   => ['nullable', 'exists:customer_vehicles,id'],
-            'technician_id'         => ['nullable', 'exists:employees,id'],
+            'technician_id'         => ['required', 'exists:employees,id'],
 
             // Items
             'items'                 => ['required', 'array', 'min:1'],
@@ -35,8 +35,10 @@ class StorePosInvoiceRequest extends FormRequest
 
             // Scrap trade-in
             'has_scrap'             => ['sometimes', 'boolean'],
-            'scrap_capacity_ah'     => ['nullable', 'required_if:has_scrap,true', 'integer', 'min:30', 'max:250'],
-            'scrap_count'           => ['nullable', 'required_if:has_scrap,true', 'integer', 'min:1'],
+            'scrap_capacity_ah'     => ['nullable', 'integer', 'min:30', 'max:250'],
+            'scrap_count'           => ['nullable', 'integer', 'min:1'],
+            'scrap_price_override'  => ['nullable', 'numeric', 'min:0'],
+            'scrap_deduction_amount'=> ['nullable', 'numeric', 'min:0'],
 
             // Discounts & Tax
             'discount_amount'       => ['nullable', 'numeric', 'min:0'],
@@ -122,22 +124,58 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
 
-            // 2. Validate Scrap Deduction
+            // 2. Validate Scrap Deduction (Flexible: supports manual custom price per battery or direct total scrap deduction)
             $scrapDeduction = 0.0;
             if ($this->boolean('has_scrap')) {
-                $ah = (int) $this->input('scrap_capacity_ah');
-                $count = (int) $this->input('scrap_count', 1);
-                $tier = ScrapPricingTier::findPriceForCapacity($ah);
+                $count = max(1, (int) $this->input('scrap_count', 1));
+                $ah = (int) $this->input('scrap_capacity_ah', 70);
 
-                if (!$tier) {
-                    $validator->errors()->add('scrap_capacity_ah', "لا توجد شريحة تسعير كهنة معتمدة لسعة {$ah} أمبير.");
+                if ($this->filled('scrap_deduction_amount')) {
+                    $scrapDeduction = round((float) $this->input('scrap_deduction_amount'), 2);
+                } elseif ($this->filled('scrap_price_override')) {
+                    $scrapDeduction = round((float) $this->input('scrap_price_override') * $count, 2);
                 } else {
-                    $scrapDeduction = (float) $tier->default_scrap_price * $count;
+                    $tier = ScrapPricingTier::findPriceForCapacity($ah);
+                    if ($tier) {
+                        $scrapDeduction = (float) $tier->default_scrap_price * $count;
+                    }
                 }
             }
 
-            // 3. Validate Final Amount vs Payments Sum
+            // 3. Validate Discount & Price Permissions (Cashier restrictions)
+            /** @var \App\Models\User|null $currentUser */
+            $currentUser = $this->user();
+            $canDiscount = $currentUser ? $currentUser->can('invoices.discount') : true;
+
             $discount = (float) $this->input('discount_amount', 0);
+            if ($discount > 0 && !$canDiscount) {
+                $overrideCode = (string) $this->input('manager_override_code');
+                if (!$this->isManagerOverrideValid($overrideCode)) {
+                    $validator->errors()->add(
+                        'discount_amount',
+                        'ليس لديك صلاحية تطبيق خصومات على الفاتورة. يلزم إدخال كود موافقة المشرف/المدير للمتابعة.'
+                    );
+                }
+            }
+
+            foreach ($items as $index => $item) {
+                $productId = $item['product_id'] ?? null;
+                $product = $products->get($productId);
+                if ($product && isset($item['unit_price']) && is_numeric($item['unit_price'])) {
+                    $inputPrice = (float) $item['unit_price'];
+                    if ($inputPrice < (float) $product->retail_price && !$canDiscount) {
+                        $overrideCode = (string) $this->input('manager_override_code');
+                        if (!$this->isManagerOverrideValid($overrideCode)) {
+                            $validator->errors()->add(
+                                "items.{$index}.unit_price",
+                                "ليس لديك صلاحية تخفيض سعر بيع الصنف ({$product->name}) عن السعر الرسمي ({$product->retail_price} ج.م). يلزم إدخال كود موافقة المشرف."
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 4. Validate Final Amount vs Payments Sum
             $tax = (float) $this->input('tax_amount', 0);
             $finalAmount = max(0, ($subtotal + $tax) - $discount - $scrapDeduction);
 
@@ -164,7 +202,7 @@ class StorePosInvoiceRequest extends FormRequest
                 );
             }
 
-            // 4. Validate Credit Limit & Manager Override
+            // 5. Validate Credit Limit & Manager Override
             if ($creditAmount > 0) {
                 $customerId = $this->input('customer_id');
                 if (!$customerId) {
@@ -211,7 +249,7 @@ class StorePosInvoiceRequest extends FormRequest
 
         // 2. Check if code matches password of any user with admin or manager role
         $managers = User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['admin', 'manager', 'branch_manager']);
+            $query->whereIn('name', ['admin', 'manager', 'branch_manager', 'super-admin', 'branch-manager']);
         })->get();
 
         foreach ($managers as $manager) {
@@ -226,6 +264,8 @@ class StorePosInvoiceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'technician_id.required'            => 'يجب اختيار الفني / العامل المسؤول عن التركيب.',
+            'technician_id.exists'              => 'الفني المختار غير مسجل بالنظام.',
             'items.required'                    => 'يجب إضافة منتج واحد على الأقل في الفاتورة.',
             'items.*.product_id.required'       => 'يرجى اختيار المنتج.',
             'items.*.quantity.required'         => 'الكمية مطلوبة.',

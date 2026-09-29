@@ -256,3 +256,66 @@ test('sales return on credit invoice deducts from customer debt and records refu
         'balance_after' => 0,
     ]);
 });
+
+test('sales invoices index filters by date_from and date_to accurately', function () {
+    $customer = Customer::create([
+        'name'                   => 'عميل فحص التواريخ',
+        'phone'                  => '01099887766',
+        'credit_limit'           => 5000,
+        'current_credit_balance' => 0,
+        'tier'                   => 'standard',
+        'is_active'              => true,
+    ]);
+
+    // Invoice from 2026-09-20 (outside filter)
+    $invOld = Invoice::create([
+        'invoice_number'   => 'INV-DATE-OLD',
+        'branch_id'        => $this->branch->id,
+        'customer_id'      => $customer->id,
+        'cashier_id'       => $this->superAdmin->id,
+        'subtotal'         => 1000,
+        'final_amount'     => 1000,
+        'paid_amount'      => 1000,
+        'remaining_amount' => 0,
+        'payment_method'   => 'cash',
+        'status'           => 'paid',
+    ]);
+    $invOld->created_at = '2026-09-20 10:00:00';
+    $invOld->saveQuietly();
+
+    // Invoice from 2026-09-27 (target filter)
+    $invTarget = Invoice::create([
+        'invoice_number'   => 'INV-DATE-TARGET',
+        'branch_id'        => $this->branch->id,
+        'customer_id'      => $customer->id,
+        'cashier_id'       => $this->superAdmin->id,
+        'subtotal'         => 2500,
+        'final_amount'     => 2500,
+        'paid_amount'      => 2500,
+        'remaining_amount' => 0,
+        'payment_method'   => 'cash',
+        'status'           => 'paid',
+    ]);
+    $invTarget->created_at = '2026-09-27 14:30:00';
+    $invTarget->saveQuietly();
+
+    // Request with date_from and date_to
+    $response = $this->actingAs($this->superAdmin)
+        ->get(route('admin.invoices.index', [
+            'date_from' => '2026-09-27',
+            'date_to'   => '2026-09-27',
+        ]));
+
+    $response->assertOk()
+        ->assertSee('INV-DATE-TARGET')
+        ->assertDontSee('INV-DATE-OLD');
+
+    // Also test alias route /admin/sales/invoices
+    $aliasResponse = $this->actingAs($this->superAdmin)
+        ->get('/admin/sales/invoices?date_from=2026-09-27&date_to=2026-09-27');
+
+    $aliasResponse->assertOk()
+        ->assertSee('INV-DATE-TARGET')
+        ->assertDontSee('INV-DATE-OLD');
+});
+

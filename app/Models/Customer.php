@@ -21,6 +21,14 @@ class Customer extends Model
         'is_active',
     ];
 
+    protected $attributes = [
+        'credit_limit'           => 5000.00,
+        'current_credit_balance' => 0.00,
+        'tier'                   => 'standard',
+        'is_active'              => true,
+    ];
+
+
     protected function casts(): array
     {
         return [

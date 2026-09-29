@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->string('name', 150);
             $table->string('phone', 30)->unique()->index();
             $table->string('national_id', 30)->nullable();
-            $table->decimal('credit_limit', 10, 2)->default(0);
+            $table->decimal('credit_limit', 10, 2)->default(5000.00);
             $table->decimal('current_credit_balance', 10, 2)->default(0);
             $table->enum('tier', ['standard', 'vip', 'fleet'])->default('standard');
             $table->boolean('is_active')->default(true);

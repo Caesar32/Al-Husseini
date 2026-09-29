@@ -15,7 +15,7 @@ class LockScreenController extends Controller
     /**
      * عرض شاشة قفل النظام
      */
-    public function show()
+    public function show(Request $request)
     {
         $user = Auth::user();
 
@@ -25,7 +25,12 @@ class LockScreenController extends Controller
 
         session(['lockscreen_locked' => true]);
 
-        return view('admin.auth.lockscreen', compact('user'));
+        $throttleKey = 'lockscreen|' . $user->id . '|' . $request->ip();
+        $lockoutSeconds = RateLimiter::tooManyAttempts($throttleKey, 5)
+            ? RateLimiter::availableIn($throttleKey)
+            : (session('lockout_seconds') ?? 0);
+
+        return view('admin.auth.lockscreen', compact('user', 'lockoutSeconds'));
     }
 
     /**
@@ -50,6 +55,7 @@ class LockScreenController extends Controller
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            session()->flash('lockout_seconds', $seconds);
             throw ValidationException::withMessages([
                 'password' => "تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار {$seconds} ثانية.",
             ]);
@@ -59,12 +65,21 @@ class LockScreenController extends Controller
         if (Hash::check($request->password, $user->password)) {
             RateLimiter::clear($throttleKey);
             session()->forget('lockscreen_locked');
+            session()->forget('lockout_seconds');
 
             return redirect()->intended(route('admin.dashboard'))
                 ->with('status', 'أهلاً بك مجدداً، تم فتح الشاشة بنجاح.');
         }
 
         RateLimiter::hit($throttleKey, 300); // 5 دقائق عقوبة
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            session()->flash('lockout_seconds', $seconds);
+            throw ValidationException::withMessages([
+                'password' => "تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار {$seconds} ثانية.",
+            ]);
+        }
 
         return back()->withErrors([
             'password' => 'كلمة المرور غير صحيحة، يرجى إعادة المحاولة.',

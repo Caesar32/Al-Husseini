@@ -80,8 +80,11 @@ test('pos store endpoint creates invoice and returns 201 json payload', function
     $battery = Product::where('is_battery', true)->first();
     $battery->update(['current_stock' => 10, 'retail_price' => 3000]);
 
+    $technician = Employee::first();
+
     $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.pos.store'), [
+            'technician_id' => $technician->id,
             'items' => [
                 [
                     'product_id'     => $battery->id,

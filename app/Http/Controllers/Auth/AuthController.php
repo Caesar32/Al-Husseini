@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
@@ -17,10 +18,17 @@ class AuthController extends Controller
     public function showLoginForm()
     {
         if (Auth::check()) {
+            /** @var \App\Models\User $user */
+            $user = Auth::user();
+            if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
+                return redirect()->route('admin.pos.index');
+            }
             return redirect()->route('admin.dashboard');
         }
 
-        return view('admin.auth.login');
+        $lockoutSeconds = session('lockout_seconds') ?? 0;
+
+        return view('admin.auth.login', compact('lockoutSeconds'));
     }
 
     /**
@@ -28,28 +36,52 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
-        $request->validate([
-            'email' => ['required', 'string', 'email'],
-            'password' => ['required', 'string'],
-        ], [
-            'email.required' => 'يرجى إدخال البريد الإلكتروني.',
-            'email.email' => 'يرجى إدخال بريد إلكتروني صالح.',
-            'password.required' => 'يرجى إدخال كلمة المرور.',
-        ]);
+        $login = trim((string) ($request->input('login') ?? $request->input('email')));
+        $password = (string) $request->input('password');
 
-        $throttleKey = Str::transliterate(Str::lower($request->input('email')) . '|' . $request->ip());
+        if ($login === '') {
+            throw ValidationException::withMessages([
+                'email' => 'يرجى إدخال اسم المستخدم أو البريد الإلكتروني أو الهاتف.',
+            ]);
+        }
+
+        if ($password === '') {
+            throw ValidationException::withMessages([
+                'password' => 'يرجى إدخال كلمة المرور.',
+            ]);
+        }
+
+        $throttleKey = Str::transliterate(Str::lower($login) . '|' . $request->ip());
 
         if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
             $seconds = RateLimiter::availableIn($throttleKey);
+            session()->flash('lockout_seconds', $seconds);
             throw ValidationException::withMessages([
                 'email' => "تم تجاوز عدد محاولات الدخول المسموح بها. يرجى المحاولة بعد {$seconds} ثانية.",
             ]);
         }
 
-        $credentials = $request->only('email', 'password');
         $remember = $request->boolean('remember');
+        $authenticated = false;
 
-        if (Auth::attempt($credentials, $remember)) {
+        if (filter_var($login, FILTER_VALIDATE_EMAIL)) {
+            $authenticated = Auth::attempt(['email' => $login, 'password' => $password], $remember);
+        } else {
+            // Try by phone
+            if (Auth::attempt(['phone' => $login, 'password' => $password], $remember)) {
+                $authenticated = true;
+            } else {
+                // Try matching by name
+                $candidate = User::where('name', $login)->first();
+                if ($candidate && \Illuminate\Support\Facades\Hash::check($password, $candidate->password)) {
+                    Auth::login($candidate, $remember);
+                    $authenticated = true;
+                }
+            }
+        }
+
+        if ($authenticated) {
+            /** @var \App\Models\User $user */
             $user = Auth::user();
 
             if (!$user->is_active) {
@@ -60,15 +92,28 @@ class AuthController extends Controller
             }
 
             RateLimiter::clear($throttleKey);
+            session()->forget('lockout_seconds');
             $request->session()->regenerate();
+
+            if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
+                return redirect()->intended(route('admin.pos.index'));
+            }
 
             return redirect()->intended(route('admin.dashboard'));
         }
 
-        RateLimiter::hit($throttleKey);
+        RateLimiter::hit($throttleKey, 300);
 
-        return back()->withInput($request->only('email', 'remember'))->withErrors([
-            'email' => 'بيانات تسجيل الدخول غير صحيحة، يرجى التأكد من البريد وكلمة المرور.',
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            session()->flash('lockout_seconds', $seconds);
+            throw ValidationException::withMessages([
+                'email' => "تم تجاوز عدد محاولات الدخول المسموح بها. يرجى المحاولة بعد {$seconds} ثانية.",
+            ]);
+        }
+
+        return back()->withInput($request->only('email', 'login', 'remember'))->withErrors([
+            'email' => 'بيانات تسجيل الدخول غير صحيحة، يرجى التأكد من البريد أو اسم المستخدم وكلمة المرور.',
         ]);
     }
 

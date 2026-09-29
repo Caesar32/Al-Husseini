@@ -20,10 +20,100 @@ class DashboardController extends Controller
      */
     public function index(Request $request)
     {
-        // 1. KPI Stats
-        $validInvoices = Invoice::where('status', '!=', 'cancelled');
-        $totalSales = (float) $validInvoices->sum('final_amount');
-        $invoicesCount = (int) $validInvoices->count();
+        // 1. KPI Stats & Sales Periods Calculations
+        $todayStart = Carbon::today()->startOfDay();
+        $weekStart = Carbon::today()->subDays(6)->startOfDay(); // Last 7 days including today
+        $monthStart = Carbon::today()->startOfMonth();
+        $yearStart = Carbon::today()->startOfYear();
+
+        $baseInvoices = Invoice::where('status', '!=', 'cancelled');
+
+        $salesToday = (float) (clone $baseInvoices)->where('created_at', '>=', $todayStart)->sum('final_amount');
+        $invoicesCountToday = (int) (clone $baseInvoices)->where('created_at', '>=', $todayStart)->count();
+
+        $salesWeek = (float) (clone $baseInvoices)->where('created_at', '>=', $weekStart)->sum('final_amount');
+        $invoicesCountWeek = (int) (clone $baseInvoices)->where('created_at', '>=', $weekStart)->count();
+
+        $salesMonth = (float) (clone $baseInvoices)->where('created_at', '>=', $monthStart)->sum('final_amount');
+        $invoicesCountMonth = (int) (clone $baseInvoices)->where('created_at', '>=', $monthStart)->count();
+
+        $salesYear = (float) (clone $baseInvoices)->where('created_at', '>=', $yearStart)->sum('final_amount');
+        $invoicesCountYear = (int) (clone $baseInvoices)->where('created_at', '>=', $yearStart)->count();
+
+        $salesAll = (float) (clone $baseInvoices)->sum('final_amount');
+        $invoicesCountAll = (int) (clone $baseInvoices)->count();
+
+        $salesPeriods = [
+            'today' => [
+                'key' => 'today',
+                'label' => 'اليوم',
+                'badge' => 'مبيعات اليوم',
+                'sublabel' => 'اليوم',
+                'total' => round($salesToday),
+                'total_formatted' => number_format(round($salesToday), 0) . ' ج.م',
+                'count' => $invoicesCountToday,
+                'invoices_url' => route('admin.sales.invoices', ['date_from' => $todayStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+            ],
+            'week' => [
+                'key' => 'week',
+                'label' => 'أسبوع',
+                'badge' => 'آخر 7 أيام',
+                'sublabel' => 'هذا الأسبوع',
+                'total' => round($salesWeek),
+                'total_formatted' => number_format(round($salesWeek), 0) . ' ج.م',
+                'count' => $invoicesCountWeek,
+                'invoices_url' => route('admin.sales.invoices', ['date_from' => $weekStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+            ],
+            'month' => [
+                'key' => 'month',
+                'label' => 'شهر',
+                'badge' => 'الشهر الحالي',
+                'sublabel' => 'هذا الشهر',
+                'total' => round($salesMonth),
+                'total_formatted' => number_format(round($salesMonth), 0) . ' ج.م',
+                'count' => $invoicesCountMonth,
+                'invoices_url' => route('admin.sales.invoices', ['date_from' => $monthStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+            ],
+            'year' => [
+                'key' => 'year',
+                'label' => 'سنة',
+                'badge' => 'السنة الحالية',
+                'sublabel' => 'هذا العام',
+                'total' => round($salesYear),
+                'total_formatted' => number_format(round($salesYear), 0) . ' ج.م',
+                'count' => $invoicesCountYear,
+                'invoices_url' => route('admin.sales.invoices', ['date_from' => $yearStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+            ],
+            'all' => [
+                'key' => 'all',
+                'label' => 'الكل',
+                'badge' => 'الإجمالي العام',
+                'sublabel' => 'منذ البداية',
+                'total' => round($salesAll),
+                'total_formatted' => number_format(round($salesAll), 0) . ' ج.م',
+                'count' => $invoicesCountAll,
+                'invoices_url' => route('admin.sales.invoices'),
+            ],
+        ];
+
+        $selectedPeriodKey = $request->query('sales_period', 'all');
+        if (!array_key_exists($selectedPeriodKey, $salesPeriods)) {
+            $selectedPeriodKey = 'all';
+        }
+
+        $selectedPeriod = $salesPeriods[$selectedPeriodKey];
+        $totalSales = $selectedPeriod['total'];
+        $invoicesCount = $selectedPeriod['count'];
+
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'selected_period' => $selectedPeriodKey,
+                'data' => $selectedPeriod,
+                'all_periods' => $salesPeriods,
+            ]);
+        }
+
 
         $totalCredit = (float) Customer::sum('current_credit_balance');
         $creditCustomersCount = (int) Customer::where('current_credit_balance', '>', 0)->count();
@@ -159,7 +249,10 @@ class DashboardController extends Controller
             'presentCount',
             'lateCount',
             'absentCount',
-            'workshopTechs'
+            'workshopTechs',
+            'salesPeriods',
+            'selectedPeriodKey',
+            'selectedPeriod'
         ));
     }
 }

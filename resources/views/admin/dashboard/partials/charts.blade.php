@@ -22,25 +22,25 @@
                     <div class="col-6 col-sm-3">
                         <div class="p-2.5 bg-body border rounded-3 dash-mini-tile">
                             <span class="text-muted fs-11 d-block mb-1">🔋 بطاريات سيارات</span>
-                            <h6 class="mb-0 fw-bold font-monospace text-primary fs-13" id="catStatBatteries">{{ number_format($catStatBatteries, 2) }} ج.م</h6>
+                            <h6 class="mb-0 fw-bold font-monospace text-primary fs-13" id="catStatBatteries">{{ number_format(round($catStatBatteries), 0) }} ج.م</h6>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-2.5 bg-body border rounded-3 dash-mini-tile">
                             <span class="text-muted fs-11 d-block mb-1">🛢️ زيوت وفلاتر</span>
-                            <h6 class="mb-0 fw-bold font-monospace text-success fs-13" id="catStatOils">{{ number_format($catStatOils, 2) }} ج.م</h6>
+                            <h6 class="mb-0 fw-bold font-monospace text-success fs-13" id="catStatOils">{{ number_format(round($catStatOils), 0) }} ج.م</h6>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-2.5 bg-body border rounded-3 dash-mini-tile">
                             <span class="text-muted fs-11 d-block mb-1">🔧 صيانة وخدمات</span>
-                            <h6 class="mb-0 fw-bold font-monospace text-info fs-13" id="catStatServices">{{ number_format($catStatServices, 2) }} ج.م</h6>
+                            <h6 class="mb-0 fw-bold font-monospace text-info fs-13" id="catStatServices">{{ number_format(round($catStatServices), 0) }} ج.م</h6>
                         </div>
                     </div>
                     <div class="col-6 col-sm-3">
                         <div class="p-2.5 bg-body border rounded-3 dash-mini-tile">
                             <span class="text-muted fs-11 d-block mb-1">♻️ كهنة مسترجعة</span>
-                            <h6 class="mb-0 fw-bold font-monospace text-danger fs-13" id="catStatScrap">- {{ number_format($catStatScrap, 2) }} ج.م</h6>
+                            <h6 class="mb-0 fw-bold font-monospace text-danger fs-13" id="catStatScrap">- {{ number_format(round($catStatScrap), 0) }} ج.م</h6>
                         </div>
                     </div>
                 </div>

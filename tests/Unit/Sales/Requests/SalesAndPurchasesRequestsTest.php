@@ -153,6 +153,7 @@ test('store pos invoice request calculates scrap deduction and accepts split pay
                 'battery_serial' => 'SN-SPLIT-992',
             ],
         ],
+        'technician_id'     => \App\Models\Employee::first()->id,
         'has_scrap'         => true,
         'scrap_capacity_ah' => 70,
         'scrap_count'       => 1,
@@ -166,6 +167,29 @@ test('store pos invoice request calculates scrap deduction and accepts split pay
     $request->withValidator($validator);
 
     expect($validator->passes())->toBeTrue();
+});
+
+test('store pos invoice request rejects invoice when technician is missing', function () {
+    $battery = Product::where('is_battery', true)->first();
+    $request = new StorePosInvoiceRequest();
+    $request->merge([
+        'items' => [
+            [
+                'product_id'     => $battery->id,
+                'quantity'       => 1,
+                'unit_price'     => 3000,
+                'battery_serial' => 'SN-TECH-REQ-99',
+            ],
+        ],
+        'payments' => [
+            ['method' => 'cash', 'amount' => 3000],
+        ],
+        // technician_id is missing
+    ]);
+
+    $validator = Validator::make($request->all(), $request->rules());
+    expect($validator->fails())->toBeTrue()
+        ->and($validator->errors()->has('technician_id'))->toBeTrue();
 });
 
 test('store pos invoice request requires manager override code when credit limit exceeded', function () {
@@ -184,6 +208,7 @@ test('store pos invoice request requires manager override code when credit limit
     // Transaction of 1500 on credit will push balance to 800 + 1500 = 2300 > 1000 limit
     $request = new StorePosInvoiceRequest();
     $request->merge([
+        'technician_id' => \App\Models\Employee::first()->id,
         'customer_id' => $customer->id,
         'items' => [
             [

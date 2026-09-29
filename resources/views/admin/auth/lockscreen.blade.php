@@ -53,7 +53,25 @@
                                 </p>
                             </div>
 
-                            @if ($errors->any())
+                            @php
+                                $effectiveLockout = (int) ($lockoutSeconds ?? 0);
+                                if ($effectiveLockout <= 0 && $errors->has('password')) {
+                                    foreach ($errors->get('password') as $err) {
+                                        if (preg_match('/(\d+)\s*ثانية/', $err, $matches)) {
+                                            $effectiveLockout = (int) $matches[1];
+                                            break;
+                                        }
+                                    }
+                                }
+                            @endphp
+
+                            @if ($effectiveLockout > 0)
+                                <div id="lockout-alert" class="alert alert-danger alert-border-left alert-dismissible fade show text-start my-3" role="alert">
+                                    <i class="ri-error-warning-line me-2 align-middle fs-16"></i>
+                                    <span>تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار <span id="lockout-timer" class="fw-bold">{{ $effectiveLockout }}</span> ثانية.</span>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @elseif ($errors->any())
                                 <div class="alert alert-danger alert-border-left alert-dismissible fade show text-start my-3" role="alert">
                                     <i class="ri-error-warning-line me-2 align-middle fs-16"></i>
                                     @foreach ($errors->all() as $error)
@@ -64,18 +82,18 @@
                             @endif
 
                             <div class="p-2 mt-2">
-                                <form action="{{ route('admin.lockscreen.unlock') }}" method="POST">
+                                <form action="{{ route('admin.lockscreen.unlock') }}" method="POST" id="lockscreen-form">
                                     @csrf
                                     <div class="mb-3 text-start">
                                         <label class="form-label" for="userpassword">كلمة المرور</label>
                                         <div class="position-relative auth-pass-inputgroup mb-3">
-                                            <input type="password" name="password" class="form-control pe-5 password-input @error('password') is-invalid @enderror" placeholder="أدخل كلمة المرور لفتح الشاشة" id="userpassword" autofocus required>
+                                            <input type="password" name="password" class="form-control pe-5 password-input @error('password') is-invalid @enderror" placeholder="أدخل كلمة المرور لفتح الشاشة" id="userpassword" @if($effectiveLockout > 0) disabled @else autofocus @endif required>
                                             <button class="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted password-addon material-shadow-none" type="button" id="password-addon"><i class="ri-eye-fill align-middle"></i></button>
                                         </div>
                                     </div>
 
                                     <div class="mb-2 mt-4">
-                                        <button class="btn btn-primary w-100 fw-semibold" type="submit">
+                                        <button class="btn btn-primary w-100 fw-semibold @if($effectiveLockout > 0) disabled @endif" type="submit" id="btn-unlock" @if($effectiveLockout > 0) disabled @endif>
                                             <i class="ri-lock-unlock-line align-middle me-1"></i> فتح الشاشة
                                         </button>
                                     </div>
@@ -129,6 +147,81 @@
             passwordInput.type = "text";
         } else {
             passwordInput.type = "password";
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const passwordInput = document.getElementById('userpassword');
+        const unlockBtn = document.getElementById('btn-unlock');
+        const lockForm = document.getElementById('lockscreen-form');
+        const lockoutAlert = document.getElementById('lockout-alert');
+        const timerSpan = document.getElementById('lockout-timer');
+
+        let seconds = parseInt('{{ $effectiveLockout }}', 10) || 0;
+
+        if (seconds <= 0 && timerSpan) {
+            seconds = parseInt(timerSpan.textContent.trim(), 10) || 0;
+        }
+
+        if (seconds > 0) {
+            // Ensure input and button are disabled during lockout
+            if (passwordInput) {
+                passwordInput.disabled = true;
+                passwordInput.setAttribute('disabled', 'disabled');
+                passwordInput.classList.add('bg-light');
+                passwordInput.blur();
+            }
+            if (unlockBtn) {
+                unlockBtn.disabled = true;
+                unlockBtn.setAttribute('disabled', 'disabled');
+                unlockBtn.classList.add('disabled');
+            }
+
+            // Real-time live countdown
+            const timerInterval = setInterval(function () {
+                seconds--;
+
+                if (timerSpan) {
+                    timerSpan.textContent = seconds;
+                }
+
+                if (seconds <= 0) {
+                    clearInterval(timerInterval);
+
+                    // Re-enable password input and button automatically
+                    if (passwordInput) {
+                        passwordInput.disabled = false;
+                        passwordInput.removeAttribute('disabled');
+                        passwordInput.classList.remove('bg-light');
+                        passwordInput.focus();
+                    }
+                    if (unlockBtn) {
+                        unlockBtn.disabled = false;
+                        unlockBtn.removeAttribute('disabled');
+                        unlockBtn.classList.remove('disabled');
+                    }
+
+                    // Remove/hide lockout message automatically without page refresh
+                    if (lockoutAlert) {
+                        lockoutAlert.style.transition = 'opacity 0.5s ease';
+                        lockoutAlert.style.opacity = '0';
+                        setTimeout(function () {
+                            lockoutAlert.remove();
+                        }, 500);
+                    }
+                }
+            }, 1000);
+
+            // Block any form submission attempt during lockout
+            if (lockForm) {
+                lockForm.addEventListener('submit', function (e) {
+                    if (seconds > 0) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return false;
+                    }
+                });
+            }
         }
     });
 </script>

@@ -220,11 +220,10 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         $this->assertEquals(800.00, (float) $scrap->scrap_value);
         $this->assertEquals('in_stock', $scrap->status);
 
-        // 5. التحقق من تسجيل عمولة الفني (25 ج.م)
+        // 5. التحقق من إسناد الفني كإجباري وعدم إنشاء عمولة 25 ج.م بعد إلغائها
+        $this->assertEquals($this->technician->id, $invoice->technician_id);
         $commission = TechnicianCommission::where('invoice_id', $invoice->id)->first();
-        $this->assertNotNull($commission);
-        $this->assertEquals($this->technician->id, $commission->employee_id);
-        $this->assertEquals(25.00, (float) $commission->commission_amount);
+        $this->assertNull($commission);
     }
 
     /**
@@ -251,6 +250,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         $invalidPayload = [
             'branch_id'             => $this->branch->id,
             'customer_id'           => $customer->id,
+            'technician_id'         => $this->technician->id,
             'items'                 => [
                 [
                     'product_id'     => $product->id,
@@ -294,6 +294,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         $validPayload = [
             'branch_id'             => $this->branch->id,
             'customer_id'           => $customer->id,
+            'technician_id'         => $this->technician->id,
             'items'                 => [
                 [
                     'product_id'     => $product->id,

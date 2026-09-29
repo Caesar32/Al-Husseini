@@ -7,8 +7,76 @@
 let salesTrendChart = null;
 let categoryDonutChart = null;
 
+const salesPeriodsData = @json($salesPeriods ?? []);
+
+function changeSalesPeriod(periodKey, triggerEl) {
+    if (!salesPeriodsData || !salesPeriodsData[periodKey]) return;
+    const period = salesPeriodsData[periodKey];
+
+    // 1. Update text & numbers with a subtle transition
+    const totalEl = document.getElementById('dashTotalSales');
+    const countEl = document.getElementById('dashInvoicesCount');
+    const badgeEl = document.getElementById('dashSalesPeriodBadgeText');
+    const sublabelEl = document.getElementById('dashInvoicesSublabel');
+    const linkEl = document.getElementById('dashInvoicesLink');
+
+    if (totalEl) {
+        totalEl.style.opacity = '0.3';
+        setTimeout(() => {
+            totalEl.textContent = period.total_formatted;
+            totalEl.style.opacity = '1';
+        }, 120);
+    }
+
+    if (countEl) countEl.textContent = period.count;
+    if (badgeEl) badgeEl.textContent = period.badge;
+    if (sublabelEl) sublabelEl.textContent = period.sublabel;
+    if (linkEl && period.invoices_url) linkEl.href = period.invoices_url;
+
+    // 2. Update active states on Card pills (.segmented-btn)
+    document.querySelectorAll('.sales-period-pill').forEach(btn => {
+        if (btn.dataset.period === periodKey) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // 3. Update active states on Welcome bar buttons if present
+    document.querySelectorAll('.welcome-period-btn').forEach(btn => {
+        if (btn.dataset.period === periodKey) {
+            btn.classList.remove('btn-ghost-secondary', 'text-muted');
+            btn.classList.add('btn-success', 'text-white', 'shadow-xs', 'active');
+        } else {
+            btn.classList.remove('btn-success', 'text-white', 'shadow-xs', 'active');
+            btn.classList.add('btn-ghost-secondary', 'text-muted');
+        }
+    });
+
+    // 4. Save preference in localStorage
+    try {
+        localStorage.setItem('alhusseini_dashboard_sales_period', periodKey);
+    } catch(e) {}
+
+    // 5. Update browser URL query without full reload
+    if (window.history && window.history.replaceState) {
+        const url = new URL(window.location);
+        url.searchParams.set('sales_period', periodKey);
+        window.history.replaceState({}, '', url);
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     renderDashboardCharts();
+
+    // Check if period was specified in URL or saved in localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPeriod = urlParams.get('sales_period');
+    const savedPeriod = localStorage.getItem('alhusseini_dashboard_sales_period');
+    const targetPeriod = urlPeriod || savedPeriod;
+    if (targetPeriod && salesPeriodsData && salesPeriodsData[targetPeriod] && targetPeriod !== '{{ $selectedPeriodKey ?? 'all' }}') {
+        changeSalesPeriod(targetPeriod);
+    }
 
     window.addEventListener('alhusseini-sales-updated', function () {
         if (window.AlHusseiniSales) {
@@ -36,10 +104,17 @@ function loadKPIStats() {
     const customers = window.AlHusseiniSales.getCustomers();
     const products = window.AlHusseiniSales.getProducts();
 
-    // Total sales
-    const totalSales = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
-    document.getElementById('dashTotalSales').textContent = window.AlHusseiniSales.formatCurrency(totalSales);
-    document.getElementById('dashInvoicesCount').textContent = invoices.length;
+    // Total sales (respect active period)
+    const activePeriodBtn = document.querySelector('.sales-period-pill.btn-success');
+    const activePeriod = activePeriodBtn ? activePeriodBtn.dataset.period : 'all';
+    if (activePeriod && salesPeriodsData && salesPeriodsData[activePeriod]) {
+        document.getElementById('dashTotalSales').textContent = salesPeriodsData[activePeriod].total_formatted;
+        document.getElementById('dashInvoicesCount').textContent = salesPeriodsData[activePeriod].count;
+    } else {
+        const totalSales = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
+        document.getElementById('dashTotalSales').textContent = window.AlHusseiniSales.formatCurrency(totalSales);
+        document.getElementById('dashInvoicesCount').textContent = invoices.length;
+    }
 
     // Total Credit (الآجل)
     const totalCredit = customers.reduce((sum, c) => sum + (Number(c.creditBalance) || 0), 0);

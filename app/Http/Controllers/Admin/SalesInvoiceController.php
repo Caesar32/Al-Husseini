@@ -26,10 +26,43 @@ class SalesInvoiceController extends Controller
             return response()->json($invoices);
         }
 
+        // Stats matching active date/branch/search filters
+        $statsQuery = Invoice::query();
+        if (!empty($filters['search'])) {
+            $search = trim($filters['search']);
+            $statsQuery->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function ($cq) use ($search) {
+                      $cq->where('name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                  });
+            });
+        }
+        if (!empty($filters['status'])) {
+            $statsQuery->where('status', $filters['status']);
+        }
+        if (!empty($filters['branch_id'])) {
+            $statsQuery->where('branch_id', $filters['branch_id']);
+        }
+        if (!empty($filters['date_from'])) {
+            $statsQuery->whereDate('created_at', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $statsQuery->whereDate('created_at', '<=', $filters['date_to']);
+        }
+
+        $stats = [
+            'total_sales'            => (float) (clone $statsQuery)->sum('final_amount'),
+            'invoices_count'         => (int) (clone $statsQuery)->count(),
+            'credit_invoices_count'  => (int) (clone $statsQuery)->where('remaining_amount', '>', 0)->count(),
+            'total_remaining_credit' => (float) (clone $statsQuery)->sum('remaining_amount'),
+            'scrap_count'            => (int) (clone $statsQuery)->where('scrap_deduction_amount', '>', 0)->count(),
+        ];
+
         $branches = Branch::where('is_active', true)->get();
         $viewName = view()->exists('admin.invoices.index') ? 'admin.invoices.index' : 'admin.sales.invoices';
 
-        return view($viewName, compact('invoices', 'branches'));
+        return view($viewName, compact('invoices', 'branches', 'stats', 'filters'));
     }
 
     public function show(Invoice $invoice): View

@@ -70,16 +70,6 @@ class InvoiceObserver
                     'received_by' => $invoice->technician_id ?? 1,
                 ]);
             }
-
-            // 4. تسجيل عمولة الفني إذا كان مسنداً إليه الفاتورة
-            if ($invoice->technician_id) {
-                TechnicianCommission::create([
-                    'employee_id'       => $invoice->technician_id,
-                    'invoice_id'        => $invoice->id,
-                    'commission_amount' => 50.00, // عمولة تركيب ثابتة 50 ج.م كقيمة قياسية
-                    'status'            => 'pending',
-                ]);
-            }
         });
     }
 }

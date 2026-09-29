@@ -19,6 +19,9 @@ use App\Http\Controllers\Admin\WarrantyController;
 use App\Http\Controllers\Admin\ScrapInventoryController;
 use App\Http\Controllers\Admin\CreditCustomerController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Admin\SystemDiagnosticController;
 use App\Http\Controllers\Auth\LockScreenController;
 
 /*
@@ -28,9 +31,15 @@ use App\Http\Controllers\Auth\LockScreenController;
 */
 
 Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('admin.dashboard')
-        : redirect()->route('admin.login');
+    if (!\Illuminate\Support\Facades\Auth::check()) {
+        return redirect()->route('admin.login');
+    }
+    /** @var \App\Models\User $user */
+    $user = \Illuminate\Support\Facades\Auth::user();
+    if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
+        return redirect()->route('admin.pos.index');
+    }
+    return redirect()->route('admin.dashboard');
 });
 
 // تبديل اللغة (Language Switcher)
@@ -41,6 +50,14 @@ Route::get('/lang/{locale}', function (string $locale) {
     return redirect()->back();
 })->name('switch-lang');
 
+// تجديد رمز الحماية وإبقاء الجلسة نشطة لمنع انتهاء الجلسة أثناء العمل طوال اليوم (CSRF & Session Keep-Alive)
+Route::get('/refresh-csrf', function () {
+    return response()->json([
+        'csrf_token' => csrf_token(),
+        'status' => 'active',
+    ]);
+})->name('refresh_csrf');
+
 // مسارات لوحة التحكم (Admin Panel Routes)
 Route::prefix('admin')->name('admin.')->group(function () {
 
@@ -49,7 +66,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
         Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
         Route::get('/register', function () {
-            return view('admin.auth.register');
+            return redirect()->route('admin.login')->with('info', 'تسجيل الحسابات مخصص للإدارة العامة فقط. تواصل مع المشرف العام للحصول على بيانات حسابك.');
         })->name('register');
     });
 
@@ -77,6 +94,22 @@ Route::prefix('admin')->name('admin.')->group(function () {
         // إعدادات النظام والمنشأة (System Settings)
         Route::get('/settings', [SettingController::class, 'index'])->name('settings')->middleware('can:settings.manage');
         Route::post('/settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.manage');
+
+        // فحص وتشخيص النظام الحي والمحاكاة الشاملة (System Diagnostics & Live Simulation)
+        Route::get('/system-diagnostics', [SystemDiagnosticController::class, 'index'])->name('diagnostics.index')->middleware('can:settings.manage');
+        Route::post('/system-diagnostics/audit', [SystemDiagnosticController::class, 'runAudit'])->name('diagnostics.run_audit')->middleware('can:settings.manage');
+        Route::post('/system-diagnostics/simulate', [SystemDiagnosticController::class, 'runSimulation'])->name('diagnostics.run_simulation')->middleware('can:settings.manage');
+
+        // إدارة الأدوار وتحديد الصلاحيات (Roles & Permissions)
+        Route::resource('roles', RoleController::class)->middleware('can:roles.manage');
+
+        // إدارة المستخدمين وحسابات الموظفين (User Accounts & Role Assignments)
+        Route::get('/users', [UserController::class, 'index'])->name('users.index')->middleware('can:users.manage');
+        Route::post('/users', [UserController::class, 'store'])->name('users.store')->middleware('can:users.manage');
+        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update')->middleware('can:users.manage');
+        Route::post('/users/{user}/role', [UserController::class, 'updateRole'])->name('users.role')->middleware('can:users.manage');
+        Route::post('/users/{user}/toggle-status', [UserController::class, 'toggleStatus'])->name('users.toggle-status')->middleware('can:users.manage');
+        Route::post('/users/{user}/reset-password', [UserController::class, 'resetPassword'])->name('users.reset-password')->middleware('can:users.manage');
 
         Route::get('/starter', function () {
             return view('admin.starter');
