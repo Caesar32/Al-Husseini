@@ -97,9 +97,9 @@ class LockScreenController extends Controller
 
             $seconds = RateLimiter::availableIn($lockoutKey);
 
-            return back()->withErrors([
-                'password' => "تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار {$seconds} ثانية.",
-            ]);
+            // Always redirect to the lock-screen endpoint so the fifth attempt
+            // immediately renders the authoritative lockout state.
+            return redirect()->route('admin.lockscreen');
         }
 
         return back()->withErrors([
