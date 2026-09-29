@@ -125,14 +125,24 @@ test('lock screen locks immediately after the fifth failed attempt and blocks th
     $admin = User::where('email', 'admin@alhusseini.com')->first();
     $this->actingAs($admin);
 
-    $throttleKey = 'lockscreen|' . $admin->id . '|127.0.0.1';
-    RateLimiter::clear($throttleKey);
+    $attemptsKey = 'lockscreen:attempts|' . $admin->id . '|127.0.0.1';
+    $lockoutKey = 'lockscreen:lockout|' . $admin->id . '|127.0.0.1';
+    RateLimiter::clear($attemptsKey);
+    RateLimiter::clear($lockoutKey);
 
-    for ($attempt = 1; $attempt <= 5; $attempt++) {
+    for ($attempt = 1; $attempt <= 4; $attempt++) {
         $this->post(route('admin.lockscreen.unlock'), [
             'password' => 'wrong-password',
         ])->assertRedirect();
     }
+
+    // The fifth failed attempt must immediately redirect back to the lock-screen
+    // endpoint, which renders the authoritative lockout state.
+    $response = $this->post(route('admin.lockscreen.unlock'), [
+        'password' => 'wrong-password',
+    ]);
+
+    $response->assertRedirect(route('admin.lockscreen'));
 
     $response = $this->get(route('admin.lockscreen'));
 
@@ -148,15 +158,18 @@ test('lock screen locks immediately after the fifth failed attempt and blocks th
     $response->assertRedirect();
     $response->assertSessionHasErrors('password');
 
-    RateLimiter::clear($throttleKey);
+    RateLimiter::clear($attemptsKey);
+    RateLimiter::clear($lockoutKey);
 });
 
 test('lock screen becomes available again after the lockout expires', function () {
     $admin = User::where('email', 'admin@alhusseini.com')->first();
     $this->actingAs($admin);
 
-    $throttleKey = 'lockscreen|' . $admin->id . '|127.0.0.1';
-    RateLimiter::clear($throttleKey);
+    $attemptsKey = 'lockscreen:attempts|' . $admin->id . '|127.0.0.1';
+    $lockoutKey = 'lockscreen:lockout|' . $admin->id . '|127.0.0.1';
+    RateLimiter::clear($attemptsKey);
+    RateLimiter::clear($lockoutKey);
 
     for ($attempt = 1; $attempt <= 5; $attempt++) {
         $this->post(route('admin.lockscreen.unlock'), [
@@ -178,5 +191,6 @@ test('lock screen becomes available again after the lockout expires', function (
 
     $response->assertRedirect(route('admin.dashboard'));
 
-    RateLimiter::clear($throttleKey);
+    RateLimiter::clear($attemptsKey);
+    RateLimiter::clear($lockoutKey);
 });
