@@ -19,7 +19,7 @@ interface PayrollServiceInterface
     /**
      * Approve a drafted monthly payroll batch for disbursement.
      */
-    public function approvePayroll(Payroll $payroll, ?int $approvedBy = null): bool;
+    public function approvePayroll(Payroll $payroll, ?int $approvedBy = null, bool $confirmDebtReview = false): bool;
 
     /**
      * Mark an approved payroll batch as disbursed and permanently close the monthly period.
