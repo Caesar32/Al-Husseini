@@ -30,15 +30,30 @@
                             </thead>
                             <tbody>
                                 @foreach($payrolls as $p)
-                                    <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}" data-has-debt="{{ $p->items->contains(fn($item) => (float) $item->carried_debt > 0) ? '1' : '0' }}">
+                                    @php
+                                        $rowBasic = round((float) $p->items->sum('basic_salary'), 2);
+                                        $rowAllowances = round((float) $p->items->sum('total_allowance'), 2);
+                                        $rowDeductions = round((float) $p->items->sum('total_deduction'), 2);
+                                        $rowNet = round((float) $p->items->sum('net_salary'), 2);
+                                        $rowCarriedDebt = round((float) $p->items->sum('carried_debt'), 2);
+                                        $rowExpectedNet = round($rowBasic + $rowAllowances - $rowDeductions + $rowCarriedDebt, 2);
+                                        $rowConsistent = abs($rowNet - $rowExpectedNet) < 0.01;
+                                        $rowHasZeroWithComponents = abs($rowNet) < 0.01 && ($rowBasic + $rowAllowances > 0 || $rowDeductions > 0);
+                                        $rowNeedsReview = !$rowConsistent || $rowHasZeroWithComponents;
+                                    @endphp
+                                    <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}" data-has-debt="{{ $p->items->contains(fn($item) => (float) $item->carried_debt > 0) ? '1' : '0' }}" data-needs-review="{{ $rowNeedsReview ? '1' : '0' }}">
                                         <td><span class="badge bg-dark-subtle text-dark fs-12 fw-bold font-monospace">{{ $p->year }} / {{ sprintf('%02d', $p->month) }}</span></td>
                                         <td><span class="fw-semibold">{{ $p->branch?->name }}</span></td>
-                                        <td>{{ number_format($p->total_basic_salaries) }} ج.م</td>
-                                        <td class="text-info">+{{ number_format($p->total_allowances) }} ج.م</td>
-                                        <td class="text-danger">-{{ number_format($p->total_deductions) }} ج.م</td>
-                                        <td class="fw-bold text-success fs-14">{{ number_format($p->total_net_salaries) }} ج.م</td>
+                                        <td>{{ number_format($rowBasic) }} ج.م</td>
+                                        <td class="text-info">{{ number_format($rowAllowances) }} ج.م</td>
+                                        <td class="text-danger">-{{ number_format($rowDeductions) }} ج.م</td>
+                                        <td class="fw-bold fs-14 {{ $rowNeedsReview ? 'text-warning' : 'text-success' }}">{{ number_format($rowNet) }} ج.م</td>
                                         <td>
-                                            @if($p->status === 'draft')
+                                            @if($rowNeedsReview)
+                                                <span class="badge bg-warning-subtle text-warning fs-12">
+                                                    <i class="ri-error-warning-line me-1"></i>يحتاج مراجعة الأرقام
+                                                </span>
+                                            @elseif($p->status === 'draft')
                                                 <span class="badge bg-warning-subtle text-warning fs-12"><i class="ri-time-line me-1"></i>مسودة للمراجعة</span>
                                             @elseif($p->status === 'approved')
                                                 <span class="badge bg-info-subtle text-info fs-12"><i class="ri-check-line me-1"></i>معتمد وجاهز للصرف</span>
@@ -48,7 +63,9 @@
                                         </td>
                                         <td>{{ $p->approvedBy?->name ?? '—' }}</td>
                                         <td class="text-center">
-                                            @if($p->status === 'draft')
+                                            @if($rowNeedsReview)
+                                                <span class="text-warning fs-12"><i class="ri-lock-line me-1"></i>ممنوع حتى تصحيح الأرقام</span>
+                                            @elseif($p->status === 'draft')
                                                 <button type="button" class="btn btn-sm btn-success btn-approve-payroll" data-id="{{ $p->id }}">
                                                     <i class="ri-shield-check-line me-1"></i> اعتماد المسير
                                                 </button>
