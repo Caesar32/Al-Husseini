@@ -15,7 +15,7 @@ class LockScreenController extends Controller
     private const LOCKOUT_SECONDS = 300;
 
     /**
-     * عرض شاشة قفل النظام
+     * عرض شاشة قفل النظام.
      */
     public function show(Request $request)
     {
@@ -27,10 +27,17 @@ class LockScreenController extends Controller
 
         session(['lockscreen_locked' => true]);
 
-        $throttleKey = $this->throttleKey($request, $user);
-        $lockoutSeconds = RateLimiter::tooManyAttempts($throttleKey, self::MAX_ATTEMPTS)
-            ? RateLimiter::availableIn($throttleKey)
+        $lockoutKey = $this->lockoutKey($request, $user);
+        $attemptsKey = $this->attemptsKey($request, $user);
+
+        $lockoutSeconds = RateLimiter::tooManyAttempts($lockoutKey, 1)
+            ? RateLimiter::availableIn($lockoutKey)
             : 0;
+
+        if ($lockoutSeconds <= 0) {
+            RateLimiter::clear($lockoutKey);
+            RateLimiter::clear($attemptsKey);
+        }
 
         $lockoutUntil = $lockoutSeconds > 0
             ? now()->addSeconds($lockoutSeconds)->timestamp
@@ -44,7 +51,7 @@ class LockScreenController extends Controller
     }
 
     /**
-     * إلغاء قفل الشاشة والتحقق من كلمة المرور
+     * إلغاء قفل الشاشة والتحقق من كلمة المرور.
      */
     public function unlock(Request $request)
     {
@@ -60,11 +67,12 @@ class LockScreenController extends Controller
             return redirect()->route('admin.login');
         }
 
-        $throttleKey = $this->throttleKey($request, $user);
+        $lockoutKey = $this->lockoutKey($request, $user);
+        $attemptsKey = $this->attemptsKey($request, $user);
 
-        // Rate limiting: the backend remains authoritative during lockout.
-        if (RateLimiter::tooManyAttempts($throttleKey, self::MAX_ATTEMPTS)) {
-            $seconds = RateLimiter::availableIn($throttleKey);
+        // The backend remains authoritative while the lockout is active.
+        if (RateLimiter::tooManyAttempts($lockoutKey, 1)) {
+            $seconds = RateLimiter::availableIn($lockoutKey);
 
             throw ValidationException::withMessages([
                 'password' => "تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار {$seconds} ثانية.",
@@ -72,22 +80,40 @@ class LockScreenController extends Controller
         }
 
         if (Hash::check($request->password, $user->password)) {
-            RateLimiter::clear($throttleKey);
+            RateLimiter::clear($attemptsKey);
+            RateLimiter::clear($lockoutKey);
             session()->forget('lockscreen_locked');
 
             return redirect()->intended(route('admin.dashboard'))
                 ->with('status', 'أهلاً بك مجدداً، تم فتح الشاشة بنجاح.');
         }
 
-        RateLimiter::hit($throttleKey, self::LOCKOUT_SECONDS);
+        $attempts = RateLimiter::hit($attemptsKey, self::LOCKOUT_SECONDS);
+
+        if ($attempts >= self::MAX_ATTEMPTS) {
+            // Start a fresh, full lockout window from the fifth failed attempt.
+            RateLimiter::clear($lockoutKey);
+            RateLimiter::hit($lockoutKey, self::LOCKOUT_SECONDS);
+
+            $seconds = RateLimiter::availableIn($lockoutKey);
+
+            return back()->withErrors([
+                'password' => "تم تجاوز عدد محاولات فتح الشاشة المسموح بها. يرجى الانتظار {$seconds} ثانية.",
+            ]);
+        }
 
         return back()->withErrors([
             'password' => 'كلمة المرور غير صحيحة، يرجى إعادة المحاولة.',
         ]);
     }
 
-    private function throttleKey(Request $request, $user): string
+    private function attemptsKey(Request $request, $user): string
     {
-        return 'lockscreen|' . $user->id . '|' . $request->ip();
+        return 'lockscreen:attempts|' . $user->id . '|' . $request->ip();
+    }
+
+    private function lockoutKey(Request $request, $user): string
+    {
+        return 'lockscreen:lockout|' . $user->id . '|' . $request->ip();
     }
 }
