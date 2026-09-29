@@ -73,6 +73,11 @@ class Employee extends Model
         return $this->hasMany(EmployeeDeduction::class);
     }
 
+    public function payrollDebts(): HasMany
+    {
+        return $this->hasMany(EmployeePayrollDebt::class);
+    }
+
     public function leaves(): HasMany
     {
         return $this->hasMany(EmployeeLeave::class);
