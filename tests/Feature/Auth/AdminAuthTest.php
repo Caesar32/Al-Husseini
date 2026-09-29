@@ -5,6 +5,7 @@ use App\Models\Branch;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\InitialDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
 
