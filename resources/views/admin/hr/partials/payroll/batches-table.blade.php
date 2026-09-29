@@ -30,7 +30,7 @@
                             </thead>
                             <tbody>
                                 @foreach($payrolls as $p)
-                                    <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}">
+                                    <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}" data-has-debt="{{ $p->items->contains(fn($item) => (float) $item->carried_debt > 0) ? '1' : '0' }}">
                                         <td><span class="badge bg-dark-subtle text-dark fs-12 fw-bold font-monospace">{{ $p->year }} / {{ sprintf('%02d', $p->month) }}</span></td>
                                         <td><span class="fw-semibold">{{ $p->branch?->name }}</span></td>
                                         <td>{{ number_format($p->total_basic_salaries) }} ج.م</td>
