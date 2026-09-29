@@ -250,6 +250,42 @@ class PayrollService implements PayrollServiceInterface
     }
 
     /**
+     * Validate payroll header totals against its immutable item breakdown.
+     *
+     * The item rows are the source of truth for approval/disbursement.
+     * Historical records with inconsistent stored totals must never be silently
+     * approved or disbursed.
+     */
+    private function assertPayrollTotalsConsistent(Payroll $payroll): void
+    {
+        $items = $payroll->items()->get();
+
+        $basic = round((float) $items->sum('basic_salary'), 2);
+        $allowances = round((float) $items->sum('total_allowance'), 2);
+        $deductions = round((float) $items->sum('total_deduction'), 2);
+        $net = round((float) $items->sum('net_salary'), 2);
+        $carriedDebt = round((float) $items->sum('carried_debt'), 2);
+
+        $expectedNet = round($basic + $allowances - $deductions + $carriedDebt, 2);
+
+        $headerMismatch =
+            abs((float) $payroll->total_basic - $basic) > 0.01 ||
+            abs((float) $payroll->total_allowances - $allowances) > 0.01 ||
+            abs((float) $payroll->total_deductions - $deductions) > 0.01 ||
+            abs((float) $payroll->total_net - $net) > 0.01;
+
+        $netMismatch = abs($net - $expectedNet) > 0.01;
+        $zeroWithComponents = abs($net) < 0.01 && ($basic + $allowances > 0 || $deductions > 0);
+
+        if ($headerMismatch || $netMismatch || $zeroWithComponents) {
+            throw new Exception(
+                "لا يمكن اعتماد أو صرف مسير الرواتب: إجماليات المسير لا تتطابق مع بنوده. " .
+                "المتوقع صافي {$expectedNet} ج.م، والمسجل {$net} ج.م. يجب تصحيح المسير قبل المتابعة."
+            );
+        }
+    }
+
+    /**
      * {@inheritDoc}
      */
     public function approvePayroll(Payroll $payroll, ?int $approvedBy = null, bool $confirmDebtReview = false): bool
@@ -257,6 +293,8 @@ class PayrollService implements PayrollServiceInterface
         if ($payroll->status !== 'draft') {
             throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
         }
+
+        $this->assertPayrollTotalsConsistent($payroll);
 
         $hasUnrecoveredDebt = $payroll->items()->where('carried_debt', '>', 0)->exists();
 
@@ -287,6 +325,8 @@ class PayrollService implements PayrollServiceInterface
             if ($payroll->status !== 'approved') {
                 throw new Exception("يجب اعتماد مسير الرواتب أولاً قبل الصرف.");
             }
+
+            $this->assertPayrollTotalsConsistent($payroll);
 
             $items = $payroll->items()->lockForUpdate()->get();
 
