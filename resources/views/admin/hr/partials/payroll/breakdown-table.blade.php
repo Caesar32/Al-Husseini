@@ -32,7 +32,10 @@
                                     $base = (float) ($emp->currentSalary?->basic_salary ?? 0);
                                     $allow = (float) (($emp->currentSalary?->housing_allowance ?? 0) + ($emp->currentSalary?->transport_allowance ?? 0) + ($emp->currentSalary?->other_allowances ?? 0));
                                     $empDeds = $recentDeductions->where('employee_id', $emp->id)->where('status', 'approved')->sum('amount');
-                                    $net = max(0, ($base + $allow) - $empDeds);
+                                    $gross = ($base + $allow);
+                                    $rawNet = $gross - $empDeds;
+                                    $net = max(0, $rawNet);
+                                    $shortfall = max(0, -$rawNet);
                                     $jobTitle = $emp->jobTitle?->title ?? $emp->jobTitle?->title_name ?? '';
                                     $deptName = $emp->jobTitle?->department?->name ?? '';
                                 @endphp
@@ -70,10 +73,21 @@
                                         @endif
                                     </td>
                                     <td>
-                                        <span class="fw-bold fs-14 text-success">{{ number_format($net) }} ج.م</span>
+                                        @if($shortfall > 0)
+                                            <div class="fw-bold fs-14 text-danger">{{ number_format($net) }} ج.م</div>
+                                            <small class="text-danger">عجز مرحّل: {{ number_format($shortfall) }} ج.م</small>
+                                        @else
+                                            <span class="fw-bold fs-14 text-success">{{ number_format($net) }} ج.م</span>
+                                        @endif
                                     </td>
                                     <td>
-                                        <span class="badge bg-success-subtle text-success fs-12 px-2 py-1"><i class="ri-check-double-line me-1"></i>جاهز للصرف</span>
+                                        @if($shortfall > 0)
+                                            <span class="badge bg-warning-subtle text-warning fs-12 px-2 py-1">
+                                                <i class="ri-error-warning-line me-1"></i>يتطلب مراجعة
+                                            </span>
+                                        @else
+                                            <span class="badge bg-success-subtle text-success fs-12 px-2 py-1"><i class="ri-check-double-line me-1"></i>جاهز للصرف</span>
+                                        @endif
                                     </td>
                                     <td class="text-center">
                                         <div class="d-flex gap-1 justify-content-center">
@@ -89,6 +103,7 @@
                                                 data-allow="{{ $allow }}"
                                                 data-ded="{{ $empDeds }}"
                                                 data-net="{{ $net }}"
+                                                data-shortfall="{{ $shortfall }}"
                                                 title="قسيمة الراتب">
                                                 <i class="ri-file-text-line me-1"></i> القسيمة
                                             </button>
