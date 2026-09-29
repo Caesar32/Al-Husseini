@@ -280,7 +280,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             </tr>
                             <tr>
                                 <td>إجمالي البدلات والمكافآت</td>
-                                <td class="text-end fw-bold text-info">+${allow.toLocaleString('ar-EG')}</td>
+                                <td class="text-end fw-bold text-info">${allow.toLocaleString('ar-EG')}</td>
                                 <td>تأمينات واستقطاعات أخرى</td>
                                 <td class="text-end fw-bold text-muted">0</td>
                             </tr>
@@ -296,12 +296,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     ${shortfall > 0 ? `
                     <div class="alert alert-warning text-start mb-4">
                         <strong><i class="ri-error-warning-line me-1"></i> يتطلب مراجعة قبل الصرف</strong>
-                        <div class="mt-1">الخصومات تجاوزت إجمالي الدخل بمبلغ <strong>${shortfall.toLocaleString('ar-EG')} جنيه مصري</strong>. تم تسجيل العجز كرصيد مستحق على الموظف ولا يُفقد عند إظهار صافي الراتب.</div>
+                        <div class="mt-1">الخصومات تجاوزت إجمالي الدخل بمبلغ <strong>${shortfall.toLocaleString('ar-EG')} ج.م</strong>. تم تسجيل العجز كرصيد مستحق على الموظف ولا يُفقد عند إظهار صافي الراتب.</div>
                     </div>` : ''}
                     <div class="${shortfall > 0 ? 'p-3 bg-warning-subtle' : 'p-3 bg-success-subtle'} rounded text-center mb-4">
                         <span class="text-muted fs-13 d-block mb-1">صافي الراتب المستحق للصرف النهائي:</span>
-                        <h3 class="fw-extrabold ${shortfall > 0 ? 'text-warning' : 'text-success'} mb-0">${net.toLocaleString('ar-EG')} جنيه مصري</h3>
-                        ${shortfall > 0 ? `<div class="text-danger fs-12 mt-2">الرصيد المرحّل المستحق: ${shortfall.toLocaleString('ar-EG')} جنيه مصري</div>` : ''}
+                        <h3 class="fw-extrabold ${shortfall > 0 ? 'text-warning' : 'text-success'} mb-0">${net.toLocaleString('ar-EG')} ج.م</h3>
+                        ${shortfall > 0 ? `<div class="text-danger fs-12 mt-2">الرصيد المرحّل المستحق: ${shortfall.toLocaleString('ar-EG')} ج.م</div>` : ''}
                     </div>
 
                     <div class="row pt-4 text-center fs-12 text-muted border-top">
