@@ -5,6 +5,7 @@ use App\Models\Branch;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\InitialDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
 
@@ -120,3 +121,62 @@ test('refresh csrf keep alive endpoint returns active status and valid token', f
     expect($response->json('csrf_token'))->not->toBeEmpty();
 });
 
+test('lock screen locks immediately after the fifth failed attempt and blocks the sixth attempt', function () {
+    $admin = User::where('email', 'admin@alhusseini.com')->first();
+    $this->actingAs($admin);
+
+    $throttleKey = 'lockscreen|' . $admin->id . '|127.0.0.1';
+    RateLimiter::clear($throttleKey);
+
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $this->post(route('admin.lockscreen.unlock'), [
+            'password' => 'wrong-password',
+        ])->assertRedirect();
+    }
+
+    $response = $this->get(route('admin.lockscreen'));
+
+    $response->assertOk();
+    $response->assertSee('تم إيقاف محاولات فتح الشاشة مؤقتاً');
+    $response->assertSee('id="lockout-countdown"', false);
+    $response->assertSee('disabled', false);
+
+    $response = $this->post(route('admin.lockscreen.unlock'), [
+        'password' => 'wrong-password',
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHasErrors('password');
+
+    RateLimiter::clear($throttleKey);
+});
+
+test('lock screen becomes available again after the lockout expires', function () {
+    $admin = User::where('email', 'admin@alhusseini.com')->first();
+    $this->actingAs($admin);
+
+    $throttleKey = 'lockscreen|' . $admin->id . '|127.0.0.1';
+    RateLimiter::clear($throttleKey);
+
+    for ($attempt = 1; $attempt <= 5; $attempt++) {
+        $this->post(route('admin.lockscreen.unlock'), [
+            'password' => 'wrong-password',
+        ]);
+    }
+
+    $this->travel(301)->seconds();
+
+    $response = $this->get(route('admin.lockscreen'));
+
+    $response->assertOk();
+    $response->assertDontSee('تم إيقاف محاولات فتح الشاشة مؤقتاً');
+    $response->assertSee('id="userpassword"', false);
+
+    $response = $this->post(route('admin.lockscreen.unlock'), [
+        'password' => '12345678',
+    ]);
+
+    $response->assertRedirect(route('admin.dashboard'));
+
+    RateLimiter::clear($throttleKey);
+});
