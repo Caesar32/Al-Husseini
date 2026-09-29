@@ -104,13 +104,17 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.btn-approve-payroll').forEach(btn => {
         btn.onclick = function() {
             const id = this.getAttribute('data-id');
+            const batchRow = this.closest('tr.payroll-batch-row');
+            const hasDebt = batchRow?.getAttribute('data-has-debt') === '1';
 
             Swal.fire({
-                title: 'اعتماد مسير الرواتب',
-                text: 'هل أنت متأكد من اعتماد هذا المسير وإرساله للصرف النهائي؟',
-                icon: 'question',
+                title: hasDebt ? 'اعتماد مسير يحتوي على أرصدة مرحّلة' : 'اعتماد مسير الرواتب',
+                text: hasDebt
+                    ? 'يوجد موظفون لديهم مبالغ غير مستردة بسبب تجاوز الخصومات للدخل. راجع القسائم والأرصدة المرحّلة قبل تأكيد الاعتماد.'
+                    : 'هل أنت متأكد من اعتماد هذا المسير وإرساله للصرف النهائي؟',
+                icon: hasDebt ? 'warning' : 'question',
                 showCancelButton: true,
-                confirmButtonText: 'نعم، اعتماد الآن',
+                confirmButtonText: hasDebt ? 'راجعت الأرصدة، اعتماد المسير' : 'نعم، اعتماد الآن',
                 cancelButtonText: 'إلغاء'
             }).then((res) => {
                 if (res.isConfirmed) {
