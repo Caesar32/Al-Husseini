@@ -262,11 +262,12 @@ class PayrollService implements PayrollServiceInterface
 
         $basic = round((float) $items->sum('basic_salary'), 2);
         $allowances = round((float) $items->sum('total_allowance'), 2);
+        $overtime = round((float) $items->sum('total_overtime'), 2);
         $deductions = round((float) $items->sum('total_deduction'), 2);
         $net = round((float) $items->sum('net_salary'), 2);
         $carriedDebt = round((float) $items->sum('carried_debt'), 2);
 
-        $expectedNet = round($basic + $allowances - $deductions + $carriedDebt, 2);
+        $expectedNet = round($basic + $allowances + $overtime - $deductions + $carriedDebt, 2);
 
         $headerMismatch =
             abs((float) $payroll->total_basic - $basic) > 0.01 ||
