@@ -17,9 +17,10 @@ return [
     | Manager Override
     |--------------------------------------------------------------------------
     |
-    | Hashed manager override code. Use env MANAGER_OVERRIDE_CODE_HASH
-    | or plain code MANAGER_OVERRIDE_CODE (will be hashed on first use).
-    | No default fallback — must be explicitly configured.
+    | Secret required to approve credit-limit overrides and discounts/below-retail
+    | prices at POS. Prefer MANAGER_OVERRIDE_CODE_HASH (output of Hash::make);
+    | MANAGER_OVERRIDE_CODE is a plain secret compared in constant time.
+    | There is no default and no fallback: if neither is set, overrides are refused.
     |
     */
     'manager_override_code' => env('MANAGER_OVERRIDE_CODE', null),

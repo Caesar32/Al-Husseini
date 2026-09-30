@@ -290,7 +290,8 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         $product = Product::first();
         $product->update(['current_stock' => 10, 'retail_price' => 2500.00]);
 
-        // البيع مع كود موافقة المدير الصحيح mgr_override_99
+        // البيع مع كود موافقة المدير الصحيح (سر مُعدّ صراحة في الإعدادات، لا يوجد كود افتراضي)
+        config(['finance.manager_override_hash' => \Illuminate\Support\Facades\Hash::make('supervisor-secret')]);
         $validPayload = [
             'branch_id'             => $this->branch->id,
             'customer_id'           => $customer->id,
@@ -307,7 +308,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
             'payments'              => [
                 ['method' => 'credit', 'amount' => 2500.00],
             ],
-            'manager_override_code' => 'mgr_override_99',
+            'manager_override_code' => 'supervisor-secret',
         ];
 
         $invoice = $posService->processPosSale($validPayload, $this->cashier->id);

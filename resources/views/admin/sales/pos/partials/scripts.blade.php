@@ -991,7 +991,7 @@ function submitFullInvoice() {
                     title: 'مطلوب إذن وموافقة المشرف',
                     text: overrideMsg,
                     input: 'password',
-                    inputPlaceholder: 'أدخل PIN أو كلمة مرور المشرف (الافتراضي 9999)',
+                    inputPlaceholder: 'أدخل كود موافقة المشرف',
                     showCancelButton: true,
                     confirmButtonText: 'تأكيد الصلاحية والمتابعة',
                     cancelButtonText: 'إلغاء'

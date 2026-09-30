@@ -455,19 +455,33 @@ class SystemDiagnosticService
                     $rejectedWithoutCode = true;
                 }
 
-                // المحاولة مع كود المدير المعتمد
-                $invoiceOverridden = $posService->processPosSale([
-                    'branch_id'             => $branch->id,
-                    'customer_id'           => $customer->id,
-                    'technician_id'         => $technician->id,
-                    'manager_override_code' => 'mgr_override_99',
-                    'items'                 => [
-                        ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 2500.00],
-                    ],
-                    'payments'              => [
-                        ['method' => 'credit', 'amount' => 2500.00],
-                    ],
-                ], $user->id);
+                // المحاولة مع كود المدير المعتمد: كود عشوائي مؤقت يُضبط في الإعدادات أثناء المحاكاة فقط
+                // (لا يوجد كود ثابت داخل النظام؛ الإعداد الأصلي يُستعاد بعد الاستدعاء).
+                $simulationCode = bin2hex(random_bytes(8));
+                $originalOverride = [
+                    'finance.manager_override_hash' => config('finance.manager_override_hash'),
+                    'finance.manager_override_code' => config('finance.manager_override_code'),
+                ];
+                config([
+                    'finance.manager_override_hash' => \Illuminate\Support\Facades\Hash::make($simulationCode),
+                    'finance.manager_override_code' => null,
+                ]);
+                try {
+                    $invoiceOverridden = $posService->processPosSale([
+                        'branch_id'             => $branch->id,
+                        'customer_id'           => $customer->id,
+                        'technician_id'         => $technician->id,
+                        'manager_override_code' => $simulationCode,
+                        'items'                 => [
+                            ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 2500.00],
+                        ],
+                        'payments'              => [
+                            ['method' => 'credit', 'amount' => 2500.00],
+                        ],
+                    ], $user->id);
+                } finally {
+                    config($originalOverride);
+                }
 
                 $creditLimitPassed = $rejectedWithoutCode && ($invoiceOverridden !== null);
                 $steps[] = [
