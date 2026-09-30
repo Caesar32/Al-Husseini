@@ -101,7 +101,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/system-diagnostics/simulate', [SystemDiagnosticController::class, 'runSimulation'])->name('diagnostics.run_simulation')->middleware('can:settings.manage');
 
         // إدارة الأدوار وتحديد الصلاحيات (Roles & Permissions)
-        Route::resource('roles', RoleController::class)->middleware('can:roles.manage');
+        Route::resource('roles', RoleController::class)->except(['show'])->middleware('can:roles.manage');
 
         // إدارة المستخدمين وحسابات الموظفين (User Accounts & Role Assignments)
         Route::get('/users', [UserController::class, 'index'])->name('users.index')->middleware('can:users.manage');
@@ -162,12 +162,21 @@ Route::prefix('admin')->name('admin.')->group(function () {
         });
 
         // قطاع الموردين والتوريدات
-        Route::resource('suppliers', SupplierController::class);
+        // Supplier creation happens through the modal on the index page (there is no create view).
+        Route::resource('suppliers', SupplierController::class)
+            ->except(['create'])
+            ->middlewareFor(['index', 'show'], 'can:suppliers.view')
+            ->middlewareFor('store', 'can:suppliers.create')
+            ->middlewareFor(['edit', 'update'], 'can:suppliers.edit')
+            ->middlewareFor('destroy', 'can:suppliers.delete');
         Route::get('suppliers/{supplier}/ledger', [SupplierController::class, 'ledger'])->name('suppliers.ledger')->middleware('can:suppliers.view');
         Route::post('suppliers/{supplier}/payments', [SupplierController::class, 'recordPayment'])->name('suppliers.payments')->middleware('can:purchases.settle_payment');
 
         // فواتير المشتريات والتوريد
-        Route::resource('purchases', PurchaseInvoiceController::class)->except(['edit', 'update', 'destroy']);
+        Route::resource('purchases', PurchaseInvoiceController::class)
+            ->except(['edit', 'update', 'destroy'])
+            ->middlewareFor(['index', 'show'], 'can:purchases.view')
+            ->middlewareFor(['create', 'store'], 'can:purchases.create');
         Route::get('purchases/{purchase}/print', [PurchaseInvoiceController::class, 'print'])->name('purchases.print')->middleware('can:purchases.view');
 
         // نقطة البيع ومبيعات الكاشير

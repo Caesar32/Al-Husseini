@@ -10,7 +10,7 @@ class UpdateSupplierRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return (bool) $this->user()?->can('suppliers.edit');
     }
 
     public function rules(): array
