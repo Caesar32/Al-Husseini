@@ -57,6 +57,7 @@ test('cashier cannot apply discount without supervisor override code', function 
     $battery->update(['current_stock' => 10, 'retail_price' => 3000]);
 
     $response = $this->actingAs($cashier)->postJson(route('admin.pos.store'), [
+        'branch_id' => \App\Models\Branch::first()->id,
         'technician_id' => $technician->id,
         'items' => [
             [
@@ -83,6 +84,7 @@ test('cashier can apply discount with valid supervisor override code', function 
     $battery->update(['current_stock' => 10, 'retail_price' => 3000]);
 
     $response = $this->actingAs($cashier)->postJson(route('admin.pos.store'), [
+        'branch_id' => \App\Models\Branch::first()->id,
         'technician_id'         => $technician->id,
         'items' => [
             [

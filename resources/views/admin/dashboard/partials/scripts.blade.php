@@ -13,19 +13,43 @@ function changeSalesPeriod(periodKey, triggerEl) {
     if (!salesPeriodsData || !salesPeriodsData[periodKey]) return;
     const period = salesPeriodsData[periodKey];
 
-    // 1. Update text & numbers with a subtle transition
-    const totalEl = document.getElementById('dashTotalSales');
-    const countEl = document.getElementById('dashInvoicesCount');
-    const badgeEl = document.getElementById('dashSalesPeriodBadgeText');
-    const sublabelEl = document.getElementById('dashInvoicesSublabel');
-    const linkEl = document.getElementById('dashInvoicesLink');
+    // 1. تحديث الأرقام والنصوص بانيميشن ناعم
+    const revenueEl           = document.getElementById('dashTotalRevenue');
+    const salesEl             = document.getElementById('dashTotalSales');
+    const countEl             = document.getElementById('dashInvoicesCount');
+    const badgeEl             = document.getElementById('dashSalesPeriodBadgeText');
+    const sublabelEl          = document.getElementById('dashInvoicesSublabel');
+    const linkEl              = document.getElementById('dashInvoicesLink');
+    const creditCollectedEl   = document.getElementById('dashCreditCollected');
+    const creditCollectedWrap = document.getElementById('dashCreditCollectedWrap');
 
-    if (totalEl) {
-        totalEl.style.opacity = '0.3';
+    // الإيراد النقدي الفعلي (paid + تحصيلات الآجل)
+    if (revenueEl) {
+        revenueEl.style.opacity = '0.3';
         setTimeout(() => {
-            totalEl.textContent = period.total_formatted;
-            totalEl.style.opacity = '1';
+            revenueEl.textContent = period.revenue_formatted || period.total_formatted;
+            revenueEl.style.opacity = '1';
         }, 120);
+    }
+
+    // قيمة الفواتير الصادرة (دفترية)
+    if (salesEl) {
+        salesEl.style.opacity = '0.3';
+        setTimeout(() => {
+            salesEl.textContent = period.total_formatted;
+            salesEl.style.opacity = '1';
+        }, 120);
+    }
+
+    // تحصيلات الآجل للفترة
+    if (creditCollectedEl && creditCollectedWrap) {
+        const creditAmt = period.credit_collected || 0;
+        if (creditAmt > 0) {
+            creditCollectedEl.textContent = period.credit_collected_fmt || (creditAmt.toLocaleString('ar-EG') + ' ج.م');
+            creditCollectedWrap.style.display = '';
+        } else {
+            creditCollectedWrap.style.display = 'none';
+        }
     }
 
     if (countEl) countEl.textContent = period.count;
@@ -33,7 +57,7 @@ function changeSalesPeriod(periodKey, triggerEl) {
     if (sublabelEl) sublabelEl.textContent = period.sublabel;
     if (linkEl && period.invoices_url) linkEl.href = period.invoices_url;
 
-    // 2. Update active states on Card pills (.segmented-btn)
+    // 2. تحديث الحالة النشطة على الأزرار (Segmented)
     document.querySelectorAll('.sales-period-pill').forEach(btn => {
         if (btn.dataset.period === periodKey) {
             btn.classList.add('active');
@@ -42,7 +66,7 @@ function changeSalesPeriod(periodKey, triggerEl) {
         }
     });
 
-    // 3. Update active states on Welcome bar buttons if present
+    // 3. تحديث الحالة النشطة على أزرار شريط الترحيب
     document.querySelectorAll('.welcome-period-btn').forEach(btn => {
         if (btn.dataset.period === periodKey) {
             btn.classList.remove('btn-ghost-secondary', 'text-muted');
@@ -53,18 +77,19 @@ function changeSalesPeriod(periodKey, triggerEl) {
         }
     });
 
-    // 4. Save preference in localStorage
+    // 4. حفظ التفضيل في localStorage
     try {
         localStorage.setItem('alhusseini_dashboard_sales_period', periodKey);
     } catch(e) {}
 
-    // 5. Update browser URL query without full reload
+    // 5. تحديث URL بدون إعادة تحميل
     if (window.history && window.history.replaceState) {
         const url = new URL(window.location);
         url.searchParams.set('sales_period', periodKey);
         window.history.replaceState({}, '', url);
     }
 }
+
 
 document.addEventListener('DOMContentLoaded', function () {
     renderDashboardCharts();
@@ -79,12 +104,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     window.addEventListener('alhusseini-sales-updated', function () {
-        if (window.AlHusseiniSales) {
-            loadKPIStats();
-            loadRecentInvoicesTable();
-            loadCreditDuesList();
-            loadLowStockAlerts();
-        }
+        // ⚠️ الجداول والكروت (الفواتير الأخيرة / الآجل / المخزون) مرندَّرة من السيرفر ببيانات DB حقيقية
+        // لا نسمح لـ Mock JS Store بالكتابة فوقها لمنع ظاهرة "flash ثم رجوع".
+        // loadKPIStats يقرأ من salesPeriodsData (بيانات السيرفر) فقط.
+        loadKPIStats();
     });
 
     window.addEventListener('alhusseini-hr-updated', function () {
@@ -100,37 +123,36 @@ function initAlHusseiniDashboard() {
 
 // 1. KPI Stats
 function loadKPIStats() {
-    const invoices = window.AlHusseiniSales.getInvoices();
-    const customers = window.AlHusseiniSales.getCustomers();
-    const products = window.AlHusseiniSales.getProducts();
-
-    // Total sales (respect active period)
-    const activePeriodBtn = document.querySelector('.sales-period-pill.btn-success');
-    const activePeriod = activePeriodBtn ? activePeriodBtn.dataset.period : 'all';
+    // المبيعات والإيراد: نستخدم دائماً بيانات السيرفر (salesPeriodsData) وليس الـ mock store
+    const activePeriodBtn = document.querySelector('.sales-period-pill.active');
+    const activePeriod    = activePeriodBtn ? activePeriodBtn.dataset.period : '{{ $selectedPeriodKey ?? "all" }}';
     if (activePeriod && salesPeriodsData && salesPeriodsData[activePeriod]) {
-        document.getElementById('dashTotalSales').textContent = salesPeriodsData[activePeriod].total_formatted;
-        document.getElementById('dashInvoicesCount').textContent = salesPeriodsData[activePeriod].count;
-    } else {
-        const totalSales = invoices.reduce((sum, inv) => sum + (Number(inv.totalAmount) || 0), 0);
-        document.getElementById('dashTotalSales').textContent = window.AlHusseiniSales.formatCurrency(totalSales);
-        document.getElementById('dashInvoicesCount').textContent = invoices.length;
+        const p = salesPeriodsData[activePeriod];
+        const revenueEl = document.getElementById('dashTotalRevenue');
+        const salesEl   = document.getElementById('dashTotalSales');
+        if (revenueEl) revenueEl.textContent = p.revenue_formatted || p.total_formatted;
+        if (salesEl)   salesEl.textContent   = p.total_formatted;
+        const countEl = document.getElementById('dashInvoicesCount');
+        if (countEl) countEl.textContent = p.count;
+
+        // تحصيلات الآجل للفترة
+        const creditCollectedEl   = document.getElementById('dashCreditCollected');
+        const creditCollectedWrap = document.getElementById('dashCreditCollectedWrap');
+        if (creditCollectedEl && creditCollectedWrap) {
+            const creditAmt = p.credit_collected || 0;
+            if (creditAmt > 0) {
+                creditCollectedEl.textContent = p.credit_collected_fmt || (creditAmt.toLocaleString('ar-EG') + ' ج.م');
+                creditCollectedWrap.style.display = '';
+            } else {
+                creditCollectedWrap.style.display = 'none';
+            }
+        }
     }
-
-    // Total Credit (الآجل)
-    const totalCredit = customers.reduce((sum, c) => sum + (Number(c.creditBalance) || 0), 0);
-    document.getElementById('dashTotalCredit').textContent = window.AlHusseiniSales.formatCurrency(totalCredit);
-    const creditCustCount = customers.filter(c => Number(c.creditBalance) > 0).length;
-    document.getElementById('dashCreditCustomersCount').textContent = creditCustCount;
-
-    // Customers count
-    document.getElementById('dashCustomersCount').textContent = customers.length;
-
-    // Products & Low stock count
-    const lowStock = products.filter(p => p.stock !== undefined && p.stock <= 10);
-    document.getElementById('dashProductsCount').textContent = products.length;
-    document.getElementById('dashLowStockCount').textContent = lowStock.length;
-    document.getElementById('dashLowStockBadge').textContent = `${products.length} صنف متاح`;
+    // ⚠️ باقي الكروت (الآجل، العملاء، المخزون) مرندَّرة من السيرفر ببيانات DB صحيحة.
+    // لا نكتب عليها من mock store لمنع ظاهرة Flash-then-Revert.
 }
+
+
 
 // 2. Recent Invoices Table
 function loadRecentInvoicesTable() {

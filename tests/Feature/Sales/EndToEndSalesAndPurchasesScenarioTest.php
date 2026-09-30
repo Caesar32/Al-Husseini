@@ -349,7 +349,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
                 'final_amount'   => 3000,
                 'paid_amount'    => 3000,
                 'payment_method' => 'cash',
-                'payment_status' => 'paid',
+                'status' => 'paid',
             ]);
         });
 

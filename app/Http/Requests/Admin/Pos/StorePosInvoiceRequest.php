@@ -175,9 +175,16 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
 
-            // 4. Validate Final Amount vs Payments Sum
-            $tax = (float) $this->input('tax_amount', 0);
-            $finalAmount = max(0, ($subtotal + $tax) - $discount - $scrapDeduction);
+            // 4. Validate Discount + Scrap does not exceed gross
+            $tax = round((float) $this->input('tax_amount', 0), 2);
+            $gross = round($subtotal + $tax, 2);
+            if ($discount + $scrapDeduction > $gross + 0.01) {
+                $validator->errors()->add(
+                    'discount_amount',
+                    'مجموع الخصم وخصم الكهنة (' . number_format($discount + $scrapDeduction, 2) . ' ج.م) يتجاوز إجمالي الفاتورة قبل الخصم (' . number_format($gross, 2) . ' ج.م).'
+                );
+            }
+            $finalAmount = round(max(0, $gross - $discount - $scrapDeduction), 2);
 
             $payments = $this->input('payments', []);
             $totalPayments = 0.0;
@@ -191,7 +198,8 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
 
-            if (abs($totalPayments - $finalAmount) > 0.05) {
+            $eps = (float) config('finance.epsilon', 0.01);
+            if (abs($totalPayments - $finalAmount) > $eps) {
                 $validator->errors()->add(
                     'payments',
                     sprintf(
@@ -237,28 +245,7 @@ class StorePosInvoiceRequest extends FormRequest
 
     protected function isManagerOverrideValid(?string $code): bool
     {
-        if (empty($code)) {
-            return false;
-        }
-
-        // 1. Check fixed system override pin if configured
-        $configuredCode = (string) config('app.manager_override_code', '9999');
-        if ($code === $configuredCode) {
-            return true;
-        }
-
-        // 2. Check if code matches password of any user with admin or manager role
-        $managers = User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['admin', 'manager', 'branch_manager', 'super-admin', 'branch-manager']);
-        })->get();
-
-        foreach ($managers as $manager) {
-            if (Hash::check($code, $manager->password)) {
-                return true;
-            }
-        }
-
-        return false;
+        return app(\App\Services\Finance\ManagerOverrideService::class)->isValid($code);
     }
 
     public function messages(): array

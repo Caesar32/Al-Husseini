@@ -13,13 +13,23 @@ use App\Models\ScrapBatteriesInventory;
 use App\Models\ScrapPricingTier;
 use App\Models\TechnicianCommission;
 use App\Models\Warranty;
+use App\Services\Finance\ManagerOverrideService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PosOrderService implements PosOrderServiceInterface
 {
+    private const EPSILON = 0.01;
+
+    private function epsilon(): float
+    {
+        return (float) config('finance.epsilon', self::EPSILON);
+    }
     public function getPaginatedInvoices(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
+        $filter = InvoiceFilter::fromArray($filters);
+
         $query = Invoice::query()
             ->with([
                 'customer:id,name,phone',
@@ -31,34 +41,24 @@ class PosOrderService implements PosOrderServiceInterface
                 'branch:id,name',
             ]);
 
-        if (!empty($filters['search'])) {
-            $search = trim($filters['search']);
-            $query->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
-        }
-
-        if (!empty($filters['branch_id'])) {
-            $query->where('branch_id', $filters['branch_id']);
-        }
-
-        if (!empty($filters['date_from'])) {
-            $query->whereDate('created_at', '>=', $filters['date_from']);
-        }
-
-        if (!empty($filters['date_to'])) {
-            $query->whereDate('created_at', '<=', $filters['date_to']);
-        }
+        $filter->apply($query);
 
         return $query->latest('id')->paginate($perPage)->withQueryString();
+    }
+
+    public function getInvoiceStats(array $filters = []): array
+    {
+        $filter = InvoiceFilter::fromArray($filters);
+        $base = Invoice::query();
+        $filter->applyForStats($base);
+
+        return [
+            'total_sales'            => (float) (clone $base)->sum('final_amount'),
+            'invoices_count'         => (int) (clone $base)->count(),
+            'credit_invoices_count'  => (int) (clone $base)->where('remaining_amount', '>', 0)->count(),
+            'total_remaining_credit' => (float) (clone $base)->sum('remaining_amount'),
+            'scrap_count'            => (int) (clone $base)->where('scrap_deduction_amount', '>', 0)->count(),
+        ];
     }
 
     public function processPosSale(array $data, int $cashierUserId): Invoice
@@ -125,9 +125,17 @@ class PosOrderService implements PosOrderServiceInterface
                 }
             }
 
-            $discountAmount = (float) ($data['discount_amount'] ?? 0);
-            $taxAmount = (float) ($data['tax_amount'] ?? 0);
-            $finalAmount = round(max(0, $subtotal + $taxAmount - $discountAmount - $scrapDeduction), 2);
+            $discountAmount = round((float) ($data['discount_amount'] ?? 0), 2);
+            $taxAmount = round((float) ($data['tax_amount'] ?? 0), 2);
+            $scrapDeduction = round($scrapDeduction, 2);
+            $gross = round($subtotal + $taxAmount, 2);
+            if ($discountAmount + $scrapDeduction > $gross + 0.01) {
+                throw new \DomainException('مجموع الخصم وخصم الكهنة (' . number_format($discountAmount + $scrapDeduction, 2) . ' ج.م) يتجاوز إجمالي الفاتورة قبل الخصم (' . number_format($gross, 2) . ' ج.م).');
+            }
+            $finalAmount = round($gross - $discountAmount - $scrapDeduction, 2);
+            if ($finalAmount < -0.01) {
+                throw new \LogicException('صافي الفاتورة سالب بعد الخصم.');
+            }
 
             // 3. Process Payments & Customer Credit validation with pessimistic lock
             $paymentsData = $data['payments'] ?? [];
@@ -150,7 +158,7 @@ class PosOrderService implements PosOrderServiceInterface
             }
 
             $totalPaid = round($totalPaid, 2);
-            if (abs($totalPaid - $finalAmount) > 0.05) {
+            if (abs($totalPaid - $finalAmount) > $this->epsilon()) {
                 throw new \DomainException(
                     sprintf(
                         'إجمالي مبالغ الدفع (%s ج.م) لا يتطابق مع صافي الفاتورة (%s ج.م).',
@@ -190,7 +198,10 @@ class PosOrderService implements PosOrderServiceInterface
             $invoicePaymentMethod = count($paymentMethodsUsed) > 1 ? 'split' : ($paymentMethodsUsed[0] ?? 'cash');
 
             // 4. Generate unique atomic invoice number
-            $branchId = $data['branch_id'] ?? auth()->user()?->branch_id ?? 1;
+            $branchId = $data['branch_id'] ?? \App\Models\User::find($cashierUserId)?->branch_id ?? auth()->user()?->branch_id ?? null;
+            if (empty($branchId)) {
+                throw new \InvalidArgumentException('الفرع مطلوب لإنشاء الفاتورة.');
+            }
             $invoiceNumber = 'INV-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
 
             $invoice = Invoice::withoutEvents(function () use ($invoiceNumber, $branchId, $customerId, $data, $cashierUserId, $subtotal, $discountAmount, $scrapDeduction, $taxAmount, $finalAmount, $totalPaid, $creditAmount, $invoicePaymentMethod) {
@@ -334,6 +345,9 @@ class PosOrderService implements PosOrderServiceInterface
             if ($invoice->status === 'refunded') {
                 throw new \DomainException('لا يمكن إجراء مرتجع على فاتورة مُرتجعة مسبقاً.');
             }
+            if ($invoice->status === 'cancelled') {
+                throw new \DomainException('لا يمكن إجراء مرتجع على فاتورة ملغاة.');
+            }
 
             $refundTotal = 0.0;
             $invoiceItems = $invoice->items->keyBy('product_id');
@@ -359,47 +373,75 @@ class PosOrderService implements PosOrderServiceInterface
                 }
             }
 
-            // ─── FIX-4: إصلاح محاسبة الآجل عند المرتجع ─────────────────────────────────
-            // إذا كانت الفاتورة تحمل متبقياً آجلاً، يجب خصم قيمة المرتجع من مديونية العميل
-            // وتسجيل قيد (refund) في دفتر أستاذ الآجل لضمان دقة الرصيد المحاسبي.
-            if ($invoice->remaining_amount > 0 && $invoice->customer_id) {
-                $customer = Customer::where('id', $invoice->customer_id)->lockForUpdate()->firstOrFail();
+            $refundTotal = round($refundTotal, 2);
+            $isFullReturn = $refundTotal >= ((float) $invoice->final_amount - 0.01);
 
-                // الخصم لا يتجاوز المتبقي الآجل للفاتورة فعلياً
-                $creditRefund = min((float) $refundTotal, (float) $invoice->remaining_amount);
+            // ─── إصلاح محاسبة الآجل والنقدي عند المرتجع ───────────────────────────────
+            $creditRefund = 0.0;
+            $cashRefund = 0.0;
 
-                if ($creditRefund > 0.01) {
-                    $balanceBefore = (float) $customer->current_credit_balance;
-                    $balanceAfter  = max(0, $balanceBefore - $creditRefund);
-
-                    $customer->update(['current_credit_balance' => $balanceAfter]);
-
-                    CreditLedgerEntry::create([
-                        'customer_id'   => $customer->id,
-                        'invoice_id'    => $invoice->id,
-                        'entry_type'    => 'refund',
-                        'amount'        => $creditRefund,
-                        'balance_before'=> $balanceBefore,
-                        'balance_after' => $balanceAfter,
-                        'collected_by'  => $cashierUserId,
-                        'notes'         => "تسوية آجل ناتجة عن مرتجع فاتورة رقم {$invoice->invoice_number}. السبب: {$reason}",
-                    ]);
-
-                    // تحديث متبقي الفاتورة بعد تسوية الآجل
-                    $invoice->update([
-                        'remaining_amount' => max(0, (float) $invoice->remaining_amount - $creditRefund),
-                    ]);
-                }
+            if ($invoice->customer_id) {
+                $creditRefund = min($refundTotal, max(0, (float) $invoice->remaining_amount));
+                $cashRefund = round(max(0, $refundTotal - $creditRefund), 2);
+            } else {
+                // Walk-in customer: all refund is cash
+                $cashRefund = $refundTotal;
             }
+
+            // Credit portion: reduce customer balance and ledger
+            if ($creditRefund > 0.01 && $invoice->customer_id) {
+                $customer = Customer::where('id', $invoice->customer_id)->lockForUpdate()->firstOrFail();
+                $balanceBefore = (float) $customer->current_credit_balance;
+                $balanceAfter  = max(0, round($balanceBefore - $creditRefund, 2));
+
+                $customer->update(['current_credit_balance' => $balanceAfter]);
+
+                CreditLedgerEntry::create([
+                    'customer_id'   => $customer->id,
+                    'invoice_id'    => $invoice->id,
+                    'entry_type'    => 'refund',
+                    'amount'        => $creditRefund,
+                    'balance_before'=> $balanceBefore,
+                    'balance_after' => $balanceAfter,
+                    'collected_by'  => $cashierUserId,
+                    'notes'         => "تسوية آجل ناتجة عن مرتجع فاتورة رقم {$invoice->invoice_number}. السبب: {$reason}",
+                ]);
+
+                $invoice->remaining_amount = max(0, round((float) $invoice->remaining_amount - $creditRefund, 2));
+            }
+
+            // Cash portion: create negative payment and reduce paid_amount
+            if ($cashRefund > 0.01) {
+                InvoicePayment::create([
+                    'invoice_id'            => $invoice->id,
+                    'payment_method'        => 'cash',
+                    'amount'                => -$cashRefund,
+                    'transaction_reference' => 'REFUND-' . $invoice->invoice_number,
+                    'notes'                 => "مرتجع نقدي لفاتورة {$invoice->invoice_number}. السبب: {$reason}",
+                ]);
+
+                $invoice->paid_amount = max(0, round((float) $invoice->paid_amount - $cashRefund, 2));
+            }
+
+            // Persist remaining/paid adjustments if needed (already set on model)
+            // Ensure we save the model fields before status update
+            $invoice->save();
+
             // ─────────────────────────────────────────────────────────────────────────────
 
-            // Adjust invoice status
+            // Adjust invoice status: refunded vs partially_refunded
+            $newStatus = $isFullReturn ? 'refunded' : 'partially_refunded';
+            // If already partially_refunded and this return makes it fully refunded, keep refunded
+            if ($invoice->status === 'partially_refunded' && !$isFullReturn) {
+                $newStatus = 'partially_refunded';
+            }
+
             $invoice->update([
-                'status' => 'refunded',
-                'notes'  => trim($invoice->notes . "\nمرتجع بقيمة {$refundTotal} ج.م. السبب: {$reason}"),
+                'status' => $newStatus,
+                'notes'  => trim(($invoice->notes ?? '') . "\nمرتجع بقيمة {$refundTotal} ج.م. السبب: {$reason}"),
             ]);
 
-            return $invoice->fresh(['items.product', 'customer']);
+            return $invoice->fresh(['items.product', 'customer', 'payments']);
         });
     }
 
@@ -415,43 +457,38 @@ class PosOrderService implements PosOrderServiceInterface
 
     public function getDailyCashierSummary(int $branchId, string $date): array
     {
+        // DB aggregation for financial totals (FIN-H08) — avoids loading all rows into PHP
+        $baseInvoiceQuery = Invoice::where('branch_id', $branchId)
+            ->whereDate('created_at', $date)
+            ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']);
+
+        $totalSales = (float) $baseInvoiceQuery->clone()->sum('final_amount');
+        $totalScrapDeductions = (float) $baseInvoiceQuery->clone()->sum('scrap_deduction_amount');
+        $invoicesCount = (int) $baseInvoiceQuery->clone()->count();
+
+        // Payments aggregated in DB
+        $paymentBase = InvoicePayment::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']));
+        $totalCash = (float) $paymentBase->clone()->where('payment_method', 'cash')->sum('amount');
+        $totalCard = (float) $paymentBase->clone()->where('payment_method', 'card')->sum('amount');
+        $totalCredit = (float) $paymentBase->clone()->where('payment_method', 'credit')->sum('amount');
+
+        // Batteries count via DB
+        $batteriesCount = (int) \App\Models\InvoiceItem::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']))
+            ->whereHas('product', fn($q) => $q->where('is_battery', true))
+            ->sum('quantity');
+
+        // Still load invoices for detailed return (with relations) — but limited to needed data
         $invoices = Invoice::where('branch_id', $branchId)
             ->whereDate('created_at', $date)
+            ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])
             ->with(['payments', 'items.product', 'customer:id,name', 'technician:id,full_name'])
             ->get();
-
-        $totalSales = (float) $invoices->sum('final_amount');
-        $totalCash = 0.0;
-        $totalCard = 0.0;
-        $totalCredit = 0.0;
-        $totalScrapDeductions = (float) $invoices->sum('scrap_deduction_amount');
-
-        foreach ($invoices as $inv) {
-            foreach ($inv->payments as $payment) {
-                if ($payment->payment_method === 'cash') {
-                    $totalCash += (float) $payment->amount;
-                } elseif ($payment->payment_method === 'card') {
-                    $totalCard += (float) $payment->amount;
-                } elseif ($payment->payment_method === 'credit') {
-                    $totalCredit += (float) $payment->amount;
-                }
-            }
-        }
-
-        $batteriesCount = 0;
-        foreach ($invoices as $inv) {
-            foreach ($inv->items as $item) {
-                if ($item->product?->is_battery) {
-                    $batteriesCount += $item->quantity;
-                }
-            }
-        }
 
         return [
             'date'                  => $date,
             'branch_id'             => $branchId,
-            'invoices_count'        => $invoices->count(),
-            'total_sales'           => $totalSales,
+            'invoices_count'        => $invoicesCount,
+            'total_sales'           => round($totalSales, 2),
             'total_cash'            => round($totalCash, 2),
             'total_card'            => round($totalCard, 2),
             'total_credit'          => round($totalCredit, 2),
@@ -463,6 +500,8 @@ class PosOrderService implements PosOrderServiceInterface
 
     /**
      * تحصيل دفعة من عميل آجل وتحديث رصيده ودفتر الأستاذ.
+     * يوزع الدفعة على الفواتير المفتوحة بنظام FIFO (الأقدم أولاً) لضمان تطابق
+     * customer.current_credit_balance مع مجموع invoice.remaining_amount.
      *
      * @throws \DomainException إذا كان المبلغ يتجاوز الرصيد المدين أو العميل ليس مديناً
      */
@@ -483,12 +522,18 @@ class PosOrderService implements PosOrderServiceInterface
             $customer = Customer::where('id', $customerId)->lockForUpdate()->firstOrFail();
 
             $currentBalance = (float) $customer->current_credit_balance;
+            $eps = $this->epsilon();
 
-            if ($currentBalance <= 0.01) {
+            // Idempotency: prevent duplicate receipt_number
+            if (!empty($receiptNumber) && CreditLedgerEntry::where('receipt_number', $receiptNumber)->exists()) {
+                throw new \DomainException('رقم الإيصال (' . $receiptNumber . ') مستخدم مسبقاً.');
+            }
+
+            if ($currentBalance <= $eps) {
                 throw new \DomainException("العميل ({$customer->name}) ليس عليه أي مديونية آجل مستحقة.");
             }
 
-            if ($amount > $currentBalance + 0.01) {
+            if ($amount > $currentBalance + $eps) {
                 throw new \DomainException(
                     sprintf(
                         'مبلغ التحصيل (%s ج.م) يتجاوز رصيد العميل المدين الفعلي (%s ج.م).',
@@ -502,6 +547,47 @@ class PosOrderService implements PosOrderServiceInterface
             $balanceAfter  = max(0, round($currentBalance - $amount, 2));
 
             $customer->update(['current_credit_balance' => $balanceAfter]);
+
+            // ─── توزيع الدفعة على الفواتير المفتوحة بنظام FIFO (الأقدم أولاً) ───────────
+            // يضمن ذلك تطابق رصيد العميل مع مجموع الفواتير المتبقية في كشف الحساب
+            $remainingToApply = round($amount, 2);
+            $openInvoices = Invoice::where('customer_id', $customerId)
+                ->where('remaining_amount', '>', $eps)
+                ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])
+                ->orderBy('id', 'asc')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($openInvoices as $inv) {
+                if ($remainingToApply <= $eps) {
+                    break;
+                }
+
+                $invRemaining = (float) $inv->remaining_amount;
+                $applied      = min($remainingToApply, $invRemaining);
+                $newRemaining = max(0, round($invRemaining - $applied, 2));
+                if ($newRemaining < $eps) $newRemaining = 0;
+                $newPaid      = round((float) $inv->paid_amount + $applied, 2);
+                $newStatus    = $newRemaining <= $eps ? 'paid' : 'partially_paid';
+
+                $inv->update([
+                    'paid_amount'      => $newPaid,
+                    'remaining_amount' => $newRemaining,
+                    'status'           => $newStatus,
+                ]);
+
+                // تسجيل الدفعة على مستوى الفاتورة لتظهر في تاريخ الفواتير وكشف الحساب
+                InvoicePayment::create([
+                    'invoice_id'            => $inv->id,
+                    'payment_method'        => $paymentMethod,
+                    'amount'                => $applied,
+                    'transaction_reference' => $receiptNumber,
+                    'notes'                 => $notes ?? "تحصيل دفعة آجل من العميل {$customer->name}",
+                ]);
+
+                $remainingToApply = round($remainingToApply - $applied, 2);
+            }
+            // ─────────────────────────────────────────────────────────────────────────────
 
             return CreditLedgerEntry::create([
                 'customer_id'    => $customer->id,
@@ -519,25 +605,7 @@ class PosOrderService implements PosOrderServiceInterface
 
     protected function isManagerOverrideValid(?string $code): bool
     {
-        if (empty($code)) {
-            return false;
-        }
-
-        if ($code === 'mgr_override_99' || $code === (string) config('app.manager_override_code', '9999')) {
-            return true;
-        }
-
-        $managers = \App\Models\User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['admin', 'manager', 'branch_manager', 'super_admin']);
-        })->get();
-
-        foreach ($managers as $manager) {
-            if (\Illuminate\Support\Facades\Hash::check($code, $manager->password)) {
-                return true;
-            }
-        }
-
-        return false;
+        return app(ManagerOverrideService::class)->isValid($code);
     }
 }
 

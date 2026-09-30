@@ -116,27 +116,36 @@ class CreditCustomerController extends Controller
     /**
      * كشف حساب تفصيلي للعميل مع جميع حركات الآجل.
      */
-    public function statement(Customer $customer): View|JsonResponse
+    public function statement(Request $request, Customer $customer): View|JsonResponse
     {
-        $customer->load([
-            'vehicles:id,customer_id,car_brand,car_model,plate_number',
-            'invoices' => function ($q) {
-                $q->where('remaining_amount', '>', 0)
-                  ->with(['payments', 'items.product:id,name,is_battery'])
-                  ->orderByDesc('id')
-                  ->limit(50);
-            },
-            'creditLedgers' => function ($q) {
-                $q->with('collectedByUser:id,name')
-                  ->orderByDesc('id')
-                  ->limit(100);
-            },
-        ]);
+        $customer->load('vehicles:id,customer_id,car_brand,car_model,plate_number');
 
-        if (request()->wantsJson()) {
-            return response()->json($customer);
+        $invoices = $customer->invoices()
+            ->where('remaining_amount', '>', 0.01)
+            ->with(['payments', 'items.product:id,name,is_battery'])
+            ->orderByDesc('id')
+            ->paginate(20, ['*'], 'invoices_page')
+            ->withQueryString();
+
+        $ledgers = $customer->creditLedgers()
+            ->with('collectedByUser:id,name')
+            ->orderByDesc('id')
+            ->paginate(50, ['*'], 'ledgers_page')
+            ->withQueryString();
+
+        // For JSON, return paginated structure
+        if ($request->wantsJson()) {
+            return response()->json([
+                'customer' => $customer,
+                'invoices' => $invoices,
+                'credit_ledgers' => $ledgers,
+            ]);
         }
 
-        return view('admin.credit.statement', compact('customer'));
+        // Keep backward compat: set relations to paginator items for Blade @forelse
+        $customer->setRelation('invoices', $invoices->getCollection());
+        $customer->setRelation('creditLedgers', $ledgers->getCollection());
+
+        return view('admin.credit.statement', compact('customer', 'invoices', 'ledgers'));
     }
 }

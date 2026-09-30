@@ -10,7 +10,7 @@
                     <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
                         <div class="d-flex align-items-center gap-1 overflow-hidden">
                             <i class="ri-money-dollar-circle-line text-success fs-16 shrink-0"></i>
-                            <span class="text-uppercase fw-bold text-muted text-truncate fs-12">إجمالي مبيعات المركز</span>
+                            <span class="text-uppercase fw-bold text-muted text-truncate fs-12">إيرادات ومبيعات المركز</span>
                         </div>
                         <div class="shrink-0">
                             <span class="badge bg-success-subtle text-success rounded-pill px-2 py-0.5 fs-11 fw-bold" id="dashSalesPeriodBadge">
@@ -21,9 +21,25 @@
 
                     <div class="d-flex align-items-end justify-content-between mt-2">
                         <div>
-                            <h3 class="fs-22 fw-extrabold text-success mb-1 font-monospace" id="dashTotalSales" style="transition: opacity 0.15s ease;">
-                                {{ $selectedPeriod['total_formatted'] ?? number_format(round($totalSales), 0) . ' ج.م' }}
+                            {{-- الرقم الرئيسي: الإيراد النقدي الفعلي (paid + تحصيلات الآجل) --}}
+                            <h3 class="fs-22 fw-extrabold text-success mb-0 font-monospace" id="dashTotalRevenue" style="transition: opacity 0.15s ease;">
+                                {{ $selectedPeriod['revenue_formatted'] ?? number_format(round($selectedPeriod['revenue'] ?? $totalSales), 0) . ' ج.م' }}
                             </h3>
+                            <div class="fs-11 text-muted mb-1">
+                                <i class="ri-checkbox-circle-fill text-success align-middle"></i>
+                                إيراد نقدي فعلي محصّل
+                            </div>
+                            {{-- سطر ثانوي: قيمة الفواتير الصادرة (دفترية) --}}
+                            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                <span class="fs-11 text-muted">
+                                    <i class="ri-file-list-3-line align-middle"></i>
+                                    فواتير: <span id="dashTotalSales" class="fw-bold text-dark" style="transition: opacity 0.15s ease;">{{ $selectedPeriod['total_formatted'] ?? number_format(round($totalSales), 0) . ' ج.م' }}</span>
+                                </span>
+                                <span class="fs-11 text-warning fw-bold" id="dashCreditCollectedWrap" style="{{ ($selectedPeriod['credit_collected'] ?? 0) > 0 ? '' : 'display:none' }}">
+                                    <i class="ri-hand-coin-line align-middle"></i>
+                                    تحصيل آجل: <span id="dashCreditCollected">{{ $selectedPeriod['credit_collected_fmt'] ?? '0 ج.م' }}</span>
+                                </span>
+                            </div>
                             <a href="{{ $selectedPeriod['invoices_url'] ?? route('admin.sales.invoices') }}" id="dashInvoicesLink" class="text-decoration-underline text-muted fs-11" title="عرض فواتير هذه الفترة">
                                 <span id="dashInvoicesCount" class="fw-bold">{{ $selectedPeriod['count'] ?? $invoicesCount }}</span> فاتورة معتمدة
                                 <span class="text-secondary small">(<span id="dashInvoicesSublabel">{{ $selectedPeriod['sublabel'] ?? 'منذ البداية' }}</span>)</span>
@@ -54,6 +70,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Metric 2: Credit / Receivables (Strictly called "الآجل") -->
     <div class="col-xl-3 col-md-6">

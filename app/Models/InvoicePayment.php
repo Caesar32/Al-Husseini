@@ -19,6 +19,16 @@ class InvoicePayment extends Model
         'amount' => 'decimal:2',
     ];
 
+    public function scopeActive($query)
+    {
+        return $query->whereHas('invoice', fn($q) => $q->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']));
+    }
+
+    public function scopeCash($query)
+    {
+        return $query->where('payment_method', '!=', 'credit');
+    }
+
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);

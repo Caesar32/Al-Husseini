@@ -20,7 +20,7 @@ test('admin can view dashboard with sales periods filter', function () {
     $response = $this->actingAs($admin)->get(route('admin.dashboard'));
 
     $response->assertOk()
-        ->assertSee('إجمالي مبيعات المركز')
+        ->assertSee('إيرادات ومبيعات المركز')
         ->assertSee('اليوم')
         ->assertSee('أسبوع')
         ->assertSee('شهر')
