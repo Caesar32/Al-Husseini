@@ -637,16 +637,20 @@ class SystemDiagnosticService
                 // اعتماد عمولة الفني لتظهر في مسير الراتب
                 TechnicianCommission::where('employee_id', $technician->id)->update(['status' => 'approved']);
 
-                // تسجيل 25 يوم حضور إضافي للموظف لاكتمال 26 يوم عمل شهري لتفادي خصم الغياب غير المبرر
+                // تسجيل 25 يوم حضور إضافي (غير يوم اليوم الذي سُجِّلت فيه بصمة التأخير) لاكتمال 26 يوم عمل شهري
+                // لتفادي خصم الغياب غير المبرر، أياً كان تاريخ تشغيل المحاكاة داخل الشهر.
                 $todayStr = now()->toDateString();
-                for ($d = 1; $d <= 25; $d++) {
+                $extraDays = 0;
+                for ($d = 1; $d <= now()->daysInMonth && $extraDays < 25; $d++) {
                     $dayDate = now()->startOfMonth()->addDays($d - 1)->toDateString();
-                    if ($dayDate !== $todayStr) {
-                        Attendance::firstOrCreate(
-                            ['employee_id' => $technician->id, 'work_date' => $dayDate],
-                            ['status' => 'present', 'check_in' => "{$dayDate} 09:00:00", 'check_out' => "{$dayDate} 17:00:00"]
-                        );
+                    if ($dayDate === $todayStr) {
+                        continue;
                     }
+                    Attendance::firstOrCreate(
+                        ['employee_id' => $technician->id, 'work_date' => $dayDate],
+                        ['status' => 'present', 'check_in' => "{$dayDate} 09:00:00", 'check_out' => "{$dayDate} 17:00:00"]
+                    );
+                    $extraDays++;
                 }
 
                 $payrollService = app(PayrollService::class);

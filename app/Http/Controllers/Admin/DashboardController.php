@@ -268,11 +268,11 @@ class DashboardController extends Controller
 
         // 7. Workshop Attendance for Today
         $todayStr = Carbon::today()->toDateString();
-        $presentCount = Attendance::where('work_date', $todayStr)->where('status', 'present')->count();
-        $lateCount = Attendance::where('work_date', $todayStr)->where('status', 'late')->count();
-        $absentCount = Attendance::where('work_date', $todayStr)->whereIn('status', ['absent', 'leave'])->count();
+        $presentCount = Attendance::whereDate('work_date', $todayStr)->where('status', 'present')->count();
+        $lateCount = Attendance::whereDate('work_date', $todayStr)->where('status', 'late')->count();
+        $absentCount = Attendance::whereDate('work_date', $todayStr)->whereIn('status', ['absent', 'leave'])->count();
 
-        $workshopTechs = Employee::with(['jobTitle', 'attendances' => fn($q) => $q->where('work_date', $todayStr)])
+        $workshopTechs = Employee::with(['jobTitle', 'attendances' => fn($q) => $q->whereDate('work_date', $todayStr)])
             ->where('status', 'active')
             ->take(6)
             ->get();

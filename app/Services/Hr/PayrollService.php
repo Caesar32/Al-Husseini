@@ -86,7 +86,10 @@ class PayrollService implements PayrollServiceInterface
 
             // ─── جلب كل بيانات الحضور والإجازات والعمولات والجزاءات دفعة واحدة (4 استعلامات فقط بدلاً من 4N) ───
             $allAttendances = Attendance::whereIn('employee_id', $employeeIds)
-                ->whereBetween('work_date', [$startDate->toDateString(), $endDate->toDateString()])
+                // whereDate (not whereBetween on Y-m-d strings): date-cast columns are stored as
+                // 'Y-m-d 00:00:00' on SQLite, which a string upper bound of 'Y-m-d' would exclude.
+                ->whereDate('work_date', '>=', $startDate->toDateString())
+                ->whereDate('work_date', '<=', $endDate->toDateString())
                 ->get()
                 ->groupBy('employee_id');
 
@@ -107,7 +110,8 @@ class PayrollService implements PayrollServiceInterface
 
             $allDeductions = EmployeeDeduction::whereIn('employee_id', $employeeIds)
                 ->where('status', 'approved')
-                ->whereBetween('deduction_date', [$startDate->toDateString(), $endDate->toDateString()])
+                ->whereDate('deduction_date', '>=', $startDate->toDateString())
+                ->whereDate('deduction_date', '<=', $endDate->toDateString())
                 ->get()
                 ->groupBy('employee_id');
 
