@@ -159,6 +159,366 @@ window.showHrToast = function(title, message, type) {
 <!-- Al-Husseini Real-Time Admin Notifications -->
 <script src="{{ asset('assets/js/admin-notifications.js') }}"></script>
 
+<!-- Seamless Fullscreen Engine (نظام ملء الشاشة المستمر والتنقل السلس الاحترافي) -->
+<style>
+#alhusseini-top-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background: linear-gradient(90deg, #3577f1, #0ab39c);
+    box-shadow: 0 0 10px rgba(53, 119, 241, 0.7);
+    z-index: 9999999;
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+    pointer-events: none;
+    opacity: 0;
+}
+</style>
+<div id="alhusseini-top-progress"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    // Clear any legacy storage
+    try { localStorage.removeItem('alhusseini-fullscreen'); } catch(e) {}
+
+    const btnSelector = '[data-toggle="fullscreen"]';
+    const progressBar = document.getElementById('alhusseini-top-progress');
+
+    // Progress bar controls
+    let progressTimer = null;
+    function startProgress() {
+        if (!progressBar) return;
+        clearTimeout(progressTimer);
+        progressBar.style.opacity = '1';
+        progressBar.style.width = '35%';
+        progressTimer = setTimeout(function() {
+            progressBar.style.width = '75%';
+        }, 150);
+    }
+
+    function finishProgress() {
+        if (!progressBar) return;
+        clearTimeout(progressTimer);
+        progressBar.style.width = '100%';
+        setTimeout(function() {
+            progressBar.style.opacity = '0';
+            setTimeout(function() {
+                progressBar.style.width = '0%';
+            }, 250);
+        }, 150);
+    }
+
+    function isFullscreen() {
+        return !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement ||
+            (window.innerHeight === screen.height && window.innerWidth === screen.width)
+        );
+    }
+
+    function updateIcons(active) {
+        const btns = document.querySelectorAll(btnSelector);
+        btns.forEach(function(btn) {
+            const icon = btn.querySelector('i');
+            if (!icon) return;
+            if (active) {
+                icon.className = 'bx bx-exit-fullscreen fs-22';
+                btn.setAttribute('title', 'الخروج من وضع ملء الشاشة');
+            } else {
+                icon.className = 'bx bx-fullscreen fs-22';
+                btn.setAttribute('title', 'وضع ملء الشاشة المستمر');
+            }
+        });
+    }
+
+    function enterFullscreen() {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (req) {
+            try {
+                const p = req.call(el, Element.ALLOW_KEYBOARD_INPUT || undefined);
+                if (p && p.catch) p.catch(function(){});
+            } catch(e) {}
+        }
+        updateIcons(true);
+    }
+
+    function exitFullscreen() {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exit && (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)) {
+            try {
+                const p = exit.call(document);
+                if (p && p.catch) p.catch(function(){});
+            } catch(e) {}
+        }
+        updateIcons(false);
+    }
+
+    // Attach button listener
+    function attachButtonListeners() {
+        const btns = document.querySelectorAll(btnSelector);
+        btns.forEach(function(btn) {
+            if (btn.dataset.fsAttached) return;
+            btn.dataset.fsAttached = '1';
+
+            // Clone to strip any conflicting legacy listeners
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+
+            clone.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (isFullscreen()) {
+                    exitFullscreen();
+                } else {
+                    enterFullscreen();
+                }
+            });
+        });
+        updateIcons(isFullscreen());
+    }
+
+    // ==============================================================
+    // Seamless Navigation Engine (Prevents Document Unload in Fullscreen)
+    // ==============================================================
+    let navAbort = null;
+
+    async function seamlessNavigate(url, pushState = true) {
+        if (navAbort) {
+            navAbort.abort();
+        }
+        navAbort = new AbortController();
+
+        startProgress();
+
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Al-Husseini-Seamless': '1'
+                },
+                signal: navAbort.signal
+            });
+
+            if (!res.ok) {
+                window.location.href = url;
+                return;
+            }
+
+            const html = await res.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const currentMain = document.querySelector('.main-content');
+            const newMain = doc.querySelector('.main-content');
+
+            if (!currentMain || !newMain) {
+                window.location.href = url;
+                return;
+            }
+
+            // Update title
+            if (doc.title) {
+                document.title = doc.title;
+            }
+
+            // Update URL in browser
+            if (pushState) {
+                window.history.pushState({ seamless: true, url: url }, doc.title, url);
+            }
+
+            // Content Swap with subtle micro-transition
+            currentMain.style.opacity = '0.4';
+            currentMain.style.transition = 'opacity 0.08s ease';
+
+            setTimeout(function() {
+                currentMain.innerHTML = newMain.innerHTML;
+                currentMain.style.opacity = '1';
+
+                // Sync sidebar active link
+                syncSidebar(url);
+
+                // Run page-specific scripts
+                runPageScripts(doc, currentMain);
+
+                // Re-initialize core UI widgets
+                reinitWidgets();
+
+                finishProgress();
+            }, 80);
+
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.warn('Seamless navigation fell back to native:', err);
+                window.location.href = url;
+            }
+        }
+    }
+
+    function syncSidebar(targetUrl) {
+        try {
+            const urlObj = new URL(targetUrl, window.location.origin);
+            const path = urlObj.pathname;
+            document.querySelectorAll('#scrollbar .nav-link, .app-menu .nav-link').forEach(function(link) {
+                const linkHref = link.getAttribute('href');
+                if (!linkHref) return;
+                try {
+                    const lUrl = new URL(linkHref, window.location.origin);
+                    if (lUrl.pathname === path) {
+                        link.classList.add('active');
+                        const collapse = link.closest('.collapse');
+                        if (collapse) {
+                            collapse.classList.add('show');
+                        }
+                    } else {
+                        link.classList.remove('active');
+                    }
+                } catch(e) {}
+            });
+        } catch(e) {}
+    }
+
+    function runPageScripts(doc, container) {
+        // Collect scripts: inside new .main-content and any trailing scripts after #layout-wrapper
+        const scriptList = [];
+        container.querySelectorAll('script').forEach(function(s) { scriptList.push(s); });
+        
+        doc.querySelectorAll('body > script').forEach(function(s) {
+            const src = s.getAttribute('src') || '';
+            // Skip core vendor scripts that are already loaded globally in parent
+            if (src.includes('bootstrap') || src.includes('app.js') || src.includes('plugins.js') || src.includes('vendor-scripts') || src.includes('admin-notifications')) {
+                return;
+            }
+            scriptList.push(s);
+        });
+
+        scriptList.forEach(function(s) {
+            if (s.src) {
+                if (!document.querySelector(`script[src="${s.src}"]`)) {
+                    const el = document.createElement('script');
+                    el.src = s.src;
+                    el.async = false;
+                    document.body.appendChild(el);
+                }
+            } else if (s.textContent.trim()) {
+                const rawCode = s.textContent;
+                // Convert top-level let/const to var to prevent SyntaxError on repeat visits
+                const safeCode = rawCode
+                    .replace(/(^|\n|\r|\;)\s*let\s+([a-zA-Z0-9_$]+)/g, '$1var $2')
+                    .replace(/(^|\n|\r|\;)\s*const\s+([a-zA-Z0-9_$]+)/g, '$1var $2');
+
+                try {
+                    (1, eval)(safeCode);
+                } catch(e) {
+                    console.warn('Script execution fallback:', e);
+                }
+            }
+        });
+    }
+
+    function reinitWidgets() {
+        if (typeof feather !== 'undefined') {
+            try { feather.replace(); } catch(e){}
+        }
+        if (typeof SimpleBar !== 'undefined') {
+            document.querySelectorAll('[data-simplebar]').forEach(function(el) {
+                try { new SimpleBar(el); } catch(e){}
+            });
+        }
+        try {
+            document.dispatchEvent(new Event('DOMContentLoaded'));
+            window.dispatchEvent(new Event('load'));
+            window.dispatchEvent(new Event('resize'));
+        } catch(e){}
+    }
+
+    // Intercept link clicks when in fullscreen
+    document.addEventListener('click', function(e) {
+        if (!isFullscreen()) return; // Standard behavior when not in fullscreen
+
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        if (link.hasAttribute('download') || link.getAttribute('target') === '_blank') return;
+        if (link.dataset.noPjax || link.dataset.native || link.dataset.toggle === 'fullscreen') return;
+
+        const url = new URL(link.href, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+        if (url.pathname.includes('/logout') || url.pathname.includes('/api/')) return;
+        if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+
+        e.preventDefault();
+        seamlessNavigate(url.href, true);
+    }, true);
+
+    // Intercept GET filter/search forms when in fullscreen
+    document.addEventListener('submit', function(e) {
+        if (!isFullscreen()) return;
+
+        const form = e.target;
+        if (!form || (form.method || '').toUpperCase() !== 'GET') return;
+        if (form.dataset.noPjax || form.target === '_blank') return;
+
+        const action = form.action || window.location.href;
+        const url = new URL(action, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+
+        e.preventDefault();
+        const formData = new FormData(form);
+        const searchParams = new URLSearchParams(formData);
+        const targetUrl = url.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
+        seamlessNavigate(targetUrl, true);
+    }, true);
+
+    // Intercept Refresh (F5 and Ctrl+R) when in fullscreen
+    window.addEventListener('keydown', function(e) {
+        if (isFullscreen()) {
+            if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+                e.preventDefault();
+                seamlessNavigate(window.location.href, false);
+            }
+        }
+    });
+
+    // Handle browser Back / Forward buttons
+    window.addEventListener('popstate', function() {
+        if (isFullscreen()) {
+            seamlessNavigate(window.location.href, false);
+        }
+    });
+
+    // Monitor fullscreen changes (Esc key, F11, etc.)
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(function(ev) {
+        document.addEventListener(ev, function() {
+            updateIcons(isFullscreen());
+        });
+    });
+
+    window.addEventListener('resize', function() {
+        updateIcons(isFullscreen());
+    });
+
+    function init() {
+        attachButtonListeners();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    window.addEventListener('load', init);
+})();
+</script>
+
 <!-- CSRF & Session Keep-Alive for Long Running Center Shifts -->
 <script>
 (function() {
