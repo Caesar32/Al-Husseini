@@ -82,7 +82,7 @@ class CreditCustomerController extends Controller
                 customerId:    (int) $validated['customer_id'],
                 amount:        (float) $validated['amount'],
                 paymentMethod: $validated['payment_method'],
-                collectedBy:   auth()->id() ?? 1,
+                collectedBy:   $request->user()->id,
                 receiptNumber: $validated['receipt_number'] ?? null,
                 notes:         $validated['notes'] ?? null,
             );

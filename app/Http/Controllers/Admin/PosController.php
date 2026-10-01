@@ -55,7 +55,8 @@ class PosController extends Controller
 
     public function store(StorePosInvoiceRequest $request): JsonResponse|RedirectResponse
     {
-        $cashierUserId = auth()->id() ?? 1;
+        // Route is behind `auth`; never attribute a sale to a fallback user.
+        $cashierUserId = $request->user()->id;
 
         try {
             $invoice = $this->posOrderService->processPosSale($request->validated(), $cashierUserId);

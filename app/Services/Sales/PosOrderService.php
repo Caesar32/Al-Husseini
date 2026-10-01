@@ -13,7 +13,10 @@ use App\Models\ScrapBatteriesInventory;
 use App\Models\ScrapPricingTier;
 use App\Models\TechnicianCommission;
 use App\Models\Warranty;
+use App\Enums\InvoiceStatus;
 use App\Services\Finance\ManagerOverrideService;
+use App\Services\Support\DocumentNumberService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -53,7 +56,8 @@ class PosOrderService implements PosOrderServiceInterface
         $filter->applyForStats($base);
 
         return [
-            'total_sales'            => (float) (clone $base)->sum('final_amount'),
+            // Net of returns: partially refunded invoices count for what the customer kept.
+            'total_sales'            => round(Invoice::sumNetAmount($base), 2),
             'invoices_count'         => (int) (clone $base)->count(),
             'credit_invoices_count'  => (int) (clone $base)->where('remaining_amount', '>', 0)->count(),
             'total_remaining_credit' => (float) (clone $base)->sum('remaining_amount'),
@@ -63,7 +67,41 @@ class PosOrderService implements PosOrderServiceInterface
 
     public function processPosSale(array $data, int $cashierUserId): Invoice
     {
-        return DB::transaction(function () use ($data, $cashierUserId) {
+        $idempotencyKey = isset($data['idempotency_key']) && trim((string) $data['idempotency_key']) !== ''
+            ? trim((string) $data['idempotency_key'])
+            : null;
+
+        try {
+            return $this->createPosSale($data, $cashierUserId, $idempotencyKey);
+        } catch (UniqueConstraintViolationException $e) {
+            // A concurrent submission with the same key committed first: return that invoice.
+            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey))) {
+                return $existing;
+            }
+            throw $e;
+        }
+    }
+
+    private function findByIdempotencyKey(string $key): ?Invoice
+    {
+        return Invoice::where('idempotency_key', $key)->first()?->load([
+            'items.product',
+            'customer',
+            'customerVehicle',
+            'technician',
+            'payments',
+            'cashier',
+        ]);
+    }
+
+    private function createPosSale(array $data, int $cashierUserId, ?string $idempotencyKey): Invoice
+    {
+        return DB::transaction(function () use ($data, $cashierUserId, $idempotencyKey) {
+            // Retried submission (same client key): return the already-created invoice, no side effects.
+            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey))) {
+                return $existing;
+            }
+
             $itemsData = $data['items'] ?? [];
             if (empty($itemsData)) {
                 throw new \InvalidArgumentException('يجب إضافة منتج واحد على الأقل في الفاتورة.');
@@ -202,9 +240,10 @@ class PosOrderService implements PosOrderServiceInterface
             if (empty($branchId)) {
                 throw new \InvalidArgumentException('الفرع مطلوب لإنشاء الفاتورة.');
             }
-            $invoiceNumber = 'INV-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -6));
+            // Sequential per-day number from a locked counter (released on commit; rolled-back sales free their number).
+            $invoiceNumber = app(DocumentNumberService::class)->nextFormatted('INV-' . now()->format('Ymd'));
 
-            $invoice = Invoice::withoutEvents(function () use ($invoiceNumber, $branchId, $customerId, $data, $cashierUserId, $subtotal, $discountAmount, $scrapDeduction, $taxAmount, $finalAmount, $totalPaid, $creditAmount, $invoicePaymentMethod) {
+            $invoice = Invoice::withoutEvents(function () use ($invoiceNumber, $branchId, $customerId, $data, $cashierUserId, $subtotal, $discountAmount, $scrapDeduction, $taxAmount, $finalAmount, $totalPaid, $creditAmount, $invoicePaymentMethod, $idempotencyKey) {
                 return Invoice::create([
                     'invoice_number'         => $invoiceNumber,
                     'branch_id'              => $branchId,
@@ -222,6 +261,7 @@ class PosOrderService implements PosOrderServiceInterface
                     'payment_method'         => $invoicePaymentMethod,
                     'status'                 => $creditAmount > 0 ? ($creditAmount < $finalAmount ? 'partially_paid' : 'unpaid') : 'paid',
                     'notes'                  => $data['notes'] ?? null,
+                    'idempotency_key'        => $idempotencyKey,
                 ]);
             });
 
@@ -278,7 +318,9 @@ class PosOrderService implements PosOrderServiceInterface
 
                     // Warranty requires customer_id, ensure valid customer ID
                     if (!$customerId) {
-                        $guestCustomer = Customer::firstOrCreate(
+                        // firstOrCreate is race-safe here (savepoint + unique phone); withTrashed so a
+                        // soft-deleted guest record is reused instead of colliding with its unique phone.
+                        $guestCustomer = Customer::withTrashed()->firstOrCreate(
                             ['phone' => '00000000000'],
                             [
                                 'name'                   => 'عميل نقدي عابر',
@@ -340,30 +382,42 @@ class PosOrderService implements PosOrderServiceInterface
     public function processSalesReturn(int $invoiceId, array $items, string $reason, int $cashierUserId): Invoice
     {
         return DB::transaction(function () use ($invoiceId, $items, $reason, $cashierUserId) {
+            // The invoice row lock serializes concurrent returns on the same invoice.
             $invoice = Invoice::with(['items.product', 'customer'])->lockForUpdate()->findOrFail($invoiceId);
 
-            if ($invoice->status === 'refunded') {
+            if ($invoice->status === InvoiceStatus::Refunded->value) {
                 throw new \DomainException('لا يمكن إجراء مرتجع على فاتورة مُرتجعة مسبقاً.');
             }
-            if ($invoice->status === 'cancelled') {
+            if ($invoice->status === InvoiceStatus::Cancelled->value) {
                 throw new \DomainException('لا يمكن إجراء مرتجع على فاتورة ملغاة.');
             }
 
+            $eps = $this->epsilon();
+            $requestedByLine = $this->resolveReturnLines($invoice, $items);
+
             $refundTotal = 0.0;
-            $invoiceItems = $invoice->items->keyBy('product_id');
+            foreach ($requestedByLine as $lineId => $qty) {
+                /** @var InvoiceItem $invItem */
+                $invItem = $invoice->items->firstWhere('id', $lineId);
 
-            foreach ($items as $item) {
-                $productId = $item['product_id'];
-                $qty = (int) $item['quantity'];
-
-                $invItem = $invoiceItems->get($productId);
-                if (!$invItem || $qty > $invItem->quantity) {
-                    throw new \DomainException("كمية المرتجع للصنف تتجاوز الكمية الأصلية المسجلة بالفاتورة.");
+                // Cumulative guard: earlier returns on this line are subtracted (BIZ-03).
+                if ($qty > $invItem->returnableQuantity()) {
+                    throw new \DomainException(sprintf(
+                        'كمية المرتجع للصنف (%s) تتجاوز الكمية المتاحة للإرجاع: %d من أصل %d (سبق إرجاع %d).',
+                        $invItem->product?->name ?? $invItem->product_id,
+                        $invItem->returnableQuantity(),
+                        $invItem->quantity,
+                        $invItem->returned_quantity
+                    ));
                 }
 
-                $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
+                $product = Product::where('id', $invItem->product_id)->lockForUpdate()->firstOrFail();
                 $product->increment('current_stock', $qty);
 
+                $invItem->increment('returned_quantity', $qty);
+
+                // Valued at the line unit price. Proration of invoice discount/scrap/tax is an
+                // owner decision (D3) and intentionally not applied here.
                 $refundTotal += round($qty * (float) $invItem->unit_price, 2);
 
                 // Void warranty if battery
@@ -374,7 +428,18 @@ class PosOrderService implements PosOrderServiceInterface
             }
 
             $refundTotal = round($refundTotal, 2);
-            $isFullReturn = $refundTotal >= ((float) $invoice->final_amount - 0.01);
+
+            // Invariant (BIZ-04 partial): cumulative refunds can never exceed what the invoice is worth
+            // to the customer right now — money received (paid_amount) plus debt still owed (remaining_amount).
+            // Both already reflect earlier returns, so this caps the total across all returns at final_amount.
+            $refundable = round(max(0, (float) $invoice->paid_amount + (float) $invoice->remaining_amount), 2);
+            $capNote = '';
+            if ($refundTotal > $refundable + $eps) {
+                $capNote = sprintf(' (قيمة الأصناف %s ج.م تم تحديدها بالمتاح للاسترداد %s ج.م)', number_format($refundTotal, 2), number_format($refundable, 2));
+                $refundTotal = $refundable;
+            }
+
+            $isFullReturn = $invoice->items->every(fn (InvoiceItem $line) => $line->returnableQuantity() === 0);
 
             // ─── إصلاح محاسبة الآجل والنقدي عند المرتجع ───────────────────────────────
             $creditRefund = 0.0;
@@ -423,26 +488,68 @@ class PosOrderService implements PosOrderServiceInterface
                 $invoice->paid_amount = max(0, round((float) $invoice->paid_amount - $cashRefund, 2));
             }
 
+            $invoice->refunded_amount = round((float) $invoice->refunded_amount + $refundTotal, 2);
+
             // Persist remaining/paid adjustments if needed (already set on model)
             // Ensure we save the model fields before status update
             $invoice->save();
 
             // ─────────────────────────────────────────────────────────────────────────────
 
-            // Adjust invoice status: refunded vs partially_refunded
-            $newStatus = $isFullReturn ? 'refunded' : 'partially_refunded';
-            // If already partially_refunded and this return makes it fully refunded, keep refunded
-            if ($invoice->status === 'partially_refunded' && !$isFullReturn) {
-                $newStatus = 'partially_refunded';
-            }
+            // Fully refunded only when every unit of every line has been returned.
+            $newStatus = $isFullReturn ? InvoiceStatus::Refunded->value : InvoiceStatus::PartiallyRefunded->value;
 
             $invoice->update([
                 'status' => $newStatus,
-                'notes'  => trim(($invoice->notes ?? '') . "\nمرتجع بقيمة {$refundTotal} ج.م. السبب: {$reason}"),
+                'notes'  => trim(($invoice->notes ?? '') . "\nمرتجع بقيمة {$refundTotal} ج.م{$capNote}. السبب: {$reason}"),
             ]);
 
             return $invoice->fresh(['items.product', 'customer', 'payments']);
         });
+    }
+
+    /**
+     * Map requested return rows to invoice lines and sum quantities per line.
+     * Each row identifies its line by invoice_item_id (preferred) or, for older callers,
+     * by product_id when that product appears on exactly one line of the invoice.
+     *
+     * @return array<int, int> invoice_item_id => quantity
+     */
+    private function resolveReturnLines(Invoice $invoice, array $items): array
+    {
+        if (empty($items)) {
+            throw new \DomainException('يرجى تحديد الأصناف المراد إرجاعها.');
+        }
+
+        $perLine = [];
+        foreach ($items as $row) {
+            $qty = (int) ($row['quantity'] ?? 0);
+            if ($qty < 1) {
+                throw new \DomainException('كمية المرتجع يجب أن تكون 1 على الأقل.');
+            }
+
+            if (!empty($row['invoice_item_id'])) {
+                $line = $invoice->items->firstWhere('id', (int) $row['invoice_item_id']);
+                if (!$line) {
+                    throw new \DomainException('البند المحدد للمرتجع لا ينتمي إلى هذه الفاتورة.');
+                }
+            } elseif (!empty($row['product_id'])) {
+                $lines = $invoice->items->where('product_id', (int) $row['product_id']);
+                if ($lines->isEmpty()) {
+                    throw new \DomainException('الصنف المحدد للمرتجع غير موجود في هذه الفاتورة.');
+                }
+                if ($lines->count() > 1) {
+                    throw new \DomainException('الصنف مكرر في أكثر من بند بالفاتورة؛ يرجى تحديد البند (invoice_item_id).');
+                }
+                $line = $lines->first();
+            } else {
+                throw new \DomainException('يجب تحديد البند أو الصنف المراد إرجاعه.');
+            }
+
+            $perLine[$line->id] = ($perLine[$line->id] ?? 0) + $qty;
+        }
+
+        return $perLine;
     }
 
     public function calculateScrapDeduction(int $capacityAh, int $quantity = 1): float
@@ -460,27 +567,27 @@ class PosOrderService implements PosOrderServiceInterface
         // DB aggregation for financial totals (FIN-H08) — avoids loading all rows into PHP
         $baseInvoiceQuery = Invoice::where('branch_id', $branchId)
             ->whereDate('created_at', $date)
-            ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']);
+            ->countable();
 
-        $totalSales = (float) $baseInvoiceQuery->clone()->sum('final_amount');
+        $totalSales = Invoice::sumNetAmount($baseInvoiceQuery);
         $totalScrapDeductions = (float) $baseInvoiceQuery->clone()->sum('scrap_deduction_amount');
         $invoicesCount = (int) $baseInvoiceQuery->clone()->count();
 
-        // Payments aggregated in DB
-        $paymentBase = InvoicePayment::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']));
+        // Payments aggregated in DB (refunds are negative payments, so these are net)
+        $paymentBase = InvoicePayment::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->countable());
         $totalCash = (float) $paymentBase->clone()->where('payment_method', 'cash')->sum('amount');
         $totalCard = (float) $paymentBase->clone()->where('payment_method', 'card')->sum('amount');
         $totalCredit = (float) $paymentBase->clone()->where('payment_method', 'credit')->sum('amount');
 
-        // Batteries count via DB
-        $batteriesCount = (int) \App\Models\InvoiceItem::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']))
+        // Batteries count via DB, net of returned units
+        $batteriesCount = (int) \App\Models\InvoiceItem::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->countable())
             ->whereHas('product', fn($q) => $q->where('is_battery', true))
-            ->sum('quantity');
+            ->sum(DB::raw('quantity - returned_quantity'));
 
         // Still load invoices for detailed return (with relations) — but limited to needed data
         $invoices = Invoice::where('branch_id', $branchId)
             ->whereDate('created_at', $date)
-            ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])
+            ->countable()
             ->with(['payments', 'items.product', 'customer:id,name', 'technician:id,full_name'])
             ->get();
 
@@ -551,9 +658,10 @@ class PosOrderService implements PosOrderServiceInterface
             // ─── توزيع الدفعة على الفواتير المفتوحة بنظام FIFO (الأقدم أولاً) ───────────
             // يضمن ذلك تطابق رصيد العميل مع مجموع الفواتير المتبقية في كشف الحساب
             $remainingToApply = round($amount, 2);
+            // Partially refunded invoices are included: debt left on them is still owed (BIZ-05).
             $openInvoices = Invoice::where('customer_id', $customerId)
                 ->where('remaining_amount', '>', $eps)
-                ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])
+                ->countable()
                 ->orderBy('id', 'asc')
                 ->lockForUpdate()
                 ->get();
@@ -568,7 +676,11 @@ class PosOrderService implements PosOrderServiceInterface
                 $newRemaining = max(0, round($invRemaining - $applied, 2));
                 if ($newRemaining < $eps) $newRemaining = 0;
                 $newPaid      = round((float) $inv->paid_amount + $applied, 2);
-                $newStatus    = $newRemaining <= $eps ? 'paid' : 'partially_paid';
+                // A partially refunded invoice keeps that status (the return history must stay visible);
+                // its payment state is carried by remaining_amount.
+                $newStatus    = $inv->status === InvoiceStatus::PartiallyRefunded->value
+                    ? InvoiceStatus::PartiallyRefunded->value
+                    : ($newRemaining <= $eps ? InvoiceStatus::Paid->value : InvoiceStatus::PartiallyPaid->value);
 
                 $inv->update([
                     'paid_amount'      => $newPaid,
@@ -589,6 +701,14 @@ class PosOrderService implements PosOrderServiceInterface
             }
             // ─────────────────────────────────────────────────────────────────────────────
 
+            // Any amount not matched to an open invoice settles debt that has no invoice in the
+            // system (opening balances brought in as ledger entries, e.g. SalesAndPosDataSeeder).
+            // It is recorded explicitly instead of being silently absorbed.
+            $ledgerNotes = $notes ?? "تحصيل دفعة آجل من العميل {$customer->name} بطريقة {$paymentMethod}";
+            if ($remainingToApply > $eps) {
+                $ledgerNotes .= sprintf(' | منها %s ج.م على رصيد مديونية غير مرتبط بفواتير (رصيد افتتاحي).', number_format($remainingToApply, 2));
+            }
+
             return CreditLedgerEntry::create([
                 'customer_id'    => $customer->id,
                 'invoice_id'     => null,
@@ -598,7 +718,7 @@ class PosOrderService implements PosOrderServiceInterface
                 'balance_after'  => $balanceAfter,
                 'collected_by'   => $collectedBy,
                 'receipt_number' => $receiptNumber,
-                'notes'          => $notes ?? "تحصيل دفعة آجل من العميل {$customer->name} بطريقة {$paymentMethod}",
+                'notes'          => $ledgerNotes,
             ]);
         });
     }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Contracts\Sales\PosOrderServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Sales\ProcessSalesReturnRequest;
 use App\Models\Branch;
 use App\Models\Invoice;
 use Illuminate\Http\JsonResponse;
@@ -63,24 +64,16 @@ class SalesInvoiceController extends Controller
         return view('admin.invoices.show', compact('invoice'));
     }
 
-    public function processReturn(Request $request, Invoice $invoice): RedirectResponse|JsonResponse
+    public function processReturn(ProcessSalesReturnRequest $request, Invoice $invoice): RedirectResponse|JsonResponse
     {
-        $validated = $request->validate([
-            'reason'             => ['required', 'string', 'max:500'],
-            'items'              => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.quantity'   => ['required', 'integer', 'min:1'],
-        ], [
-            'reason.required'    => 'سبب المرتجع مطلوب.',
-            'items.required'     => 'يرجى تحديد الأصناف المراد إرجاعها.',
-        ]);
+        $validated = $request->validated();
 
         try {
             $updatedInvoice = $this->posOrderService->processSalesReturn(
                 $invoice->id,
                 $validated['items'],
                 $validated['reason'],
-                auth()->id() ?? 1
+                $request->user()->id
             );
 
             if ($request->wantsJson()) {
@@ -94,6 +87,14 @@ class SalesInvoiceController extends Controller
             return redirect()->route('admin.invoices.show', $invoice)
                 ->with('status', 'تم تسجيل مرتجع الفاتورة بنجاح.');
         } catch (\DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors'  => ['return_error' => [$e->getMessage()]],
+                ], 422);
+            }
+
             return redirect()->back()->withErrors(['return_error' => $e->getMessage()]);
         }
     }

@@ -58,7 +58,7 @@
                     </a>
                 @endif
                 @can('invoices.cancel')
-                    @if($invoice->status !== 'returned' && $invoice->status !== 'cancelled')
+                    @if(!in_array($invoice->status, \App\Enums\InvoiceStatus::nonReturnableValues(), true) && $invoice->items->contains(fn($line) => $line->returnableQuantity() > 0))
                         <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#returnModal">
                             <i class="ri-arrow-go-back-line align-bottom me-1"></i> تسجيل مرتجع مبيعات
                         </button>
@@ -374,16 +374,21 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">الأصناف المرتجعة:</label>
                         @foreach($invoice->items as $item)
-                            <div class="form-check border p-2 rounded mb-2 d-flex align-items-center justify-content-between">
+                            @php $returnable = $item->returnableQuantity(); @endphp
+                            <div class="form-check border p-2 rounded mb-2 d-flex align-items-center justify-content-between {{ $returnable === 0 ? 'opacity-50' : '' }}">
                                 <div>
-                                    <input class="form-check-input ms-2" type="checkbox" name="items[{{ $loop->index }}][product_id]" value="{{ $item->product_id }}" id="item_{{ $item->id }}" checked>
+                                    {{-- Unchecked rows post only a quantity and are dropped by ProcessSalesReturnRequest. --}}
+                                    <input class="form-check-input ms-2" type="checkbox" name="items[{{ $loop->index }}][invoice_item_id]" value="{{ $item->id }}" id="item_{{ $item->id }}" {{ $returnable === 0 ? 'disabled' : 'checked' }}>
                                     <label class="form-check-label fw-semibold" for="item_{{ $item->id }}">
                                         {{ $item->product?->name }}
+                                        @if((int) $item->returned_quantity > 0)
+                                            <span class="fs-11 text-muted d-block">سبق إرجاع {{ $item->returned_quantity }} من {{ $item->quantity }}</span>
+                                        @endif
                                     </label>
                                 </div>
                                 <div class="d-flex align-items-center" style="width: 120px;">
                                     <span class="fs-12 text-muted me-2">كمية:</span>
-                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ $item->quantity }}" min="1" max="{{ $item->quantity }}" required>
+                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ $returnable }}" min="1" max="{{ $returnable }}" {{ $returnable === 0 ? 'disabled' : '' }}>
                                 </div>
                             </div>
                         @endforeach

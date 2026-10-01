@@ -53,12 +53,21 @@ class StorePosInvoiceRequest extends FormRequest
             // Manager Override Code for Credit Limit Exceed
             'manager_override_code' => ['nullable', 'string'],
             'notes'                 => ['nullable', 'string', 'max:500'],
+            // Client-generated per-checkout key; a retried submission returns the original invoice.
+            'idempotency_key'       => ['nullable', 'string', 'max:64'],
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
+            // A retry of an already-committed checkout (same idempotency key) must not be re-validated:
+            // its serials and stock were consumed by the original sale. The service returns that invoice.
+            $idempotencyKey = trim((string) $this->input('idempotency_key', ''));
+            if ($idempotencyKey !== '' && \App\Models\Invoice::where('idempotency_key', $idempotencyKey)->exists()) {
+                return;
+            }
+
             $items = $this->input('items', []);
             if (!is_array($items) || empty($items)) {
                 return;
