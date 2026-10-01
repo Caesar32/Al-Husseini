@@ -73,34 +73,74 @@ Branch `remediation/2026-10` (from `main` 45b9ccc). The plan is in MASTER_REMEDI
 - ff3df99: migration 000002 made idempotent with a working down() (DB-02). A full rollback and re-migrate of all 10 remediation migrations on isolated SQLite passes (integrity_check ok, foreign_key_check clean).
 - Tests: 275 passed / 1675 assertions.
 
-### Batch 5: Phase 4 POS and credit UI (IN PROGRESS)
-- Agent af9b991e70525541a on branch batch/phase4-pos.
-  - Committed: b15e343 (POS stock check per product), f4aa7f9 (POS screen on real data).
-  - In progress: credit page payments endpoint and view (uncommitted in its worktree).
-- Not merged. After merging, run the full suite.
+### Batch 5: Phase 4 merge, mock stores, Phase 9 (COMPLETE)
+- 1cc1a4d: Phase 4 merged (POS and credit screens on server data, collections endpoint, stock check per product across lines, one battery unit per line). Report: batch-phase4.md.
+- 4c239d6: sales-store.js and hr-store.js are no longer loaded on any page. A test renders 11 admin pages and asserts none references them. The two .js files remain on disk (deletion needs approval).
+- 86077c4: SEC-08 branch isolation (BranchScope + BelongsToBranch on 7 models; WithinUserBranch rule on 5 requests; BRANCH_ISOLATION flag).
+- c29f94e: last employee-id-1 fallback removed from POS scrap recording.
 
-## Stopping point (2026-10-01)
-- Branch remediation/2026-10 at 6d0594a (plus this report commit). Full suite: 253 passed / 1548 assertions, 0 failed, 0 skipped, constraints enforced.
-- Pending migrations on dev MySQL, not run (owner action: `php artisan migrate`):
-  - 2026_10_01_000001
-  - 050000
-  - 060000-060002
-  - Phase 8 (080000) once merged
-- Next READY batch:
-  1. Collect and review the Phase 8 and Phase 4 agent branches, merge each, then run the full suite. If an agent stopped early, resume it on its branch; its work is in its worktree under .claude/worktrees.
-  2. Phase 9: SEC-08 branch isolation, plus settings wiring for keys whose rules are derivable.
-  3. Phase 10 cleanup: remove the dead observers, sales-store.js/hr-store.js (after Phase 4/8), the dead SupplierController::create, and the redundant indexes.
-  4. Final validation pass and an update of security-audit.md, business-integrity.md and master-audit.md statuses.
-- BLOCKED on owner decisions:
-  - D1: production data repair (`suppliers:rebuild-ledger-balances --apply`, UI-sale repair).
-  - D3: refund proration.
-  - D4: technician commissions.
-  - D5 (partial): automatic leave-status reversion.
-  - D6 (partial): scrap sale cash linkage.
-  - D7: locale.
-  - Purchase-return route permission (reuse purchases.create or add purchases.return).
-  - Supplier catalog sync semantics (merge vs replace).
-  - Replacement warranty period.
-  - Supplier credit-limit enforcement.
-  - Resale of a returned battery serial (unique index on warranties.serial_number).
-  - Role grants for purchases.create / suppliers.* (currently super-admin only; adjustable in the Roles UI).
+# Execution Summary
+- Branch `remediation/2026-10`, 43 commits since the baseline tag (176 files, +14555 / -3179) before this report.
+- Batches executed: 0 baseline, 1 test integrity, 2 shared infrastructure and security, 3 parallel modules (Phases 3, 5, 6+7), 4 Phase 8 and follow-ups, 5 Phase 4 and Phase 9. Four module phases ran as parallel agents in isolated worktrees and were merged one at a time with the full suite run after each merge.
+- Phases COMPLETE: 0, 1, 3, 4, 5, 6+7, 8. Phase 9 is complete for branch isolation (SEC-08) and the settings that can be wired without changing behaviour.
+- Phases PARTIAL: 9 (settings that need an owner decision, locale), 10 (cleanup, see Remaining Work).
+- BLOCKED parts: see Remaining Blockers.
+
+# Batch Results (tests before -> after)
+| Batch | Tests passed | Failed | Notes |
+|---|---|---|---|
+| HEAD 45b9ccc (strict tests) | 152 | 2 | the two failures were the month-end payroll simulation; pre-existing |
+| Baseline working tree (constraints silently off) | 168 | 0 | weakened diagnostics test, constraints disabled by migration |
+| 1 test integrity | 169 | 0 | constraints enforced; month-end date bugs fixed; strict test restored |
+| 2 security | 198 | 0 | |
+| 3 merges (3, 5, 6+7) | 250 | 0 | |
+| 4 Phase 8 and follow-ups | 275 | 0 | |
+| 5 Phase 4, mock stores, branch isolation | 310 (1889 assertions) | 0 | 0 skipped |
+- No test was skipped. The only test assertions removed since the baseline are the dashboard label rename, the replacement of the legacy override codes by a configured secret, and the invalid `payment_status`/`invoice_type` columns (all documented in their commits).
+- Failures found and resolved on the way: payroll last-day-of-month window (SQLite), simulation only passing on days 26 and later, ExampleTest 302 (UserFactory missing `is_active`), HrReportsTest 404 (fixture in a different branch), migration 000002 not rolling back on SQLite.
+
+# Remaining Blockers (owner decisions; none can be inferred from the code)
+| Decision | Affects | Why it can't be inferred |
+|---|---|---|
+| D1 production data repair | `suppliers:rebuild-ledger-balances --apply`, repair of UI-created sales (product_id 1, fake serials), UI-era returned quantities | depends on what production holds; the command is dry-run by default and writes a JSON backup first |
+| D3 refund proration | BIZ-04 | policy for spreading invoice discount, scrap deduction and tax over returned lines |
+| D4 technician commissions | BIZ-19, payroll gross | no rule for rate, trigger or approval exists in code or docs |
+| D5 leave end | automatic return to active status | whether `on_leave` should be derived or reverted is a policy |
+| D6 scrap sale | cash/treasury link | no treasury concept exists |
+| D7 locale | FE-07 | translate, or remove the switch |
+| Purchase returns | route permission | reuse `purchases.create` or add `purchases.return` |
+| Supplier catalog sync | merge or replace | `sync()` would delete entries not in the request |
+| Replacement warranty | period | full new period (current) or remaining |
+| Supplier credit limit | enforcement | block, warn, or ignore |
+| Returned battery serial | resale | unique index on `warranties.serial_number` includes voided rows |
+| Settings not wired | vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), allow_negative_stock (unsigned stock on MySQL), scrap_prefix | wiring changes behaviour |
+| Payroll rules | late-penalty rate, zero-net guard when debt absorbs the batch, leave balances (the 26-day norm is now a setting) | policy |
+| Role grants | `purchases.create`, `suppliers.create/edit` are super-admin only | which roles should hold them |
+
+# Security Status
+- RESOLVED (committed and tested): SEC-01 avatar storage (reclassified HIGH; the PHP-extension RCE claim was a false positive, because Laravel blocks those extensions), SEC-02, SEC-03, SEC-04, SEC-05, SEC-06, SEC-07, SEC-08, SEC-09, SEC-10, SEC-11, SEC-12, SEC-13, SEC-14 (new: login form prefilled admin credentials), POS idempotency keys scoped per cashier.
+- Route verification: of 112 routes, the 17 without `can:` are exactly the documented auth-only or guest routes (login, register, logout, root redirect, lockscreen, profile and avatar, global search which is now permission-filtered, starter, 404, lang, CSRF).
+- UNRESOLVED / residual risk:
+  - Operators must set `MANAGER_OVERRIDE_CODE_HASH`; without it every override is refused (fail closed).
+  - Client-side stored XSS through `innerHTML` was only partly reviewed; the rewritten POS, credit, products and customers screens escape server data, the remaining views were not audited.
+  - Production web server configuration and whether seeders ran in production are unknown. The deploy guide now denies script and html extensions under `/uploads`.
+  - Suppliers, customers and products have no branch column, so they are shared across branches by design.
+  - Any staff member can fetch another user's avatar image (staff photos); low sensitivity.
+  - Pint style is not enforced and the codebase was never Pint-formatted (about 100 files flagged, including untouched baseline files); no repo-wide reformat was done, to keep the diff reviewable.
+
+# Database Status
+- New migrations, NOT yet run on dev MySQL (owner action: `php artisan migrate`): 2026_10_01_000001 (document_sequences), 050000 (return tracking, refunded amount, idempotency key on invoices), 060000 (purchase item returned quantity), 060001 (claim notes), 060002 (scrap_sales), 080000 (deduction payroll item link).
+- Rewritten, already applied on dev MySQL, no rerun needed: 2026_09_30_000001 (SQLite branch only; the MySQL result is unchanged) and 2026_09_30_000002 (idempotent; MySQL already in the target state).
+- Verified on isolated SQLite with seeded data: a full rollback and re-migrate of all ten remediation migrations, `integrity_check` ok, `foreign_key_check` clean. Foreign keys and CHECK constraints are enforced during tests, and a TestCase assertion fails if anything disables them.
+- Data risks: invoices created through the old POS screen may carry product_id 1 and generated serials; ledger repair and per-line returned quantities for past returns are D1-blocked.
+
+# Final Test Status
+- 310 passed, 1889 assertions, 0 failed, 0 skipped.
+- Known failures: none. The two HEAD failures (month-end payroll simulation) are fixed at the root cause.
+- Not covered by automated tests: real browser flows (scanner focus, modals, an actual checkout) and MySQL-specific migration paths. A manual test sale on a staging copy is needed before release.
+
+# Remaining Work (concrete)
+1. Owner: run `php artisan migrate`, set `MANAGER_OVERRIDE_CODE_HASH`, review and merge `remediation/2026-10`, run a manual POS test sale.
+2. Needs your approval before deletion: public/assets/js/sales-store.js, public/assets/js/hr-store.js, app/Observers/InvoiceObserver.php, app/Observers/PurchaseInvoiceObserver.php, resources/views/admin/dashboard/partials/invoice-modal.blade.php, the dead SupplierController::create method, and the five agent worktrees and branches (`batch/*`, `worktree-agent-*`, under .claude/worktrees).
+3. ARC-04 stock movement journal (stock changes from five writers); ARC-06 move DashboardController aggregation into a service and batch the 7-day trend query; DB-03 redundant indexes; DB-04 `Invoice::scrapBattery` / `technicianCommission` hasOne vs many; FE-08 hard-coded `/admin/...` URLs in JS; the unused Vite/Tailwind pipeline.
+4. Owner decisions listed above, each unblocking its dependent task.
