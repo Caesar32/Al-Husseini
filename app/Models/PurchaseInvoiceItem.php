@@ -11,6 +11,7 @@ class PurchaseInvoiceItem extends Model
         'purchase_invoice_id',
         'product_id',
         'quantity',
+        'returned_quantity',
         'unit_cost_price',
         'total_cost_price',
         'batch_number',
@@ -21,6 +22,7 @@ class PurchaseInvoiceItem extends Model
     {
         return [
             'quantity' => 'integer',
+            'returned_quantity' => 'integer',
             'unit_cost_price' => 'decimal:2',
             'total_cost_price' => 'decimal:2',
             'production_date' => 'date',

@@ -3,18 +3,22 @@
 namespace App\Observers;
 
 use App\Models\WarrantyClaim;
+use App\Services\Support\DocumentNumberService;
+use Illuminate\Support\Facades\DB;
 
 class WarrantyClaimObserver
 {
     public function creating(WarrantyClaim $claim): void
     {
         if (empty($claim->claim_number)) {
-            $prefix = 'CLM-' . now()->format('Ym') . '-';
-            $nextSequence = WarrantyClaim::whereYear('created_at', now()->year)
-                ->whereMonth('created_at', now()->month)
-                ->count() + 1;
+            // Lock-protected monthly sequence (replaces "count of this month's claims + 1",
+            // which collided under concurrency or after deletions).
+            $prefix = 'CLM-' . now()->format('Ym');
+            $numbers = app(DocumentNumberService::class);
 
-            $claim->claim_number = $prefix . str_pad((string) $nextSequence, 4, '0', STR_PAD_LEFT);
+            $claim->claim_number = DB::transactionLevel() > 0
+                ? $numbers->nextFormatted($prefix, 4)
+                : DB::transaction(fn () => $numbers->nextFormatted($prefix, 4));
         }
 
         if (empty($claim->received_at)) {

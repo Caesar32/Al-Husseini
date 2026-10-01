@@ -243,6 +243,10 @@
                         <label class="form-label">سيريال البطارية الجديدة المنصرفة <span class="text-danger">*</span></label>
                         <input type="text" name="replacement_battery_serial" class="form-control" placeholder="سيريال البطارية البديلة">
                     </div>
+                    <div class="col-12">
+                        <label class="form-label">سبب رفض الضمان <small class="text-muted">(مطلوب عند اختيار رفض الضمان)</small></label>
+                        <textarea name="rejection_reason" class="form-control" rows="2" maxlength="500" placeholder="مثال: كسر في الغطاء / سوء استخدام"></textarea>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">

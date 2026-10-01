@@ -5,6 +5,8 @@ namespace App\Services\Sales;
 use App\Contracts\Sales\ScrapBatteryServiceInterface;
 use App\Models\ScrapBatteriesInventory;
 use App\Models\ScrapPricingTier;
+use App\Models\ScrapSale;
+use App\Services\Support\DocumentNumberService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -39,9 +41,10 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
         return $query->latest('id')->paginate($perPage)->withQueryString();
     }
 
-    public function getInventoryMetrics(int $branchId): array
+    public function getInventoryMetrics(?int $branchId): array
     {
-        $inStockBatteries = ScrapBatteriesInventory::where('branch_id', $branchId)
+        $inStockBatteries = ScrapBatteriesInventory::query()
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->where('status', 'in_stock')
             ->get();
 
@@ -95,18 +98,37 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
                 }
             }
 
-            $batchNumber = 'SCRAP-BATCH-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -4));
-            $totalCostValue = (float) $batteries->sum('scrap_value');
-            $totalSalePrice = (float) ($data['total_amount'] ?? 0);
+            $batchNumber = app(DocumentNumberService::class)->nextFormatted('SCRAP-BATCH-' . now()->format('Ymd'), 4);
+            $totalCostValue = round((float) $batteries->sum('scrap_value'), 2);
+            $totalSalePrice = round((float) ($data['total_amount'] ?? 0), 2);
             $grossProfit = round($totalSalePrice - $totalCostValue, 2);
+
+            // The batch is recorded as a sale (buyer, amount, method). Linking it to a cash or
+            // treasury account is an open owner decision (D6); none exists in the system.
+            $branchIds = $batteries->pluck('branch_id')->unique();
+            $sale = ScrapSale::create([
+                'batch_number'    => $batchNumber,
+                'branch_id'       => $branchIds->count() === 1 ? $branchIds->first() : null,
+                'buyer_name'      => $data['buyer_name'],
+                'buyer_phone'     => $data['buyer_phone'] ?? null,
+                'payment_method'  => $data['payment_method'] ?? null,
+                'batteries_count' => $batteries->count(),
+                'total_amount'    => $totalSalePrice,
+                'cost_value'      => $totalCostValue,
+                'gross_profit'    => $grossProfit,
+                'sold_by'         => $authorizedByUserId,
+                'notes'           => $data['notes'] ?? null,
+            ]);
 
             // Update status of all items in batch
             ScrapBatteriesInventory::whereIn('id', $batteryIds)->update([
-                'status'       => 'sold_to_factory',
-                'batch_number' => $batchNumber,
+                'status'        => 'sold_to_factory',
+                'batch_number'  => $batchNumber,
+                'scrap_sale_id' => $sale->id,
             ]);
 
             return [
+                'scrap_sale_id'    => $sale->id,
                 'batch_number'     => $batchNumber,
                 'batteries_count'  => $batteries->count(),
                 'buyer_name'       => $data['buyer_name'],

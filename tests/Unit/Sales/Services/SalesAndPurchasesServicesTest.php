@@ -76,6 +76,7 @@ test('purchase service processes purchase with exact weighted average cost WAC f
     // Total stock will be 20, Total value = 22,000 EGP -> Expected WAC = 1100.00 EGP
     $invoice = $purchaseService->createDirectPurchase([
         'supplier_id'     => $supplier->id,
+        'branch_id'       => Branch::first()->id,
         'invoice_number'  => 'PUR-WAC-TEST-01',
         'invoice_date'    => '2026-09-23',
         'items'           => [
@@ -107,7 +108,8 @@ test('purchase service processes purchase with exact weighted average cost WAC f
 
     // Test supplier payment settlement
     $paymentEntry = $purchaseService->recordSupplierPayment($supplier->id, 3000.00, 'cash', [
-        'notes' => 'سداد جزء من المديونية',
+        'notes'   => 'سداد جزء من المديونية',
+        'paid_by' => $user->id,
     ]);
 
     $supplier->refresh();

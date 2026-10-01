@@ -79,6 +79,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         // سداد 5,000 ج.م كاش، والمتبقي 15,000 ج.م آجل
         $invoice1 = $purchaseService->createDirectPurchase([
             'supplier_id'     => $supplierA->id,
+            'branch_id'       => $this->branch->id,
             'invoice_number'  => 'PUR-SEC1-01',
             'invoice_date'    => '2026-09-23',
             'items'           => [
@@ -106,6 +107,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         // ( (10 * 2000) + (10 * 2200) ) / (10 + 10) = (20,000 + 22,000) / 20 = 42,000 / 20 = 2,100.00 ج.م
         $invoice2 = $purchaseService->createDirectPurchase([
             'supplier_id'     => $supplierB->id,
+            'branch_id'       => $this->branch->id,
             'invoice_number'  => 'PUR-SEC1-02',
             'invoice_date'    => '2026-09-23',
             'items'           => [
@@ -141,7 +143,8 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
 
         // اختبار سداد دفعة للمورد (أ) بمبلغ 5,000 ج.م وتحديث دفتر الأستاذ
         $paymentEntry = $purchaseService->recordSupplierPayment($supplierA->id, 5000.00, 'cash', [
-            'notes' => 'سداد جزء من فاتورة PUR-SEC1-01',
+            'notes'   => 'سداد جزء من فاتورة PUR-SEC1-01',
+            'paid_by' => $this->cashier->id,
         ]);
 
         $supplierA->refresh();

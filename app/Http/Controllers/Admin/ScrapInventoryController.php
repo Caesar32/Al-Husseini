@@ -20,10 +20,16 @@ class ScrapInventoryController extends Controller
 
     public function index(Request $request): View|JsonResponse
     {
-        $branchId = (int) ($request->get('branch_id') ?: (auth()->user()?->branch_id ?: 1));
+        // Selected branch, else the user's branch; users without a branch see all branches.
+        // Metrics and the inventory list use the same branch scope.
+        $branchId = $request->filled('branch_id')
+            ? (int) $request->get('branch_id')
+            : (auth()->user()?->branch_id ? (int) auth()->user()->branch_id : null);
 
         $metrics = $this->scrapBatteryService->getInventoryMetrics($branchId);
-        $inventory = $this->scrapBatteryService->getPaginatedInventory($request->only(['status', 'capacity_ah', 'batch_number']));
+        $inventory = $this->scrapBatteryService->getPaginatedInventory(
+            $request->only(['status', 'capacity_ah', 'batch_number']) + ['branch_id' => $branchId]
+        );
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -41,7 +47,7 @@ class ScrapInventoryController extends Controller
     public function sellBatch(StoreScrapSaleBatchRequest $request): RedirectResponse|JsonResponse
     {
         try {
-            $result = $this->scrapBatteryService->dispatchScrapSaleBatch($request->validated(), auth()->id() ?? 1);
+            $result = $this->scrapBatteryService->dispatchScrapSaleBatch($request->validated(), (int) auth()->id());
 
             if ($request->wantsJson()) {
                 return response()->json([
@@ -53,7 +59,11 @@ class ScrapInventoryController extends Controller
 
             return redirect()->route('admin.scrap.index')
                 ->with('status', "تم بيع شحنة الكهنة بنجاح برقم ({$result['batch_number']}). أرباح الشحنة: " . number_format($result['gross_profit'], 2) . " ج.م.");
-        } catch (\DomainException $e) {
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
             return redirect()->back()->withErrors(['scrap_error' => $e->getMessage()]);
         }
     }

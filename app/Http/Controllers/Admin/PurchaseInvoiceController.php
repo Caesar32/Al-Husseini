@@ -47,8 +47,15 @@ class PurchaseInvoiceController extends Controller
 
     public function store(StorePurchaseInvoiceRequest $request): RedirectResponse|JsonResponse
     {
-        $userId = auth()->id() ?? 1;
-        $invoice = $this->purchaseService->createDirectPurchase($request->validated(), $userId);
+        try {
+            $invoice = $this->purchaseService->createDirectPurchase($request->validated(), (int) auth()->id());
+        } catch (\InvalidArgumentException|\DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return redirect()->back()->withErrors(['purchase_error' => $e->getMessage()])->withInput();
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
