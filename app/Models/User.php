@@ -57,4 +57,24 @@ class User extends Authenticatable
     {
         return $this->belongsTo(Branch::class);
     }
+
+    /**
+     * Avatars are stored on the private "local" disk under avatars/ and served through an
+     * authenticated route. Older avatars were written to public/uploads/avatars with names
+     * like avatar_{id}_{time}.{ext}; only names matching that image pattern are still shown.
+     */
+    public function avatarUrl(): string
+    {
+        $avatar = (string) $this->avatar;
+
+        if (str_starts_with($avatar, 'avatars/')) {
+            return route('admin.profile.avatar.show', ['user' => $this->id, 'v' => md5($avatar)]);
+        }
+
+        if (preg_match('/^avatar_\d+_\d+\.(jpe?g|png|webp)$/i', $avatar)) {
+            return asset('uploads/avatars/' . $avatar);
+        }
+
+        return asset('assets/images/users/avatar-1.jpg');
+    }
 }

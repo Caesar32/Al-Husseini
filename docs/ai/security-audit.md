@@ -9,7 +9,15 @@ Snapshot 2026-09-30, working tree included. CONFIRMED means the code was read di
 
 ## Confirmed findings
 
-### SEC-01 CRITICAL: avatar upload can store a server-executable file
+### SEC-01 HIGH (reclassified from CRITICAL on 2026-10-01): avatar upload kept the client extension inside the web root
+- Correction: the RCE path described below is a FALSE POSITIVE as written. Laravel's `mimes`/`image` validation (ValidatesAttributes::shouldBlockPhpUpload) rejects client extensions php, php3-8, phtml and phar. This was verified by test.
+- What remains true: any other client extension was kept and written into public/uploads/avatars. For example `x.html` holding a valid image plus markup would be served as same-origin HTML (stored XSS). Other extensions depend on server handlers (pht, shtml).
+- Remediated (see REMEDIATION_EXECUTION_REPORT.md):
+  - The file is stored on the private local disk with a random name and an extension derived from its content.
+  - It is served through an auth-only route with nosniff.
+  - Legacy names are trusted only when they match the old image pattern.
+  - The deployment guide denies script and html extensions under /uploads.
+- Original text follows.
 - File: app/Http/Controllers/Admin/ProfileController.php::updateAvatar L71-94.
 - Evidence: validation is `image|mimes:jpeg,png,jpg,webp|max:2048`, and both rules inspect the content-sniffed MIME type. The saved name, however, uses `getClientOriginalExtension()` (L85), and the file is moved into `public_path('uploads/avatars')` (L86, L92).
 - Root cause: the extension comes from the client, the file is stored inside the web root, and the name is predictable (`avatar_{id}_{time}`).

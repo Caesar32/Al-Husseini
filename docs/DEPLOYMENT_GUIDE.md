@@ -144,6 +144,13 @@ server {
     index index.php;
     charset utf-8;
 
+    # ملفات رفعها المستخدمون سابقاً داخل المجلد العام (الصور الشخصية القديمة): تُخدَّم كصور فقط ولا تُنفَّذ
+    # الصور الجديدة تُحفظ خارج public وتُعرض عبر مسار مُصادَق عليه (admin/profile/avatar/{user})
+    location ^~ /uploads/ {
+        location ~* \.(php|phtml|phar|pht|html?|svg|shtml)$ { deny all; }
+        add_header X-Content-Type-Options "nosniff";
+    }
+
     # مسار فحص الصحة المستخدم في الـ CI/CD
     location = /up {
         try_files $uri $uri/ /index.php?$query_string;

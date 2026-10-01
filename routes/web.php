@@ -90,6 +90,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('/profile/info', [ProfileController::class, 'updateInfo'])->name('profile.info');
         Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
         Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+        Route::get('/profile/avatar/{user}', [ProfileController::class, 'showAvatar'])->name('profile.avatar.show');
 
         // إعدادات النظام والمنشأة (System Settings)
         Route::get('/settings', [SettingController::class, 'index'])->name('settings')->middleware('can:settings.manage');

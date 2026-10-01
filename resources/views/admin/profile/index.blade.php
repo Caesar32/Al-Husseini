@@ -50,7 +50,7 @@
     <div class="col-xxl-3 col-lg-4">
         <div class="card card-body p-4 text-center shadow-sm">
             <div class="profile-user position-relative d-inline-block mx-auto mb-3">
-                <img src="{{ $user->avatar ? asset('uploads/avatars/' . $user->avatar) : asset('assets/images/users/avatar-1.jpg') }}" class="rounded-circle avatar-xl img-thumbnail user-profile-image shadow" alt="user-profile-image">
+                <img src="{{ $user->avatarUrl() }}" class="rounded-circle avatar-xl img-thumbnail user-profile-image shadow" alt="user-profile-image">
                 <div class="avatar-xs p-0 rounded-circle profile-photo-edit position-absolute end-0 bottom-0">
                     <label for="profile-img-file-input" class="profile-photo-edit avatar-xs">
                         <span class="avatar-title rounded-circle bg-light text-body shadow cursor-pointer">
