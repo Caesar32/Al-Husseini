@@ -68,20 +68,14 @@ class SystemDiagnosticService
         }
 
         // 2. فحص اتساق كشوف حساب العملاء (Customer Ledger vs Current Balance)
+        // كل قيد يجب أن ينقل الرصيد بقيمته وباتجاه نوعه، وأن يبدأ من رصيد القيد السابق،
+        // وآخر رصيد في الدفتر يجب أن يساوي الرصيد الحالي المخزن. العملاء بلا قيود (رصيد افتتاحي) لا يُقارنون.
         $customerMismatchCount = 0;
-        $customers = Customer::where('current_credit_balance', '>', 0)->get();
-        foreach ($customers as $customer) {
-            $ledgerDebt = CreditLedgerEntry::where('customer_id', $customer->id)
-                ->where('entry_type', 'invoice_debt')
-                ->sum('amount');
-            $ledgerPaid = CreditLedgerEntry::where('customer_id', $customer->id)
-                ->where('entry_type', 'payment_settlement')
-                ->sum('amount');
-            $calculatedBalance = round($ledgerDebt - $ledgerPaid, 2);
-            $actualBalance = round((float) $customer->current_credit_balance, 2);
-
-            // السماح بفرق طفيف إذا وُجد رصيد افتتاحي بدون قيد
-            if (abs($calculatedBalance - $actualBalance) > 1.0) {
+        $customerSigns = ['invoice_debt' => 1, 'payment_collection' => -1, 'refund' => -1];
+        $customerIds = CreditLedgerEntry::distinct()->pluck('customer_id');
+        foreach (Customer::whereIn('id', $customerIds)->get() as $customer) {
+            $entries = CreditLedgerEntry::where('customer_id', $customer->id)->orderBy('id')->get();
+            if ($this->ledgerChainIsBroken($entries, $customerSigns, (float) $customer->current_credit_balance)) {
                 $customerMismatchCount++;
             }
         }
@@ -97,19 +91,14 @@ class SystemDiagnosticService
         ];
 
         // 3. فحص اتساق كشوف حساب الموردين (Supplier Ledger vs Current Balance)
+        // نفس قاعدة سلسلة الأرصدة لكل الموردين الذين لهم قيود (بما فيها الأرصدة الصفرية والسالبة).
+        // adjustment = إشعار خصم ضمان من المورد (يُنقص المستحق للمورد).
         $supplierMismatchCount = 0;
-        $suppliers = Supplier::where('current_balance', '>', 0)->get();
-        foreach ($suppliers as $supplier) {
-            $ledgerDebt = SupplierLedgerEntry::where('supplier_id', $supplier->id)
-                ->where('entry_type', 'purchase_invoice')
-                ->sum('amount');
-            $ledgerPaid = SupplierLedgerEntry::where('supplier_id', $supplier->id)
-                ->where('entry_type', 'payment')
-                ->sum('amount');
-            $calculatedBalance = round($ledgerDebt - $ledgerPaid, 2);
-            $actualBalance = round((float) $supplier->current_balance, 2);
-
-            if (abs($calculatedBalance - $actualBalance) > 1.0) {
+        $supplierSigns = ['purchase_invoice' => 1, 'supplier_payment' => -1, 'purchase_return' => -1, 'adjustment' => -1];
+        $supplierIds = SupplierLedgerEntry::distinct()->pluck('supplier_id');
+        foreach (Supplier::withTrashed()->whereIn('id', $supplierIds)->get() as $supplier) {
+            $entries = SupplierLedgerEntry::where('supplier_id', $supplier->id)->orderBy('id')->get();
+            if ($this->ledgerChainIsBroken($entries, $supplierSigns, (float) $supplier->current_balance)) {
                 $supplierMismatchCount++;
             }
         }
@@ -228,6 +217,39 @@ class SystemDiagnosticService
             'issues'       => $issues,
             'audited_at'   => now()->toDateTimeString(),
         ];
+    }
+
+    /**
+     * True when a ledger (ordered by id) is not a consistent running balance:
+     * an entry does not start where the previous one ended, an entry of a known type does not
+     * move the balance by its amount in that type's direction, or the final balance differs
+     * from the stored current balance. Entry types missing from $signs only need continuity.
+     *
+     * @param \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model> $entries
+     * @param array<string, int> $signs entry_type => +1 / -1
+     */
+    private function ledgerChainIsBroken($entries, array $signs, float $currentBalance): bool
+    {
+        $eps = (float) config('finance.epsilon', 0.01);
+        $previousAfter = null;
+
+        foreach ($entries as $entry) {
+            $before = (float) $entry->balance_before;
+            $after = (float) $entry->balance_after;
+
+            if ($previousAfter !== null && abs($before - $previousAfter) > $eps) {
+                return true;
+            }
+
+            $sign = $signs[$entry->entry_type] ?? null;
+            if ($sign !== null && abs(($before + $sign * (float) $entry->amount) - $after) > $eps) {
+                return true;
+            }
+
+            $previousAfter = $after;
+        }
+
+        return $previousAfter !== null && abs($previousAfter - $currentBalance) > $eps;
     }
 
     /**
