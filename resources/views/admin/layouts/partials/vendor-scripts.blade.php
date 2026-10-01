@@ -16,8 +16,12 @@
 <!-- Global Spotlight Search Engine -->
 <script src="{{ asset('assets/js/global-spotlight-search.js') }}"></script>
 
+{{-- Page-owned scripts. The seamless navigation engine re-runs ONLY the scripts inside this
+     container after swapping .main-content; layout-owned inline scripts below must run once. --}}
+<div id="page-scripts">
 @yield('script')
 @stack('scripts')
+</div>
 
 <!-- Theme Icon & Sidebar State Sync (Bulletproof & Immediate) -->
 <script>
@@ -290,7 +294,11 @@ window.showHrToast = function(title, message, type) {
         if (navAbort) {
             navAbort.abort();
         }
-        navAbort = new AbortController();
+        const thisNavigation = new AbortController();
+        navAbort = thisNavigation;
+        // Last click wins: a navigation that has been superseded must not swap content,
+        // push history or fall back to a native load over the newer one.
+        const isCurrent = function() { return navAbort === thisNavigation; };
 
         startProgress();
 
@@ -300,8 +308,10 @@ window.showHrToast = function(title, message, type) {
                     'X-Requested-With': 'XMLHttpRequest',
                     'X-Al-Husseini-Seamless': '1'
                 },
-                signal: navAbort.signal
+                signal: thisNavigation.signal
             });
+
+            if (!isCurrent()) return;
 
             if (!res.ok) {
                 window.location.href = url;
@@ -309,6 +319,8 @@ window.showHrToast = function(title, message, type) {
             }
 
             const html = await res.text();
+            if (!isCurrent()) return;
+
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
@@ -334,20 +346,28 @@ window.showHrToast = function(title, message, type) {
             currentMain.style.opacity = '0.4';
             currentMain.style.transition = 'opacity 0.08s ease';
 
-            setTimeout(function() {
+            setTimeout(async function() {
+                if (!isCurrent()) return;
+
                 currentMain.innerHTML = newMain.innerHTML;
                 currentMain.style.opacity = '1';
 
                 // Sync sidebar active link
                 syncSidebar(url);
 
-                // Run page-specific scripts
-                runPageScripts(doc, currentMain);
+                try {
+                    // Run page-specific scripts (waiting for any library they load first);
+                    // collect the init handlers they register
+                    const pageInitHandlers = await runPageScripts(doc, currentMain);
 
-                // Re-initialize core UI widgets
-                reinitWidgets();
+                    // A newer navigation replaced this page while its libraries were loading
+                    if (!isCurrent()) return;
 
-                finishProgress();
+                    // Re-initialize core UI widgets, then run ONLY this page's init handlers
+                    reinitWidgets(pageInitHandlers);
+                } finally {
+                    finishProgress();
+                }
             }, 80);
 
         } catch (err) {
@@ -381,45 +401,90 @@ window.showHrToast = function(title, message, type) {
         } catch(e) {}
     }
 
-    function runPageScripts(doc, container) {
-        // Collect scripts: inside new .main-content and any trailing scripts after #layout-wrapper
+    // Runs the scripts that belong to the page being swapped in, in document order, and returns the
+    // DOMContentLoaded / load handlers they registered (see reinitWidgets).
+    //
+    // Only scripts inside the new .main-content and inside the layout's #page-scripts container
+    // are page-owned. The layout's own inline scripts (this engine, theme sync, CSRF keep-alive)
+    // are siblings of that container and must NEVER be re-executed: doing so registered a new
+    // copy of every global listener per navigation, so one click started N parallel fetches
+    // and N swaps that raced each other (blank/dimmed/stale content).
+    //
+    // Scripts run sequentially: a newly added <script src> is awaited before the inline code that
+    // follows it, because that code usually depends on the library (e.g. ApexCharts); running it
+    // immediately threw "X is not defined" and left the page without its content.
+    async function runPageScripts(doc, container) {
         const scriptList = [];
         container.querySelectorAll('script').forEach(function(s) { scriptList.push(s); });
-        
-        doc.querySelectorAll('body > script').forEach(function(s) {
-            const src = s.getAttribute('src') || '';
-            // Skip core vendor scripts that are already loaded globally in parent
-            if (src.includes('bootstrap') || src.includes('app.js') || src.includes('plugins.js') || src.includes('vendor-scripts') || src.includes('admin-notifications')) {
-                return;
-            }
-            scriptList.push(s);
-        });
+        doc.querySelectorAll('#page-scripts script').forEach(function(s) { scriptList.push(s); });
 
-        scriptList.forEach(function(s) {
+        const captured = [];
+
+        for (const s of scriptList) {
             if (s.src) {
-                if (!document.querySelector(`script[src="${s.src}"]`)) {
-                    const el = document.createElement('script');
-                    el.src = s.src;
-                    el.async = false;
-                    document.body.appendChild(el);
-                }
+                await loadExternalScript(s.src);
             } else if (s.textContent.trim()) {
-                const rawCode = s.textContent;
-                // Convert top-level let/const to var to prevent SyntaxError on repeat visits
-                const safeCode = rawCode
-                    .replace(/(^|\n|\r|\;)\s*let\s+([a-zA-Z0-9_$]+)/g, '$1var $2')
-                    .replace(/(^|\n|\r|\;)\s*const\s+([a-zA-Z0-9_$]+)/g, '$1var $2');
-
-                try {
-                    (1, eval)(safeCode);
-                } catch(e) {
-                    console.warn('Script execution fallback:', e);
-                }
+                evalPageScript(s.textContent, captured);
             }
+        }
+
+        return captured;
+    }
+
+    // Appends a page library once; resolves when it has loaded (or failed, so one broken
+    // library cannot stall the whole navigation).
+    function loadExternalScript(src) {
+        if (document.querySelector('script[src="' + src + '"]')) {
+            return Promise.resolve();
+        }
+
+        return new Promise(function(resolve) {
+            const el = document.createElement('script');
+            el.src = src;
+            el.async = false;
+            el.onload = resolve;
+            el.onerror = function() {
+                console.warn('Page script failed to load:', src);
+                resolve();
+            };
+            document.body.appendChild(el);
         });
     }
 
-    function reinitWidgets() {
+    // Evaluates one inline page script in the global scope. Page scripts wire their init to
+    // DOMContentLoaded/load, which already fired for this document, so those registrations are
+    // captured instead of attached: they run exactly once (reinitWidgets) and never accumulate.
+    function evalPageScript(rawCode, captured) {
+        // Convert top-level let/const to var to prevent SyntaxError on repeat visits
+        const safeCode = rawCode
+            .replace(/(^|\n|\r|\;)\s*let\s+([a-zA-Z0-9_$]+)/g, '$1var $2')
+            .replace(/(^|\n|\r|\;)\s*const\s+([a-zA-Z0-9_$]+)/g, '$1var $2');
+
+        const docAdd = document.addEventListener;
+        const winAdd = window.addEventListener;
+        const capture = function(target, original) {
+            return function(type, listener, options) {
+                if ((type === 'DOMContentLoaded' || type === 'load') && listener) {
+                    captured.push({ target: target, type: type, listener: listener });
+                    return;
+                }
+                return original.call(this, type, listener, options);
+            };
+        };
+        document.addEventListener = capture(document, docAdd);
+        window.addEventListener = capture(window, winAdd);
+
+        try {
+            (1, eval)(safeCode);
+        } catch(e) {
+            console.warn('Script execution fallback:', e);
+        } finally {
+            document.addEventListener = docAdd;
+            window.addEventListener = winAdd;
+        }
+    }
+
+    function reinitWidgets(pageInitHandlers) {
         if (typeof feather !== 'undefined') {
             try { feather.replace(); } catch(e){}
         }
@@ -428,11 +493,25 @@ window.showHrToast = function(title, message, type) {
                 try { new SimpleBar(el); } catch(e){}
             });
         }
-        try {
-            document.dispatchEvent(new Event('DOMContentLoaded'));
-            window.dispatchEvent(new Event('load'));
-            window.dispatchEvent(new Event('resize'));
-        } catch(e){}
+
+        // Run only the init handlers the swapped-in page registered. Dispatching
+        // DOMContentLoaded/load on document/window instead re-fired every handler of every page
+        // visited so far, plus layout one-time setup (e.g. admin-notifications.js starts a 30 s
+        // polling interval on DOMContentLoaded: one more poller per navigation).
+        (pageInitHandlers || []).forEach(function(entry) {
+            const event = new Event(entry.type);
+            try {
+                if (typeof entry.listener === 'function') {
+                    entry.listener.call(entry.target, event);
+                } else if (typeof entry.listener.handleEvent === 'function') {
+                    entry.listener.handleEvent(event);
+                }
+            } catch(e) {
+                console.warn('Page init handler failed:', e);
+            }
+        });
+
+        try { window.dispatchEvent(new Event('resize')); } catch(e){}
     }
 
     // Intercept link clicks when in fullscreen
