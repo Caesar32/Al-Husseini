@@ -176,23 +176,21 @@
                                         </div>
                                     @endif
 
-                                    {{-- Demo quick-fill exposes seeded credentials: local development only (SEC-14). --}}
-                                    @if (app()->environment('local'))
-                                    <!-- Quick Demo Testing Buttons -->
-                                    <div class="mb-3 p-2 bg-light rounded border">
+                                    {{-- Account switcher: accounts and (non-production) password come from config
+                                         auth.login_switcher via AuthController; nothing is hard-coded here. --}}
+                                    @if (!empty($loginSwitcher['accounts']))
+                                    <div class="mb-3 p-2 bg-light rounded border" id="account-switcher"
+                                         @if (($loginSwitcher['password'] ?? null) !== null) data-password="{{ $loginSwitcher['password'] }}" @endif>
                                         <div class="d-flex align-items-center justify-content-between mb-1">
-                                            <span class="fs-11 fw-bold text-muted"><i class="ri-user-shared-line me-1 text-primary"></i> تعبئة تجريبية سريعة:</span>
+                                            <span class="fs-11 fw-bold text-muted"><i class="ri-user-shared-line me-1 text-primary"></i> تبديل الحساب:</span>
                                         </div>
                                         <div class="d-flex flex-wrap gap-1">
-                                            <button type="button" class="btn btn-xs btn-outline-danger py-0 px-2 fs-11" onclick="fillLogin('admin@alhusseini.com', '12345678')">
-                                                المشرف العام
+                                            @foreach ($loginSwitcher['accounts'] as $account)
+                                            <button type="button" class="btn btn-xs btn-outline-{{ $account['style'] }} py-0 px-2 fs-11 account-switch"
+                                                    data-login="{{ $account['login'] }}" onclick="fillLogin(this)" @if($effectiveLockout > 0) disabled @endif>
+                                                {{ $account['label'] }}
                                             </button>
-                                            <button type="button" class="btn btn-xs btn-outline-warning py-0 px-2 fs-11" onclick="fillLogin('cashier@alhusseini.com', '12345678')">
-                                                كاشير المبيعات
-                                            </button>
-                                            <button type="button" class="btn btn-xs btn-outline-success py-0 px-2 fs-11" onclick="fillLogin('accountant@alhusseini.com', '12345678')">
-                                                المحاسب المالي
-                                            </button>
+                                            @endforeach
                                         </div>
                                     </div>
                                     @endif
@@ -278,11 +276,21 @@
 <script src="{{ asset('assets/js/pages/particles.app.js') }}"></script>
 <script src="{{ asset('assets/js/pages/password-addon.init.js') }}"></script>
 <script>
-function fillLogin(login, pass) {
+function fillLogin(button) {
     const loginInput = document.getElementById('loginInput');
     const passInput = document.getElementById('password-input');
-    if (loginInput) loginInput.value = login;
-    if (passInput) passInput.value = pass;
+    const switcher = document.getElementById('account-switcher');
+    const password = switcher ? switcher.dataset.password : undefined;
+
+    if (loginInput) loginInput.value = button.dataset.login;
+    if (passInput) {
+        passInput.value = password !== undefined ? password : '';
+        if (password === undefined) passInput.focus(); // no preset password: the user types it
+    }
+
+    document.querySelectorAll('#account-switcher .account-switch').forEach(function (b) {
+        b.classList.toggle('active', b === button);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {

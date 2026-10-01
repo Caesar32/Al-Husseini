@@ -114,4 +114,30 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Login Page Account Switcher
+    |--------------------------------------------------------------------------
+    |
+    | Buttons on the login page that fill in the login of a known account.
+    |
+    | enabled:  LOGIN_ACCOUNT_SWITCHER. null (unset) = automatic: shown in every environment
+    |           except production. true/false forces it on/off.
+    | accounts: only accounts that exist and are active are offered.
+    | password: LOGIN_SWITCHER_PASSWORD, optional. When set it is also filled in, but ONLY
+    |           outside production (it is never rendered in production). Leave unset and the
+    |           user types the password.
+    |
+    */
+
+    'login_switcher' => [
+        'enabled' => env('LOGIN_ACCOUNT_SWITCHER'),
+        'password' => env('LOGIN_SWITCHER_PASSWORD'),
+        'accounts' => [
+            ['login' => 'admin@alhusseini.com', 'label' => 'المشرف العام', 'style' => 'danger'],
+            ['login' => 'cashier@alhusseini.com', 'label' => 'كاشير المبيعات', 'style' => 'warning'],
+            ['login' => 'accountant@alhusseini.com', 'label' => 'المحاسب المالي', 'style' => 'success'],
+        ],
+    ],
+
 ];

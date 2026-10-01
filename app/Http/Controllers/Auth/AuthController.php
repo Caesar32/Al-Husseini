@@ -24,8 +24,40 @@ class AuthController extends Controller
         }
 
         $lockoutSeconds = session('lockout_seconds') ?? 0;
+        $loginSwitcher = $this->loginSwitcher();
 
-        return view('admin.auth.login', compact('lockoutSeconds'));
+        return view('admin.auth.login', compact('lockoutSeconds', 'loginSwitcher'));
+    }
+
+    /**
+     * Accounts offered by the login page's account switcher (config auth.login_switcher).
+     * Automatic mode shows it everywhere except production; only existing, active accounts are
+     * listed, and a password is only ever included outside production.
+     *
+     * @return array{accounts: list<array{login: string, label: string, style: string}>, password: ?string}
+     */
+    private function loginSwitcher(): array
+    {
+        $config = (array) config('auth.login_switcher');
+        $enabled = $config['enabled'] ?? null;
+        $enabled = $enabled === null ? !app()->isProduction() : (bool) $enabled;
+
+        if (!$enabled) {
+            return ['accounts' => [], 'password' => null];
+        }
+
+        $configured = (array) ($config['accounts'] ?? []);
+        $active = User::whereIn('email', array_column($configured, 'login'))
+            ->where('is_active', true)
+            ->pluck('email')
+            ->all();
+
+        $password = app()->isProduction() ? null : (($config['password'] ?? null) ?: null);
+
+        return [
+            'accounts' => array_values(array_filter($configured, fn (array $a) => in_array($a['login'], $active, true))),
+            'password' => $password,
+        ];
     }
 
     /**

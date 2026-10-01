@@ -147,11 +147,15 @@ test('re-running the initial seeder does not reset passwords or reactivate accou
         ->and($cashier->is_active)->toBeFalse();
 });
 
-test('the login page does not prefill or display credentials outside local development', function () {
+test('the login page never prefills the form or hard-codes credentials', function () {
+    // Independent of any LOGIN_SWITCHER_PASSWORD in the developer's .env (see LoginAccountSwitcherTest).
+    config(['auth.login_switcher.password' => null]);
+
     $this->get(route('admin.login'))
         ->assertOk()
         ->assertDontSee('12345678')
-        ->assertDontSee("fillLogin('admin@alhusseini.com'", false);
+        ->assertDontSee("fillLogin('admin@alhusseini.com'", false)
+        ->assertDontSee('value="admin@alhusseini.com"', false);
 });
 
 // ── SEC-09: settings allow-list ──────────────────────────────────────────────
