@@ -42,28 +42,22 @@
                             <label class="form-label fs-9 text-muted mb-0 fw-bold">العدد:</label>
                             <div class="input-group input-group-sm">
                                 <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" onclick="adjustScrapCount(-1)">-</button>
-                                <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCountInput" value="1" min="1" max="20" oninput="calculateCartTotal()">
+                                <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCountInput" value="1" min="1" max="20" oninput="onScrapCapacityChange()">
                                 <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" onclick="adjustScrapCount(1)">+</button>
                             </div>
                         </div>
                         <div class="col-4">
-                            <label class="form-label fs-9 text-muted mb-0 fw-bold">السعة:</label>
-                            <select class="form-select form-select-sm fs-10 p-1" id="scrapCapacitySelect" onchange="onScrapCapacityChange()">
-                                <option value="45">45 Ah</option>
-                                <option value="60">60 Ah</option>
-                                <option value="70" selected>70 Ah</option>
-                                <option value="90">90 Ah</option>
-                                <option value="100">100 Ah</option>
-                                <option value="150">150 Ah</option>
-                            </select>
+                            <label class="form-label fs-9 text-muted mb-0 fw-bold">السعة (Ah):</label>
+                            <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCapacityInput" value="70" min="30" max="250" oninput="onScrapCapacityChange()">
                         </div>
                         <div class="col-4">
                             <label class="form-label fs-9 text-muted mb-0 fw-bold">سعر الكهنة:</label>
                             <div class="input-group input-group-sm">
-                                <input type="number" step="10" class="form-control form-control-sm font-monospace fw-bold text-success text-center p-0 fs-11" id="scrapPriceInput" placeholder="السعر" oninput="calculateCartTotal(false)">
+                                <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center p-0 fs-11" id="scrapPriceInput" placeholder="السعر" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" oninput="calculateCartTotal()">
                             </div>
                         </div>
                     </div>
+                    <div class="fs-10 text-muted mt-1" id="scrapTierHint"></div>
                     <div class="d-flex justify-content-between align-items-center mt-1 fs-10 text-muted">
                         <span>صافي خصم الكهنة:</span>
                         <span class="fw-bold text-success font-monospace fs-11" id="tradeInDiscountDisplay">- 0 ج.م</span>
@@ -76,6 +70,10 @@
                 <div class="d-flex justify-content-between mb-0">
                     <span class="text-muted">المجموع قبل الخصم:</span>
                     <span class="fw-bold text-dark font-monospace" id="cartSubtotal">0 ج.م</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-0 gap-2">
+                    <label for="cartDiscountInput" class="text-muted mb-0 text-nowrap">خصم إضافي:</label>
+                    <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 110px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" oninput="calculateCartTotal()">
                 </div>
                 <div class="d-flex justify-content-between mb-0 text-danger d-none" id="cartScrapDiscountRow">
                     <span>خصم الكهنة المسترجعة:</span>
@@ -131,6 +129,7 @@
                         <strong class="text-success font-monospace fs-12" id="cashChangeOutput">0 ج.م</strong>
                     </div>
                 </div>
+                <div class="d-flex flex-wrap gap-1 mt-1" id="quickCashChips"></div>
             </div>
 
             <!-- Credit Fields (If payment is "الآجل") -->
