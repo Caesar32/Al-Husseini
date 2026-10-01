@@ -43,6 +43,7 @@
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">إجمالي المدفوعات المسددة</p>
                     <h4 class="fs-20 fw-bold mb-0 text-success">{{ number_format($statement['total_payments'], 2) }} ج.م</h4>
+                    <p class="fs-11 text-muted mb-0">مرتجعات: {{ number_format($statement['total_returns'] ?? 0, 2) }} ج.م | تسويات وإشعارات خصم: {{ number_format($statement['total_adjustments'] ?? 0, 2) }} ج.م</p>
                 </div>
             </div>
         </div>
