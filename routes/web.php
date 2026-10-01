@@ -207,6 +207,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
         Route::get('credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
 
+        // ─── BEGIN Phase 4: credit collections history (server-backed) ──────────────────────
+        Route::get('credit/payments', [CreditCustomerController::class, 'payments'])->name('credit.payments')->middleware('can:credit.view');
+        // ─── END Phase 4 ─────────────────────────────────────────────────────────────────────
+
         // التوافق مع المسارات السابقة (Backwards Compatibility Route Aliases)
         Route::prefix('sales')->name('sales.')->group(function () {
             Route::get('/pos', [PosController::class, 'index'])->name('pos')->middleware('can:pos.access');

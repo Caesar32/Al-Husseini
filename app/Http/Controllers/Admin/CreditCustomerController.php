@@ -6,6 +6,7 @@ use App\Contracts\Sales\PosOrderServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CreditLedgerEntry;
+use App\Services\Sales\CreditCollectionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,7 +15,8 @@ use Illuminate\View\View;
 class CreditCustomerController extends Controller
 {
     public function __construct(
-        protected PosOrderServiceInterface $posOrderService
+        protected PosOrderServiceInterface $posOrderService,
+        protected CreditCollectionService $collections
     ) {}
 
     /**
@@ -24,12 +26,9 @@ class CreditCustomerController extends Controller
     {
         // جلب العملاء المدينين مع إحصائياتهم - Eager Loading للعلاقات
         $customers = Customer::where('current_credit_balance', '>', 0)
-            ->with([
-                'vehicles:id,customer_id,car_brand,car_model,plate_number',
-                'creditLedgers' => function ($q) {
-                    $q->orderByDesc('id')->limit(5);
-                },
-            ])
+            ->with(['vehicles:id,customer_id,car_brand,car_model,plate_number'])
+            ->withSum(['invoices as purchases_total' => fn ($q) => $q->countable()], 'final_amount')
+            ->withSum(['invoices as refunded_total' => fn ($q) => $q->countable()], 'refunded_amount')
             ->orderByDesc('current_credit_balance')
             ->get();
 
@@ -40,21 +39,72 @@ class CreditCustomerController extends Controller
             $c->credit_limit > 0 && $c->current_credit_balance > $c->credit_limit
         )->count();
 
+        // Only the fields the page needs (no national ids or other internal columns).
+        $customerRows = $customers->map(fn (Customer $c) => [
+            'id'              => $c->id,
+            'name'            => $c->name,
+            'phone'           => $c->phone,
+            'tier'            => $c->tier,
+            'credit_limit'    => (float) $c->credit_limit,
+            'credit_balance'  => (float) $c->current_credit_balance,
+            'purchases_total' => round((float) $c->purchases_total - (float) $c->refunded_total, 2),
+            'vehicle'         => $c->vehicles->first() ? [
+                'car'          => trim($c->vehicles->first()->car_brand . ' ' . $c->vehicles->first()->car_model),
+                'plate_number' => $c->vehicles->first()->plate_number,
+            ] : null,
+        ])->values();
+
+        $collectedThisMonth = $this->collections->collectedBetween(now()->startOfMonth(), now()->endOfMonth());
+        $collectionsCount   = $this->collections->countCollections();
+        $totalCustomers     = Customer::where('is_active', true)
+            ->where('phone', '!=', \App\Services\Sales\CustomerService::WALK_IN_PHONE)
+            ->count();
+
         if ($request->wantsJson()) {
             return response()->json([
-                'customers'          => $customers,
-                'total_outstanding'  => $totalOutstanding,
-                'customers_count'    => $customersCount,
+                'customers'            => $customerRows,
+                'total_outstanding'    => $totalOutstanding,
+                'customers_count'      => $customersCount,
                 'exceeded_limit_count' => $exceededLimitCount,
+                'collected_this_month' => $collectedThisMonth,
             ]);
         }
 
-        return view('admin.sales.credit', compact(
-            'customers',
-            'totalOutstanding',
-            'customersCount',
-            'exceededLimitCount'
-        ));
+        return view('admin.sales.credit', [
+            'customers'          => $customerRows,
+            'totalOutstanding'   => $totalOutstanding,
+            'customersCount'     => $customersCount,
+            'exceededLimitCount' => $exceededLimitCount,
+            'collectedThisMonth' => $collectedThisMonth,
+            'collectionsCount'   => $collectionsCount,
+            'totalCustomers'     => $totalCustomers,
+        ]);
+    }
+
+    /**
+     * سجل سندات تحصيل الآجل (من دفتر الأستاذ) مع إجمالي تحصيلات الشهر الحالي.
+     */
+    public function payments(Request $request): JsonResponse
+    {
+        $page = $this->collections->paginateCollections(20);
+
+        return response()->json([
+            'data' => collect($page->items())->map(fn (CreditLedgerEntry $e) => [
+                'id'             => $e->id,
+                'receipt_number' => $e->receipt_number,
+                'amount'         => (float) $e->amount,
+                'customer'       => $e->customer ? ['id' => $e->customer->id, 'name' => $e->customer->name] : null,
+                'collected_by'   => $e->collectedByUser?->name,
+                'notes'          => $e->notes,
+                'created_at'     => $e->created_at?->toDateTimeString(),
+            ])->values(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page'    => $page->lastPage(),
+                'total'        => $page->total(),
+            ],
+            'collected_this_month' => $this->collections->collectedBetween(now()->startOfMonth(), now()->endOfMonth()),
+        ]);
     }
 
     /**

@@ -178,7 +178,7 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="text-uppercase fw-bold text-muted fs-12 mb-1">المحصل من الآجل مؤخراً</p>
+                            <p class="text-uppercase fw-bold text-muted fs-12 mb-1">المحصل من الآجل هذا الشهر</p>
                             <h3 class="fs-24 fw-extrabold text-success mb-1 font-monospace" id="kpiCollectedThisMonth">0 ج.م</h3>
                             <small class="text-muted fs-11">تم توريدها لحساب المركز</small>
                         </div>
@@ -248,11 +248,10 @@
                                 </div>
                                 <div class="col-md-4 col-12">
                                     <select class="form-select" id="filterCustType" onchange="renderCreditTable()">
-                                        <option value="all">جميع أنواع العملاء</option>
-                                        <option value="ملاكي">سيارات ملاكي خاصة</option>
-                                        <option value="ورش وشركات">ورش صيانة وشركات</option>
-                                        <option value="تاكسي وأوبر">تاكسي وأوبر</option>
-                                        <option value="نقل وتريلات">نقل وتريلات</option>
+                                        <option value="all">جميع تصنيفات العملاء</option>
+                                        <option value="standard">عادي</option>
+                                        <option value="vip">مميز (VIP)</option>
+                                        <option value="fleet">أساطيل وشركات</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3 col-12 text-md-end">
@@ -293,10 +292,8 @@
                                             <th>اسم العميل</th>
                                             <th>تاريخ السداد</th>
                                             <th>المبلغ المحصل (ج.م)</th>
-                                            <th>طريقة الدفع</th>
                                             <th>المستلم بالمركز</th>
                                             <th>ملاحظات السداد</th>
-                                            <th class="no-print">الحالة</th>
                                         </tr>
                                     </thead>
                                     <tbody id="tbodyCreditPayments">
@@ -304,6 +301,7 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <div class="d-flex justify-content-center gap-2 mt-3 no-print" id="paymentsPager"></div>
                         </div>
                     </div>
                 </div>
@@ -346,7 +344,7 @@
                                 <button type="button" class="btn btn-outline-primary btn-sm quick-pay-preset" onclick="setPayFullAmount()">سداد كامل المتبقي</button>
                             </div>
                             <div class="input-group">
-                                <input type="number" class="form-control form-control-lg fw-bold fs-16 border-success text-center" id="payAmountInput" required min="50" step="50" value="500">
+                                <input type="number" class="form-control form-control-lg fw-bold fs-16 border-success text-center" id="payAmountInput" required min="0.01" step="0.01" value="500">
                                 <span class="input-group-text bg-success-subtle text-success fw-bold">جنيه مصري (EGP)</span>
                             </div>
                         </div>
@@ -356,20 +354,21 @@
                             <label class="form-label fw-bold text-dark fs-13">طريقة استلام الدفعة:</label>
                             <select class="form-select" id="payMethodSelect">
                                 <option value="cash">نقداً (كاش بالخزينة)</option>
-                                <option value="instapay">تحويل إنستاباي (InstaPay)</option>
-                                <option value="vodafone_cash">فودافون كاش / محفظة</option>
-                                <option value="bank">إيداع / تحويل بنكي</option>
+                                <option value="bank_transfer">تحويل بنكي / إنستاباي / محفظة</option>
+                                <option value="card">بطاقة بنكية (فيزا)</option>
                             </select>
                         </div>
 
-                        <!-- Receiver -->
-                        <div class="mb-3">
-                            <label class="form-label fw-bold text-dark fs-13">المستلم بالإدارة:</label>
-                            <select class="form-select" id="payReceiverSelect">
-                                <option value="الحاج محمود الحسيني">الحاج محمود الحسيني (المدير العام)</option>
-                                <option value="إبراهيم حسن (كبير البائعين)">إبراهيم حسن (مسؤول الصالة)</option>
-                                <option value="الخزينة الرئيسية">الخزينة الرئيسية للمركز</option>
-                            </select>
+                        <!-- Receipt number (optional) & receiver (always the signed-in user) -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-13">رقم سند القبض (اختياري):</label>
+                                <input type="text" class="form-control font-monospace" id="payReceiptInput" maxlength="50">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label fw-bold text-dark fs-13">المستلم:</label>
+                                <input type="text" class="form-control" value="{{ auth()->user()->name }}" readonly>
+                            </div>
                         </div>
 
                         <!-- Notes -->
@@ -417,162 +416,84 @@
 <script>
 'use strict';
 
-// Server-backed credit data (FIN-M06: no longer localStorage-only)
-window.serverCreditData = {
+// Server data only (no browser mock store).
+const CREDIT_DATA = {
     totalOutstanding: {{ number_format($totalOutstanding, 2, '.', '') }},
-    customersCount: {{ $customersCount }},
-    exceededLimitCount: {{ $exceededLimitCount }},
-    customers: @json($customers)
+    customersCount: {{ (int) $customersCount }},
+    exceededLimitCount: {{ (int) $exceededLimitCount }},
+    collectedThisMonth: {{ number_format($collectedThisMonth, 2, '.', '') }},
+    collectionsCount: {{ (int) $collectionsCount }},
+    totalCustomers: {{ (int) $totalCustomers }},
+    customers: @json($customers),
 };
+const CREDIT_ROUTES = {
+    settle: @json(route('admin.credit.settle')),
+    payments: @json(route('admin.credit.payments')),
+    statement: @json(route('admin.credit.statement', ['customer' => '__ID__'])),
+};
+const TIER_LABELS = { standard: 'عادي', vip: 'مميز (VIP)', fleet: 'أساطيل وشركات' };
 
 let currentTargetCustomer = null;
+let paymentsPage = 1;
+
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function fmt(amount) {
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(amount) || 0) + ' ج.م';
+}
+
+function csrf() {
+    return typeof window.getCsrfToken === 'function'
+        ? window.getCsrfToken()
+        : (document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}');
+}
+
+function statementUrl(id) {
+    return CREDIT_ROUTES.statement.replace('__ID__', encodeURIComponent(id));
+}
+
+function findCreditCustomer(id) {
+    return CREDIT_DATA.customers.find(c => c.id === Number(id)) || null;
+}
 
 document.addEventListener('DOMContentLoaded', function () {
-    const today = new Date();
     const el = document.getElementById('printCreditDate');
-    if (el) el.textContent = today.toLocaleDateString('ar-EG', { dateStyle: 'full' });
+    if (el) el.textContent = new Date().toLocaleDateString('ar-EG', { dateStyle: 'full' });
 
     renderCreditDashboard();
-
-    window.addEventListener('alhusseini-sales-updated', function () {
-        renderCreditDashboard();
-    });
+    loadPayments(1);
 });
 
 function renderCreditDashboard() {
-    // Prefer server data; fallback to localStorage mock if not available
-    let summary = null;
-    if (window.serverCreditData && Array.isArray(window.serverCreditData.customers)) {
-        const custs = window.serverCreditData.customers;
-        // Hydrate minimal summary from server
-        summary = {
-            totalCreditOutstanding: window.serverCreditData.totalOutstanding,
-            creditCustomersCount: window.serverCreditData.customersCount,
-            totalCollectedThisMonth: 0, // server does not track monthly collected here; keep 0
-            totalCustomers: custs.length, // approximate; full totalCustomers would require extra query
-            creditCustomers: custs.map(c => ({
-                id: c.id,
-                name: c.name,
-                phone: c.phone,
-                carModel: (c.vehicles && c.vehicles[0]) ? (c.vehicles[0].car_brand + ' ' + c.vehicles[0].car_model) : '',
-                carPlate: (c.vehicles && c.vehicles[0]) ? c.vehicles[0].plate_number : '',
-                type: c.tier === 'fleet' ? 'ورش وشركات' : (c.tier === 'vip' ? 'تاكسي وأوبر' : 'ملاكي'),
-                creditBalance: parseFloat(c.current_credit_balance),
-                totalPurchases: 0,
-            })),
-            // For payments tab, keep localStorage if available, else empty
-            getCreditPayments: () => window.AlHusseiniSales ? window.AlHusseiniSales.getCreditPayments() : []
-        };
-        // Update KPIs from server
-        const totOutEl = document.getElementById('kpiTotalOutstanding');
-        if (totOutEl) totOutEl.textContent = new Intl.NumberFormat('ar-EG', {style:'currency', currency:'EGP'}).format(summary.totalCreditOutstanding);
-        const custCountEl = document.getElementById('kpiCreditCustomersCount');
-        if (custCountEl) custCountEl.textContent = `${summary.creditCustomersCount} عميل`;
-        // Keep collected as 0 or from localStorage if available
-        const collectedEl = document.getElementById('kpiCollectedThisMonth');
-        if (collectedEl && window.AlHusseiniSales) {
-            try { collectedEl.textContent = window.AlHusseiniSales.formatCurrency(window.AlHusseiniSales.getCreditSummary().totalCollectedThisMonth); } catch(e) {}
-        }
-        const ratioEl = document.getElementById('kpiCreditRatio');
-        if (ratioEl) {
-            const ratio = summary.creditCustomersCount > 0 ? 100 : 0;
-            ratioEl.textContent = `${ratio}%`;
-        }
-        const totalCustEl = document.getElementById('kpiTotalCustomersText');
-        if (totalCustEl) totalCustEl.textContent = `من إجمالي ${summary.creditCustomersCount} عميل مدين`;
-        const badgeCust = document.getElementById('badgeCreditCustCount');
-        if (badgeCust) badgeCust.textContent = summary.creditCustomersCount;
-        const badgePay = document.getElementById('badgeCreditPayCount');
-        if (badgePay && window.AlHusseiniSales) { try { badgePay.textContent = window.AlHusseiniSales.getCreditPayments().length; } catch(e) {} }
+    document.getElementById('kpiTotalOutstanding').textContent = fmt(CREDIT_DATA.totalOutstanding);
+    document.getElementById('kpiCreditCustomersCount').textContent = `${CREDIT_DATA.customersCount} عميل`;
+    document.getElementById('kpiCollectedThisMonth').textContent = fmt(CREDIT_DATA.collectedThisMonth);
 
-        // Render tables with server data
-        renderCreditTableServer(summary);
-        renderPaymentsTable();
-        return;
-    }
-
-    if (!window.AlHusseiniSales) return;
-
-    const fallbackSummary = window.AlHusseiniSales.getCreditSummary();
-
-    // 1. Update KPIs
-    document.getElementById('kpiTotalOutstanding').textContent = window.AlHusseiniSales.formatCurrency(fallbackSummary.totalCreditOutstanding);
-    document.getElementById('kpiCreditCustomersCount').textContent = `${fallbackSummary.creditCustomersCount} عميل`;
-    document.getElementById('kpiCollectedThisMonth').textContent = window.AlHusseiniSales.formatCurrency(fallbackSummary.totalCollectedThisMonth);
-
-    const ratio = fallbackSummary.totalCustomers > 0 ? Math.round((fallbackSummary.creditCustomersCount / fallbackSummary.totalCustomers) * 100) : 0;
+    const ratio = CREDIT_DATA.totalCustomers > 0
+        ? Math.round((CREDIT_DATA.customersCount / CREDIT_DATA.totalCustomers) * 100)
+        : 0;
     document.getElementById('kpiCreditRatio').textContent = `${ratio}%`;
-    document.getElementById('kpiTotalCustomersText').textContent = `من إجمالي ${fallbackSummary.totalCustomers} عميل مسجل`;
+    document.getElementById('kpiTotalCustomersText').textContent = `من إجمالي ${CREDIT_DATA.totalCustomers} عميل مسجل`;
 
-    document.getElementById('badgeCreditCustCount').textContent = fallbackSummary.creditCustomersCount;
-    document.getElementById('badgeCreditPayCount').textContent = window.AlHusseiniSales.getCreditPayments().length;
+    document.getElementById('badgeCreditCustCount').textContent = CREDIT_DATA.customersCount;
+    document.getElementById('badgeCreditPayCount').textContent = CREDIT_DATA.collectionsCount;
 
     renderCreditTable();
-    renderPaymentsTable();
-}
-
-function renderCreditTableServer(serverSummary) {
-    const searchVal = (document.getElementById('searchCreditInput')?.value || '').trim().toLowerCase();
-    const typeVal = document.getElementById('filterCustType')?.value || 'all';
-    const tbody = document.getElementById('tbodyCreditCustomers');
-    if (!tbody) return;
-    const filtered = serverSummary.creditCustomers.filter(c => {
-        if (typeVal !== 'all' && c.type !== typeVal) return false;
-        if (searchVal) {
-            const matchName = c.name.toLowerCase().includes(searchVal);
-            const matchPhone = c.phone.toLowerCase().includes(searchVal);
-            const matchCar = (c.carModel||'').toLowerCase().includes(searchVal);
-            const matchPlate = (c.carPlate||'').toLowerCase().includes(searchVal);
-            if (!matchName && !matchPhone && !matchCar && !matchPlate) return false;
-        }
-        return true;
-    });
-    const visibleEl = document.getElementById('visibleCreditCount');
-    if (visibleEl) visibleEl.textContent = filtered.length;
-    if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-5 text-muted fs-13"><i class="ri-checkbox-circle-line fs-24 text-success d-block mb-1"></i>لا توجد مديونيات آجلة مطابقة لبحثك! كل الحسابات خالصة.</td></tr>`;
-        return;
-    }
-    let html = '';
-    filtered.forEach(c => {
-        const balance = Number(c.creditBalance) || 0;
-        const totalPurchases = Number(c.totalPurchases) || 0;
-        html += `
-            <tr>
-                <td><div class="d-flex align-items-center"><div class="avatar-xs me-2"><span class="avatar-title rounded-circle bg-warning-subtle text-warning fw-bold fs-13">${c.name.charAt(0)}</span></div><div><h6 class="fs-13 mb-0 fw-bold text-dark">${c.name}</h6><small class="text-muted font-monospace">${c.id}</small></div></div></td>
-                <td><span class="font-monospace fw-semibold text-dark fs-12">${c.phone}</span></td>
-                <td><span class="fw-bold fs-12 text-dark d-block">${c.carModel}</span><span class="badge bg-light text-secondary border font-monospace fs-11">${c.carPlate}</span></td>
-                <td><span class="badge bg-primary-subtle text-primary fs-11">${c.type}</span></td>
-                <td><span class="font-monospace text-muted fs-12">${new Intl.NumberFormat('ar-EG', {style:'currency', currency:'EGP'}).format(totalPurchases)}</span></td>
-                <td><span class="badge bg-danger text-white fs-13 font-monospace px-2 py-1 shadow-sm">${new Intl.NumberFormat('ar-EG', {style:'currency', currency:'EGP'}).format(balance)}</span></td>
-                <td><span class="badge bg-warning-subtle text-warning fs-11 fw-bold"><i class="ri-time-line me-1"></i>آجل مستحق السداد</span></td>
-                <td class="text-center no-print"><div class="d-inline-flex gap-1"><button type="button" class="btn btn-sm btn-success fw-bold" onclick="openPaymentModal('${c.id}')"><i class="ri-hand-coin-line me-1"></i> تحصيل دفعة</button><button type="button" class="btn btn-sm btn-soft-primary" onclick="openStatementModal('${c.id}')" title="كشف الفواتير"><i class="ri-file-text-line"></i> الفواتير</button></div></td>
-            </tr>
-        `;
-    });
-    tbody.innerHTML = html;
 }
 
 function renderCreditTable() {
-    if (!window.AlHusseiniSales) return;
-
-    const summary = window.AlHusseiniSales.getCreditSummary();
     const searchVal = (document.getElementById('searchCreditInput')?.value || '').trim().toLowerCase();
-    const typeVal = document.getElementById('filterCustType')?.value || 'all';
-
+    const tierVal = document.getElementById('filterCustType')?.value || 'all';
     const tbody = document.getElementById('tbodyCreditCustomers');
     if (!tbody) return;
 
-    const filtered = summary.creditCustomers.filter(c => {
-        if (typeVal !== 'all' && c.type !== typeVal) return false;
-        if (searchVal) {
-            const matchName = c.name.toLowerCase().includes(searchVal);
-            const matchPhone = c.phone.toLowerCase().includes(searchVal);
-            const matchCar = c.carModel.toLowerCase().includes(searchVal);
-            const matchPlate = c.carPlate.toLowerCase().includes(searchVal);
-            if (!matchName && !matchPhone && !matchCar && !matchPlate) return false;
-        }
-        return true;
+    const filtered = CREDIT_DATA.customers.filter(c => {
+        if (tierVal !== 'all' && c.tier !== tierVal) return false;
+        if (!searchVal) return true;
+        return [c.name, c.phone, c.vehicle?.car, c.vehicle?.plate_number]
+            .some(v => v && String(v).toLowerCase().includes(searchVal));
     });
 
     document.getElementById('visibleCreditCount').textContent = filtered.length;
@@ -582,398 +503,240 @@ function renderCreditTable() {
         return;
     }
 
-    let html = '';
-    filtered.forEach(c => {
-        const balance = Number(c.creditBalance) || 0;
-        const totalPurchases = Number(c.totalPurchases) || 0;
-
-        html += `
+    tbody.innerHTML = filtered.map(c => {
+        const exceeded = c.credit_limit > 0 && c.credit_balance > c.credit_limit;
+        return `
             <tr>
-                <td>
-                    <div class="d-flex align-items-center">
-                        <div class="avatar-xs me-2">
-                            <span class="avatar-title rounded-circle bg-warning-subtle text-warning fw-bold fs-13">
-                                ${c.name.charAt(0)}
-                            </span>
-                        </div>
-                        <div>
-                            <h6 class="fs-13 mb-0 fw-bold text-dark">${c.name}</h6>
-                            <small class="text-muted font-monospace">${c.id}</small>
-                        </div>
-                    </div>
-                </td>
-                <td><span class="font-monospace fw-semibold text-dark fs-12">${c.phone}</span></td>
-                <td>
-                    <span class="fw-bold fs-12 text-dark d-block">${c.carModel}</span>
-                    <span class="badge bg-light text-secondary border font-monospace fs-11">${c.carPlate}</span>
-                </td>
-                <td><span class="badge bg-primary-subtle text-primary fs-11">${c.type}</span></td>
-                <td><span class="font-monospace text-muted fs-12">${window.AlHusseiniSales.formatCurrency(totalPurchases)}</span></td>
-                <td>
-                    <span class="badge bg-danger text-white fs-13 font-monospace px-2 py-1 shadow-sm">
-                        ${window.AlHusseiniSales.formatCurrency(balance)}
-                    </span>
-                </td>
-                <td>
-                    <span class="badge bg-warning-subtle text-warning fs-11 fw-bold">
-                        <i class="ri-time-line me-1"></i>آجل مستحق السداد
-                    </span>
-                </td>
-                <td class="text-center no-print">
-                    <div class="d-inline-flex gap-1">
-                        <button type="button" class="btn btn-sm btn-success fw-bold" onclick="openPaymentModal('${c.id}')">
-                            <i class="ri-hand-coin-line me-1"></i> تحصيل دفعة
-                        </button>
-                        <button type="button" class="btn btn-sm btn-soft-primary" onclick="openStatementModal('${c.id}')" title="كشف الفواتير">
-                            <i class="ri-file-text-line"></i> الفواتير
-                        </button>
-                    </div>
-                </td>
+                <td><div class="d-flex align-items-center"><div class="avatar-xs me-2"><span class="avatar-title rounded-circle bg-warning-subtle text-warning fw-bold fs-13">${esc(c.name.charAt(0))}</span></div><div><h6 class="fs-13 mb-0 fw-bold text-dark">${esc(c.name)}</h6><small class="text-muted font-monospace">#${c.id}</small></div></div></td>
+                <td><span class="font-monospace fw-semibold text-dark fs-12">${esc(c.phone)}</span></td>
+                <td>${c.vehicle ? `<span class="fw-bold fs-12 text-dark d-block">${esc(c.vehicle.car)}</span><span class="badge bg-light text-secondary border font-monospace fs-11">${esc(c.vehicle.plate_number)}</span>` : '<span class="text-muted fs-12">-</span>'}</td>
+                <td><span class="badge bg-primary-subtle text-primary fs-11">${esc(TIER_LABELS[c.tier] || c.tier)}</span></td>
+                <td><span class="font-monospace text-muted fs-12">${esc(fmt(c.purchases_total))}</span></td>
+                <td><span class="badge bg-danger text-white fs-13 font-monospace px-2 py-1 shadow-sm">${esc(fmt(c.credit_balance))}</span></td>
+                <td>${exceeded
+                    ? '<span class="badge bg-danger-subtle text-danger fs-11 fw-bold"><i class="ri-error-warning-line me-1"></i>تجاوز سقف الائتمان</span>'
+                    : '<span class="badge bg-warning-subtle text-warning fs-11 fw-bold"><i class="ri-time-line me-1"></i>آجل مستحق السداد</span>'}</td>
+                <td class="text-center no-print"><div class="d-inline-flex gap-1">
+                    <button type="button" class="btn btn-sm btn-success fw-bold" onclick="openPaymentModal(${c.id})"><i class="ri-hand-coin-line me-1"></i> تحصيل دفعة</button>
+                    <button type="button" class="btn btn-sm btn-soft-primary" onclick="openStatementModal(${c.id})" title="كشف الفواتير"><i class="ri-file-text-line"></i> الفواتير</button>
+                </div></td>
             </tr>
         `;
-    });
-
-    tbody.innerHTML = html;
+    }).join('');
 }
 
-function renderPaymentsTable() {
-    if (!window.AlHusseiniSales) return;
-    const payments = window.AlHusseiniSales.getCreditPayments();
+async function loadPayments(page) {
     const tbody = document.getElementById('tbodyCreditPayments');
+    const pager = document.getElementById('paymentsPager');
     if (!tbody) return;
 
-    if (payments.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted fs-13">لا توجد سندات تحصيل مسجلة بعد</td></tr>`;
-        return;
+    try {
+        const url = new URL(CREDIT_ROUTES.payments, window.location.origin);
+        url.searchParams.set('payments_page', page);
+        const res = await fetch(url, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        paymentsPage = data.meta.current_page;
+
+        CREDIT_DATA.collectedThisMonth = data.collected_this_month;
+        CREDIT_DATA.collectionsCount = data.meta.total;
+        document.getElementById('kpiCollectedThisMonth').textContent = fmt(data.collected_this_month);
+        document.getElementById('badgeCreditPayCount').textContent = data.meta.total;
+
+        if (data.data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-5 text-muted fs-13">لا توجد سندات تحصيل مسجلة بعد.</td></tr>';
+        } else {
+            tbody.innerHTML = data.data.map(p => `
+                <tr>
+                    <td><span class="font-monospace fw-bold text-dark fs-12">${esc(p.receipt_number || '-')}</span></td>
+                    <td>${p.customer ? `<a href="${esc(statementUrl(p.customer.id))}" target="_blank" class="fw-semibold">${esc(p.customer.name)}</a>` : '-'}</td>
+                    <td><span class="font-monospace fs-12">${esc((p.created_at || '').substring(0, 16))}</span></td>
+                    <td><span class="fw-bold text-success font-monospace fs-13">+ ${esc(fmt(p.amount))}</span></td>
+                    <td><span class="fs-12">${esc(p.collected_by || '-')}</span></td>
+                    <td><span class="text-muted fs-12">${esc(p.notes || '')}</span></td>
+                </tr>
+            `).join('');
+        }
+
+        if (pager) {
+            pager.innerHTML = data.meta.last_page > 1 ? `
+                <button type="button" class="btn btn-sm btn-light" ${paymentsPage <= 1 ? 'disabled' : ''} onclick="loadPayments(${paymentsPage - 1})">السابق</button>
+                <span class="align-self-center fs-12 text-muted">صفحة ${paymentsPage} من ${data.meta.last_page}</span>
+                <button type="button" class="btn btn-sm btn-light" ${paymentsPage >= data.meta.last_page ? 'disabled' : ''} onclick="loadPayments(${paymentsPage + 1})">التالي</button>
+            ` : '';
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger fs-13">تعذر تحميل سجل التحصيلات من الخادم.</td></tr>';
     }
-
-    const payLabels = { 'cash': 'نقداً بالخزينة', 'instapay': 'تحويل إنستاباي', 'vodafone_cash': 'فودافون كاش', 'bank': 'إيداع بنكي' };
-
-    let html = '';
-    payments.forEach(p => {
-        html += `
-            <tr>
-                <td><span class="badge bg-light text-dark border font-monospace fs-12 fw-bold">${p.receiptNo || p.id}</span></td>
-                <td><strong class="text-dark fs-13">${p.customerName}</strong></td>
-                <td><span class="text-muted fs-12">${p.date} (${p.time || ''})</span></td>
-                <td><span class="fw-bold text-success font-monospace fs-13">+ ${window.AlHusseiniSales.formatCurrency(p.amount)}</span></td>
-                <td><span class="badge bg-success-subtle text-success fs-11">${payLabels[p.method] || p.method}</span></td>
-                <td><span class="text-dark fs-12">${p.receivedBy || 'الحاج محمود الحسيني'}</span></td>
-                <td><span class="text-muted fs-12">${p.notes || '-'}</span></td>
-                <td class="no-print"><span class="badge bg-success text-white fs-10"><i class="ri-check-line me-1"></i>تم التوريد</span></td>
-            </tr>
-        `;
-    });
-
-    tbody.innerHTML = html;
 }
 
 function openPaymentModal(custId) {
-    let cust = null;
-    // Try server data first
-    if (window.serverCreditData && Array.isArray(window.serverCreditData.customers)) {
-        const c = window.serverCreditData.customers.find(x => String(x.id) === String(custId));
-        if (c) {
-            cust = {
-                id: c.id,
-                name: c.name,
-                phone: c.phone,
-                carModel: (c.vehicles && c.vehicles[0]) ? (c.vehicles[0].car_brand + ' ' + c.vehicles[0].car_model) : '',
-                carPlate: (c.vehicles && c.vehicles[0]) ? c.vehicles[0].plate_number : '',
-                creditBalance: parseFloat(c.current_credit_balance),
-            };
-        }
-    }
-    if (!cust && window.AlHusseiniSales) cust = window.AlHusseiniSales.getCustomerById(custId);
+    const cust = findCreditCustomer(custId);
     if (!cust) return;
     currentTargetCustomer = cust;
 
     document.getElementById('payCustId').value = cust.id;
     document.getElementById('payCustName').textContent = cust.name;
-    document.getElementById('payCustCarInfo').textContent = `${cust.carModel} — لوحة: ${cust.carPlate} | هاتف: ${cust.phone}`;
-    const fmt = window.AlHusseiniSales ? window.AlHusseiniSales.formatCurrency : (v => new Intl.NumberFormat('ar-EG', {style:'currency', currency:'EGP'}).format(v));
-    document.getElementById('payCustBalanceBadge').textContent = `الآجل المستحق: ${fmt(cust.creditBalance)}`;
+    document.getElementById('payCustCarInfo').textContent = cust.vehicle
+        ? `${cust.vehicle.car} — لوحة: ${cust.vehicle.plate_number} | هاتف: ${cust.phone}`
+        : `هاتف: ${cust.phone}`;
+    document.getElementById('payCustBalanceBadge').textContent = `الآجل المستحق: ${fmt(cust.credit_balance)}`;
+    document.getElementById('payAmountInput').value = Math.min(cust.credit_balance, 500);
+    document.getElementById('payAmountInput').max = cust.credit_balance;
+    document.getElementById('payReceiptInput').value = '';
+    document.getElementById('payNotesInput').value = '';
 
-    // Default payment amount
-    const defaultAmount = Math.min(cust.creditBalance, 500);
-    document.getElementById('payAmountInput').value = defaultAmount;
-
-    const modal = new bootstrap.Modal(document.getElementById('recordPaymentModal'));
-    modal.show();
+    new bootstrap.Modal(document.getElementById('recordPaymentModal')).show();
 }
 
 function setPayAmount(amount) {
     if (!currentTargetCustomer) return;
-    const finalAmt = Math.min(currentTargetCustomer.creditBalance, amount);
-    document.getElementById('payAmountInput').value = finalAmt;
+    document.getElementById('payAmountInput').value = Math.min(currentTargetCustomer.credit_balance, amount);
 }
 
 function setPayFullAmount() {
     if (!currentTargetCustomer) return;
-    document.getElementById('payAmountInput').value = currentTargetCustomer.creditBalance;
+    document.getElementById('payAmountInput').value = currentTargetCustomer.credit_balance;
 }
 
-function submitCreditPayment(e) {
+async function submitCreditPayment(e) {
     e.preventDefault();
-    const custId = document.getElementById('payCustId').value;
-    const amount = Number(document.getElementById('payAmountInput').value);
-    const method = document.getElementById('payMethodSelect').value;
-    const receivedBy = document.getElementById('payReceiverSelect').value;
-    const notes = document.getElementById('payNotesInput').value.trim();
+    const custId = Number(document.getElementById('payCustId').value);
+    const cust = findCreditCustomer(custId);
+    if (!cust) {
+        Swal.fire('خطأ في التحصيل', 'العميل غير موجود. أعد تحميل الصفحة.', 'error');
+        return;
+    }
+
+    const body = {
+        customer_id: cust.id,
+        amount: Number(document.getElementById('payAmountInput').value),
+        payment_method: document.getElementById('payMethodSelect').value,
+        notes: document.getElementById('payNotesInput').value.trim() || null,
+    };
+    const receipt = document.getElementById('payReceiptInput').value.trim();
+    if (receipt) body.receipt_number = receipt;
 
     const submitBtn = e.target.querySelector('button[type="submit"]');
-    const originalBtnText = submitBtn ? submitBtn.innerHTML : '';
+    const originalBtnHtml = submitBtn ? submitBtn.innerHTML : '';
     if (submitBtn) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> جاري التسجيل...';
     }
 
-    const numericCustomerId = !isNaN(parseInt(custId)) ? parseInt(custId) : null;
-
-    // Send payment to backend
-    fetch("{{ route('admin.credit.settle') }}", {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'X-CSRF-TOKEN': (typeof window.getCsrfToken === 'function' ? window.getCsrfToken() : '{{ csrf_token() }}')
-        },
-        body: JSON.stringify({
-            customer_id: numericCustomerId,
-            amount: amount,
-            payment_method: method === 'instapay' ? 'bank_transfer' : method,
-            notes: notes
-        })
-    })
-    .then(async res => {
-        const data = await res.json();
+    try {
+        const res = await fetch(CREDIT_ROUTES.settle, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf() },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
-            throw new Error(data.message || 'فشل تسجيل التحصيل من الخادم.');
-        }
-        return data;
-    })
-    .then(data => {
-        // Sync local mock storage if available
-        if (window.AlHusseiniSales && window.AlHusseiniSales.recordCreditPayment) {
-            window.AlHusseiniSales.recordCreditPayment({
-                customerId: custId,
-                amount: amount,
-                method: method,
-                receivedBy: receivedBy,
-                notes: notes
-            });
+            throw new Error(data.errors ? Object.values(data.errors).flat().join(' - ') : (data.message || 'فشل تسجيل التحصيل من الخادم.'));
         }
 
-        const modalEl = document.getElementById('recordPaymentModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
+        // Reflect the server result (authoritative new balance).
+        const newBalance = Number(data.new_balance || 0);
+        CREDIT_DATA.totalOutstanding = Math.max(0, CREDIT_DATA.totalOutstanding - (cust.credit_balance - newBalance));
+        cust.credit_balance = newBalance;
+        if (newBalance <= 0) {
+            CREDIT_DATA.customers = CREDIT_DATA.customers.filter(c => c.id !== cust.id);
+            CREDIT_DATA.customersCount = CREDIT_DATA.customers.length;
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('recordPaymentModal'))?.hide();
+        renderCreditDashboard();
+        loadPayments(1);
 
         Swal.fire({
             icon: 'success',
             title: 'تم تسجيل سند التحصيل بنجاح!',
             html: `
                 <div class="p-2 mb-2 bg-light rounded text-center">
-                    <strong class="text-success font-monospace fs-16">${data.message}</strong>
-                    ${data.receipt_number ? `<div class="text-muted fs-12 mt-1">رقم سند القبض: <span class="font-monospace fw-bold">${data.receipt_number}</span></div>` : ''}
-                    <div class="text-dark fs-13 mt-1">الرصيد المتبقي الجديد: <strong class="font-monospace text-danger">${Number(data.new_balance || 0).toLocaleString('ar-EG')} ج.م</strong></div>
+                    <strong class="text-success fs-15">${esc(data.message || '')}</strong>
+                    ${data.receipt_number ? `<div class="text-muted fs-12 mt-1">رقم سند القبض: <span class="font-monospace fw-bold">${esc(data.receipt_number)}</span></div>` : ''}
+                    <div class="text-dark fs-13 mt-1">الرصيد المتبقي الجديد: <strong class="font-monospace text-danger">${esc(fmt(newBalance))}</strong></div>
                 </div>
             `,
             confirmButtonText: 'حسناً',
             confirmButtonColor: '#198754'
-        }).then(() => {
-            renderCreditDashboard();
         });
-    })
-    .catch(err => {
-        console.warn('API Credit Settlement fallback:', err);
-        // Fallback to local if offline or mock-only customer
-        if (window.AlHusseiniSales && window.AlHusseiniSales.recordCreditPayment) {
-            const result = window.AlHusseiniSales.recordCreditPayment({
-                customerId: custId,
-                amount: amount,
-                method: method,
-                receivedBy: receivedBy,
-                notes: notes
-            });
-
-            if (result.success) {
-                const modalEl = document.getElementById('recordPaymentModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'تم تسجيل سند التحصيل بنجاح!',
-                    html: `تم تحصيل مبلغ <strong>${amount} ج.م</strong> وتحديث الرصيد فورياً.`,
-                    confirmButtonText: 'ممتاز',
-                    confirmButtonColor: '#198754'
-                });
-
-                renderCreditDashboard();
-                return;
-            }
-        }
-        Swal.fire('خطأ في التحصيل', err.message || 'حدث خطأ أثناء السداد', 'error');
-    })
-    .finally(() => {
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'خطأ في التحصيل', text: err.message || 'حدث خطأ أثناء السداد', confirmButtonText: 'موافق' });
+    } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = originalBtnText;
-        }
-    });
-}
-
-function openStatementModal(custId) {
-    // Try server data first
-    let cust = null;
-    let isServer = false;
-    if (window.serverCreditData && Array.isArray(window.serverCreditData.customers)) {
-        const c = window.serverCreditData.customers.find(x => String(x.id) === String(custId));
-        if (c) {
-            cust = {
-                id: c.id,
-                name: c.name,
-                phone: c.phone,
-                carModel: (c.vehicles && c.vehicles[0]) ? (c.vehicles[0].car_brand + ' ' + c.vehicles[0].car_model) : '',
-                carPlate: (c.vehicles && c.vehicles[0]) ? c.vehicles[0].plate_number : '',
-                creditBalance: parseFloat(c.current_credit_balance),
-            };
-            isServer = true;
+            submitBtn.innerHTML = originalBtnHtml;
         }
     }
-    if (!cust && window.AlHusseiniSales) cust = window.AlHusseiniSales.getCustomerById(custId);
+}
+
+async function openStatementModal(custId) {
+    const cust = findCreditCustomer(custId);
     if (!cust) return;
 
     const modalEl = document.getElementById('customerStatementModal');
     const modalBody = document.getElementById('statementModalBody');
     document.getElementById('statementModalTitle').textContent = `كشف حساب آجل: ${cust.name}`;
+    modalBody.innerHTML = '<div class="text-center py-4"><span class="spinner-border text-primary"></span><p class="text-muted fs-13 mt-2">جاري تحميل كشف الحساب من الخادم...</p></div>';
+    new bootstrap.Modal(modalEl).show();
 
-    if (isServer && !isNaN(parseInt(custId))) {
-        // Fetch real statement from server
-        modalBody.innerHTML = `<div class="text-center py-4"><span class="spinner-border text-primary"></span><p class="text-muted fs-13 mt-2">جاري تحميل كشف الحساب من الخادم...</p></div>`;
-        new bootstrap.Modal(modalEl).show();
-        fetch(`/admin/credit/${custId}/statement`, {
-            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': (typeof window.getCsrfToken === 'function' ? window.getCsrfToken() : document.querySelector('meta[name="csrf-token"]')?.content || '') }
-        })
-        .then(r => r.ok ? r.json() : Promise.reject('fail'))
-        .then(data => {
-            const invs = data.invoices?.data || data.invoices || [];
-            const leds = data.credit_ledgers?.data || data.credit_ledgers || [];
-            // Invoices may be paginated object or array
-            const invArray = Array.isArray(invs) ? invs : (invs.data || []);
-            const ledArray = Array.isArray(leds) ? leds : (leds.data || []);
-            modalBody.innerHTML = `
-                <div class="p-3 bg-light rounded border mb-3">
-                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <div><h5 class="fw-bold mb-1 text-dark">${cust.name}</h5><p class="text-muted mb-0 fs-12">${cust.carModel} - لوحة: <strong>${cust.carPlate}</strong> | هاتف: ${cust.phone}</p></div>
-                        <div class="text-end"><span class="fs-12 text-muted d-block">الرصيد المتبقي على الآجل:</span><h4 class="text-danger fw-extrabold mb-0 font-monospace">${new Intl.NumberFormat('ar-EG', {style:'currency', currency:'EGP'}).format(cust.creditBalance)}</h4><a href="/admin/credit/${custId}/statement" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="ri-file-list-3-line me-1"></i> كشف الحساب التفصيلي المعتمد</a></div>
-                    </div>
-                </div>
-                <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-bill-line me-1 text-primary"></i> فواتير المبيعات الصادرة للعميل:</h6>
-                <div class="table-responsive mb-3"><table class="table table-sm table-bordered fs-12 mb-0"><thead class="table-light"><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>إجمالي الفاتورة</th><th>المدفوع</th><th>المتبقي بالآجل</th><th>الحالة</th></tr></thead><tbody>
-                    ${invArray.length ? invArray.map(inv => `
-                        <tr><td class="font-monospace fw-bold">${inv.invoice_number}</td><td>${(inv.created_at||'').substring(0,10)}</td><td class="font-monospace">${Number(inv.final_amount).toLocaleString('ar-EG')} ج.م</td><td class="font-monospace text-success">${Number(inv.paid_amount).toLocaleString('ar-EG')} ج.م</td><td class="font-monospace text-danger fw-bold">${Number(inv.remaining_amount).toLocaleString('ar-EG')} ج.م</td><td><span class="badge ${Number(inv.remaining_amount)>0?'bg-warning-subtle text-warning':'bg-success-subtle text-success'}">${inv.status}</span></td></tr>
-                    `).join('') : `<tr><td colspan="6" class="text-center py-2 text-muted">لا توجد فواتير آجل مفتوحة</td></tr>`}
-                </tbody></table></div>
-                <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-history-line me-1 text-success"></i> سندات ودفعات التحصيل المسددة:</h6>
-                <div class="table-responsive"><table class="table table-sm table-bordered fs-12 mb-0"><thead class="table-light"><tr><th>رقم الإيصال</th><th>التاريخ</th><th>المبلغ المحصل</th><th>طريقة السداد</th></tr></thead><tbody>
-                    ${ledArray.length ? ledArray.map(l => `
-                        <tr><td class="font-monospace">${l.receipt_number||'-'}</td><td>${(l.created_at||'').substring(0,10)}</td><td class="text-success font-monospace fw-bold">+ ${Number(l.amount).toLocaleString('ar-EG')} ج.م</td><td>${l.entry_type}</td></tr>
-                    `).join('') : `<tr><td colspan="4" class="text-center py-2 text-muted">لا توجد سندات سابقة</td></tr>`}
-                </tbody></table></div>
-            `;
-        })
-        .catch(() => {
-            modalBody.innerHTML = `<div class="text-center py-4 text-muted">تعذر تحميل كشف الحساب. <a href="/admin/credit/${custId}/statement" target="_blank">فتح الكشف الكامل</a></div>`;
-        });
-        return;
-    }
+    const fullUrl = statementUrl(cust.id);
+    try {
+        const res = await fetch(fullUrl, { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const invoices = Array.isArray(data.invoices) ? data.invoices : (data.invoices?.data || []);
+        const ledgers = Array.isArray(data.credit_ledgers) ? data.credit_ledgers : (data.credit_ledgers?.data || []);
+        const vehicleText = cust.vehicle ? `${cust.vehicle.car} - لوحة: ${cust.vehicle.plate_number} | ` : '';
 
-    const invoices = window.AlHusseiniSales.getInvoices().filter(i => String(i.customerId) === String(custId));
-    const payments = window.AlHusseiniSales.getCreditPayments().filter(p => String(p.customerId) === String(custId));
-
-    document.getElementById('statementModalTitle').textContent = `كشف حساب آجل: ${cust.name}`;
-
-    modalBody.innerHTML = `
-        <div class="p-3 bg-light rounded border mb-3">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <div>
-                    <h5 class="fw-bold mb-1 text-dark">${cust.name}</h5>
-                    <p class="text-muted mb-0 fs-12">${cust.carModel} - لوحة: <strong>${cust.carPlate}</strong> | هاتف: ${cust.phone}</p>
-                </div>
-                <div class="text-end">
-                    <span class="fs-12 text-muted d-block">الرصيد المتبقي على الآجل:</span>
-                    <h4 class="text-danger fw-extrabold mb-0 font-monospace">${window.AlHusseiniSales.formatCurrency(cust.creditBalance)}</h4>
-                    ${!isNaN(parseInt(custId)) ? `<a href="/admin/credit/${custId}/statement" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="ri-file-list-3-line me-1"></i> كشف الحساب التفصيلي المعتمد</a>` : ''}
+        modalBody.innerHTML = `
+            <div class="p-3 bg-light rounded border mb-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div><h5 class="fw-bold mb-1 text-dark">${esc(cust.name)}</h5><p class="text-muted mb-0 fs-12">${esc(vehicleText)}هاتف: ${esc(cust.phone)}</p></div>
+                    <div class="text-end"><span class="fs-12 text-muted d-block">الرصيد المتبقي على الآجل:</span><h4 class="text-danger fw-extrabold mb-0 font-monospace">${esc(fmt(cust.credit_balance))}</h4>
+                        <a href="${esc(fullUrl)}" target="_blank" class="btn btn-sm btn-outline-primary mt-2"><i class="ri-file-list-3-line me-1"></i> كشف الحساب التفصيلي المعتمد</a></div>
                 </div>
             </div>
-        </div>
-
-        <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-bill-line me-1 text-primary"></i> فواتير المبيعات الصادرة للعميل:</h6>
-        <div class="table-responsive mb-3">
-            <table class="table table-sm table-bordered fs-12 mb-0">
-                <thead class="table-light">
-                    <tr><th>رقم الفاتورة</th><th>التاريخ</th><th>البطارية</th><th>إجمالي الفاتورة</th><th>المدفوع</th><th>المتبقي بالآجل</th><th>الحالة</th></tr>
-                </thead>
-                <tbody>
-                    ${invoices.map(inv => `
-                        <tr>
-                            <td class="font-monospace fw-bold">${inv.invoiceNo}</td>
-                            <td>${inv.date}</td>
-                            <td>${inv.items[0]?.name || 'بطارية'}</td>
-                            <td class="font-monospace">${inv.totalAmount} ج.م</td>
-                            <td class="font-monospace text-success">${inv.paidAmount} ج.م</td>
-                            <td class="font-monospace text-danger fw-bold">${inv.remainingCredit} ج.م</td>
-                            <td><span class="badge ${inv.remainingCredit > 0 ? 'bg-warning-subtle text-warning' : 'bg-success-subtle text-success'}">${inv.remainingCredit > 0 ? 'آجل معلق' : 'مسدد بالكامل'}</span></td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        </div>
-
-        <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-history-line me-1 text-success"></i> سندات ودفعات التحصيل المسددة:</h6>
-        <div class="table-responsive">
-            <table class="table table-sm table-bordered fs-12 mb-0">
-                <thead class="table-light">
-                    <tr><th>رقم الإيصال</th><th>التاريخ</th><th>المبلغ المحصل</th><th>طريقة السداد</th><th>المستلم</th></tr>
-                </thead>
-                <tbody>
-                    ${payments.length > 0 ? payments.map(p => `
-                        <tr>
-                            <td class="font-monospace">${p.receiptNo || p.id}</td>
-                            <td>${p.date}</td>
-                            <td class="text-success font-monospace fw-bold">+ ${p.amount} ج.م</td>
-                            <td>${p.method}</td>
-                            <td>${p.receivedBy}</td>
-                        </tr>
-                    `).join('') : `<tr><td colspan="5" class="text-center py-2 text-muted">لا توجد سندات سابقة</td></tr>`}
-                </tbody>
-            </table>
-        </div>
-    `;
-
-    const modal = new bootstrap.Modal(document.getElementById('customerStatementModal'));
-    modal.show();
+            <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-bill-line me-1 text-primary"></i> فواتير المبيعات المفتوحة للعميل:</h6>
+            <div class="table-responsive mb-3"><table class="table table-sm table-bordered fs-12 mb-0"><thead class="table-light"><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>إجمالي الفاتورة</th><th>المدفوع</th><th>المتبقي بالآجل</th><th>الحالة</th></tr></thead><tbody>
+                ${invoices.length ? invoices.map(inv => `
+                    <tr><td class="font-monospace fw-bold">${esc(inv.invoice_number)}</td><td>${esc((inv.created_at || '').substring(0, 10))}</td><td class="font-monospace">${esc(fmt(inv.final_amount))}</td><td class="font-monospace text-success">${esc(fmt(inv.paid_amount))}</td><td class="font-monospace text-danger fw-bold">${esc(fmt(inv.remaining_amount))}</td><td><span class="badge ${Number(inv.remaining_amount) > 0 ? 'bg-warning-subtle text-warning' : 'bg-success-subtle text-success'}">${esc(inv.status)}</span></td></tr>
+                `).join('') : '<tr><td colspan="6" class="text-center py-2 text-muted">لا توجد فواتير آجل مفتوحة</td></tr>'}
+            </tbody></table></div>
+            <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-history-line me-1 text-success"></i> حركات حساب الآجل:</h6>
+            <div class="table-responsive"><table class="table table-sm table-bordered fs-12 mb-0"><thead class="table-light"><tr><th>رقم الإيصال</th><th>التاريخ</th><th>المبلغ</th><th>نوع الحركة</th></tr></thead><tbody>
+                ${ledgers.length ? ledgers.map(l => `
+                    <tr><td class="font-monospace">${esc(l.receipt_number || '-')}</td><td>${esc((l.created_at || '').substring(0, 10))}</td><td class="font-monospace fw-bold">${esc(fmt(l.amount))}</td><td>${esc(l.entry_type)}</td></tr>
+                `).join('') : '<tr><td colspan="4" class="text-center py-2 text-muted">لا توجد حركات سابقة</td></tr>'}
+            </tbody></table></div>
+        `;
+    } catch (e) {
+        modalBody.innerHTML = `<div class="text-center py-4 text-muted">تعذر تحميل كشف الحساب. <a href="${esc(fullUrl)}" target="_blank">فتح الكشف الكامل</a></div>`;
+    }
 }
 
 function exportCreditCSV() {
-    if (!window.AlHusseiniSales) return;
-    const summary = window.AlHusseiniSales.getCreditSummary();
-    const filename = `كشف_حسابات_الآجل_مركز_الحسيني_${new Date().toISOString().split('T')[0]}`;
-
     const headers = ['كود العميل', 'اسم العميل', 'رقم الهاتف', 'السيارة', 'رقم اللوحة', 'تصنيف العميل', 'إجمالي المشتريات (ج.م)', 'رصيد الآجل المتبقي (ج.م)'];
-    const rows = summary.creditCustomers.map(c => [
-        c.id,
-        c.name,
-        c.phone,
-        c.carModel,
-        c.carPlate,
-        c.type,
-        c.totalPurchases,
-        c.creditBalance
+    const rows = CREDIT_DATA.customers.map(c => [
+        c.id, c.name, c.phone, c.vehicle?.car || '', c.vehicle?.plate_number || '',
+        TIER_LABELS[c.tier] || c.tier, c.purchases_total, c.credit_balance
     ]);
-
-    window.AlHusseiniSales.exportToCSV(filename, headers, rows);
+    // Quote every cell; prefix formula-leading values so spreadsheets do not execute them.
+    const cell = v => {
+        let s = String(v ?? '');
+        if (/^[=+\-@]/.test(s)) s = "'" + s;
+        return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const csv = '﻿' + [headers, ...rows].map(r => r.map(cell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `كشف_حسابات_الآجل_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(link.href);
 }
 </script>
 @endsection
