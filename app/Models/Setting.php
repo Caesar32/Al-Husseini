@@ -16,12 +16,29 @@ class Setting extends Model
     /**
      * جلب قيمة إعداد معين مع دعم التخزين المؤقت (Cache)
      */
+    /**
+     * Numeric setting with a safe fallback: returns $default when the stored value is missing,
+     * non-numeric or outside [$min, $max]. Defaults equal the values the code used before the
+     * setting was wired, so an unconfigured system behaves exactly as before.
+     */
+    public static function number(string $key, float $default, float $min, float $max): float
+    {
+        $value = static::get($key);
+
+        if (!is_numeric($value) || (float) $value < $min || (float) $value > $max) {
+            return $default;
+        }
+
+        return (float) $value;
+    }
+
     public static function get(string $key, mixed $default = null): mixed
     {
-        return Cache::rememberForever("setting.{$key}", function () use ($key, $default) {
-            $setting = static::where('key', $key)->first();
-            return $setting ? $setting->value : $default;
-        });
+        // Only the stored value is cached; a missing key is not cached (null), so the caller's
+        // default applies per call instead of the first caller's default being cached forever.
+        $value = Cache::rememberForever("setting.{$key}", fn () => static::where('key', $key)->value('value'));
+
+        return $value ?? $default;
     }
 
     /**

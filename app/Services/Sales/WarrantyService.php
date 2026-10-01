@@ -178,7 +178,7 @@ class WarrantyService implements WarrantyServiceInterface
                     'customer_vehicle_id' => $warranty->customer_vehicle_id,
                     'serial_number'       => $replacementSerial,
                     'start_date'          => now()->toDateString(),
-                    'end_date'            => now()->addMonths($replacementProduct->warranty_months ?? 12)->toDateString(),
+                    'end_date'            => now()->addMonths((int) ($replacementProduct->warranty_months ?? \App\Models\Setting::number('warranty_months_default', 12, 0, 120)))->toDateString(),
                     'status'              => 'active',
                     'notes'               => "بديل معتمد لتذكرة الضمان للبطارية ({$defectiveSerial})",
                 ]);

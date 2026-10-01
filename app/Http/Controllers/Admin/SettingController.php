@@ -44,6 +44,9 @@ class SettingController extends Controller
             'default_grace_period' => ['nullable', 'integer', 'min:0', 'max:120'],
             'monthly_working_days' => ['nullable', 'integer', 'min:1', 'max:31'],
             'daily_working_hours' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'overtime_rate_multiplier' => ['nullable', 'numeric', 'min:1', 'max:10'],
+            'warranty_months_default' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'invoice_prefix' => ['nullable', 'regex:/^[A-Za-z0-9-]{1,10}$/'],
         ], [
             'company_name.required' => 'يرجى إدخال اسم المنشأة / الشركة.',
             'company_phone.required' => 'يرجى إدخال رقم الهاتف الرئيسي.',

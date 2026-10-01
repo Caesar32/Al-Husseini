@@ -145,6 +145,11 @@ class PayrollService implements PayrollServiceInterface
             $totalDeductions  = 0;
             $totalNet         = 0;
 
+            // Settings → payroll norms (defaults are the previously hard-coded values).
+            $normWorkingDays   = (int) \App\Models\Setting::number('monthly_working_days', 26, 1, 31);
+            $dailyWorkingHours = \App\Models\Setting::number('daily_working_hours', 8, 1, 24);
+            $overtimeMultiplier = \App\Models\Setting::number('overtime_rate_multiplier', 1.5, 1, 10);
+
             foreach ($employees as $employee) {
                 $salary = $employee->currentSalary;
                 if (!$salary) continue;
@@ -152,7 +157,7 @@ class PayrollService implements PayrollServiceInterface
                 $basic      = (float) $salary->basic_salary;
                 $allowances = (float) ($salary->housing_allowance + $salary->transport_allowance + $salary->other_allowances);
                 $dayRate    = $basic / $totalMonthDays;
-                $hourlyRate = $dayRate / 8; // شفت 8 ساعات عمل
+                $hourlyRate = $dayRate / $dailyWorkingHours; // ساعات العمل اليومية (إعداد daily_working_hours)
 
                 // 1. حساب الحضور والغياب والإجازات والتأخير (من الذاكرة — بدون استعلام)
                 $attendances = $allAttendances->get($employee->id, collect());
@@ -182,13 +187,13 @@ class PayrollService implements PayrollServiceInterface
 
                 $presentDays         = $attendances->where('status', '!=', 'absent')->count();
                 $coveredDays         = $presentDays + $paidLeaveDays;
-                $unexcusedAbsentDays = max(0, 26 - $coveredDays); // معيار 26 يوم عمل شهري
+                $unexcusedAbsentDays = max(0, $normWorkingDays - $coveredDays); // معيار أيام العمل الشهرية (إعداد monthly_working_days)
                 $absentDays          = $unexcusedAbsentDays + $unpaidLeaveDays;
                 $absenceCost         = $absentDays * $dayRate;
 
                 $totalLateMinutes  = $attendances->sum('late_minutes');
                 $totalOvertimeHours = (float) $attendances->sum('overtime_hours');
-                $overtimeValue     = round($totalOvertimeHours * $hourlyRate * 1.5, 2);
+                $overtimeValue     = round($totalOvertimeHours * $hourlyRate * $overtimeMultiplier, 2);
 
                 // 2. تجميع عمولات الفني (من الذاكرة — بدون استعلام)
                 $commissions = (float) $allCommissions->get($employee->id, collect())->sum('commission_amount');

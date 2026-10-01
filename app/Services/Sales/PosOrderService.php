@@ -152,7 +152,7 @@ class PosOrderService implements PosOrderServiceInterface
                     'unit_price'            => $unitPrice,
                     'total_price'           => $totalPrice,
                     'battery_serial'        => !empty($item['battery_serial']) ? trim($item['battery_serial']) : null,
-                    'warranty_duration'     => (int) ($product->warranty_months ?? 12),
+                    'warranty_duration'     => (int) ($product->warranty_months ?? \App\Models\Setting::number('warranty_months_default', 12, 0, 120)),
                     'is_battery'            => (bool) $product->is_battery,
                 ];
             }
@@ -251,7 +251,11 @@ class PosOrderService implements PosOrderServiceInterface
                 throw new \InvalidArgumentException('الفرع مطلوب لإنشاء الفاتورة.');
             }
             // Sequential per-day number from a locked counter (released on commit; rolled-back sales free their number).
-            $invoiceNumber = app(DocumentNumberService::class)->nextFormatted('INV-' . now()->format('Ymd'));
+            $invoicePrefix = (string) \App\Models\Setting::get('invoice_prefix', 'INV-');
+            if (!preg_match('/^[A-Za-z0-9-]{1,10}$/', $invoicePrefix)) {
+                $invoicePrefix = 'INV-';
+            }
+            $invoiceNumber = app(DocumentNumberService::class)->nextFormatted($invoicePrefix . now()->format('Ymd'));
 
             $invoice = Invoice::withoutEvents(function () use ($invoiceNumber, $branchId, $customerId, $data, $cashierUserId, $subtotal, $discountAmount, $scrapDeduction, $taxAmount, $finalAmount, $totalPaid, $creditAmount, $invoicePaymentMethod, $idempotencyKey) {
                 return Invoice::create([
