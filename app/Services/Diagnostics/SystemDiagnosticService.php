@@ -134,12 +134,19 @@ class SystemDiagnosticService
         }
 
         // 5. فحص سلامة مسيرات الرواتب (Payroll Net Sum Verification)
+        // نفس تعريف الاتساق المستخدم عند الاعتماد والصرف (PayrollService::evaluateConsistency).
+        // صافي صفري رغم وجود مستحقات (مسير مستوعب بالكامل في الديون) حالة مراجعة وليس خطأ حسابياً.
         $payrollMismatch = 0;
-        $payrolls = Payroll::with('items')->get();
-        foreach ($payrolls as $payroll) {
-            $itemsNetSum = round((float) $payroll->items->sum('net_salary'), 2);
-            $payrollTotalNet = round((float) $payroll->total_net, 2);
-            if (abs($itemsNetSum - $payrollTotalNet) > 0.05) {
+        $payrollZeroNetReview = 0;
+        $payrollService = app(PayrollService::class);
+        foreach (Payroll::with('items')->get() as $payroll) {
+            $result = $payrollService->evaluateConsistency($payroll);
+            if ($result['consistent']) {
+                continue;
+            }
+            if ($result['zero_with_components'] && count($result['reasons']) === 1) {
+                $payrollZeroNetReview++;
+            } else {
                 $payrollMismatch++;
             }
         }
@@ -148,9 +155,10 @@ class SystemDiagnosticService
             'name'        => 'توازن مسيرات الرواتب ومطابقة الصافي (Payroll Net Sum)',
             'status'      => $payrollMismatch === 0 ? 'passed' : 'failed',
             'severity'    => 'high',
-            'details'     => $payrollMismatch === 0
+            'details'     => ($payrollMismatch === 0
                 ? 'جميع مسيرات الرواتب متوازنة حسابياً ومطابقة لمجموع بنود الموظفين.'
-                : "تم العثور على ({$payrollMismatch}) مسير راتب لا يتطابق إجماليه مع بنود الموظفين!",
+                : "تم العثور على ({$payrollMismatch}) مسير راتب لا يتطابق إجماليه مع بنود الموظفين!")
+                . ($payrollZeroNetReview > 0 ? " | ({$payrollZeroNetReview}) مسير بصافي صفري يحتاج مراجعة الديون." : ''),
             'count'       => $payrollMismatch,
         ];
         if ($payrollMismatch > 0) {
