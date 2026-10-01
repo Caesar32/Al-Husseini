@@ -201,7 +201,8 @@ test('scrap, warranty and supplier ledger pages render after the integrity chang
     $this->warranties->processInstantClaim(($this->claimData)('W-PAGE-1', 'rejected', ['rejection_reason' => 'سبب']), $this->user->id);
 
     $this->actingAs($this->user)->get(route('admin.scrap.index'))->assertOk();
-    $this->actingAs($this->user)->get(route('admin.warranties.index'))->assertOk();
+    $this->actingAs($this->user)->get(route('admin.warranties.index'))->assertOk()->assertSee('name="rejection_reason"', false);
+    $this->actingAs($this->user)->get(route('admin.warranties.verify', ['view' => 1]))->assertOk()->assertSee('name="rejection_reason"', false);
     $this->actingAs($this->user)->get(route('admin.suppliers.ledger', $supplier))->assertOk()->assertSee('تسويات وإشعارات خصم');
 });
 
