@@ -14,6 +14,7 @@ use App\Models\InvoiceItem;
 use App\Models\Employee;
 use App\Models\Attendance;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -28,22 +29,23 @@ class DashboardController extends Controller
         $monthStart = Carbon::today()->startOfMonth();
         $yearStart  = Carbon::today()->startOfYear();
 
-        $baseInvoices = Invoice::whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']);
+        // Countable invoices (cancelled / fully refunded excluded); partially refunded counted net of refunds.
+        $baseInvoices = Invoice::countable();
 
-        // ─── مبيعات الفترة (قيمة الفواتير الصادرة - دفترية) ────────────────────────────
-        $salesToday        = (float) (clone $baseInvoices)->where('created_at', '>=', $todayStart)->sum('final_amount');
+        // ─── مبيعات الفترة (قيمة الفواتير الصادرة - دفترية، صافية بعد المرتجعات) ────────────
+        $salesToday        = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $todayStart));
         $invoicesCountToday = (int)  (clone $baseInvoices)->where('created_at', '>=', $todayStart)->count();
 
-        $salesWeek         = (float) (clone $baseInvoices)->where('created_at', '>=', $weekStart)->sum('final_amount');
+        $salesWeek         = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $weekStart));
         $invoicesCountWeek  = (int)  (clone $baseInvoices)->where('created_at', '>=', $weekStart)->count();
 
-        $salesMonth         = (float) (clone $baseInvoices)->where('created_at', '>=', $monthStart)->sum('final_amount');
+        $salesMonth         = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $monthStart));
         $invoicesCountMonth  = (int)  (clone $baseInvoices)->where('created_at', '>=', $monthStart)->count();
 
-        $salesYear          = (float) (clone $baseInvoices)->where('created_at', '>=', $yearStart)->sum('final_amount');
+        $salesYear          = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $yearStart));
         $invoicesCountYear   = (int)  (clone $baseInvoices)->where('created_at', '>=', $yearStart)->count();
 
-        $salesAll           = (float) (clone $baseInvoices)->sum('final_amount');
+        $salesAll           = Invoice::sumNetAmount(clone $baseInvoices);
         $invoicesCountAll    = (int)  (clone $baseInvoices)->count();
 
         // ─── الإيراد النقدي الفعلي = مجموع الدفعات المقبوضة فعلاً في الفترة ─────────────
@@ -181,11 +183,14 @@ class DashboardController extends Controller
         $lowStockCount = (int) Product::whereColumn('current_stock', '<=', 'reorder_threshold')->count();
 
         // 2. Category Sub-summaries
-        $catStatBatteries = (float) InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', true))->sum('total_price');
-        $catStatOils = (float) InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'oils')))->sum('total_price');
-        $catStatServices = (float) InvoiceItem::whereHas('product', fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', 'services')))->sum('total_price');
-        $catStatGreases = (float) InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'greases')))->sum('total_price');
-        $catStatScrap = (float) Invoice::whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])->sum('scrap_deduction_amount');
+        // Same sales rule as the KPIs: countable invoices only, line value net of returned units.
+        $netLineSum = fn ($query) => (float) $query->whereHas('invoice', fn($q) => $q->countable())->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
+
+        $catStatBatteries = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', true)));
+        $catStatOils = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'oils'))));
+        $catStatServices = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', 'services'))));
+        $catStatGreases = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'greases'))));
+        $catStatScrap = (float) Invoice::countable()->sum('scrap_deduction_amount');
 
         // Percentages for Donut
         $totalCatSales = $catStatBatteries + $catStatOils + $catStatGreases + $catStatServices;
@@ -226,19 +231,19 @@ class DashboardController extends Controller
             $dayEnd = $date->copy()->endOfDay();
 
             // Daily sales for batteries
-            $dayBat = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']))
+            $dayBat = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
                 ->whereHas('product', fn($q) => $q->where('is_battery', true))
-                ->sum('total_price');
+                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
 
             // Daily sales for oils
-            $dayOil = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']))
+            $dayOil = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
                 ->whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'oils')))
-                ->sum('total_price');
+                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
 
             // Daily sales for services
-            $daySrv = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']))
+            $daySrv = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
                 ->whereHas('product', fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', 'services')))
-                ->sum('total_price');
+                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
 
             $trendBatteries[] = $dayBat;
             $trendOils[] = $dayOil;
@@ -247,7 +252,7 @@ class DashboardController extends Controller
 
         // 4. Recent Invoices
         $recentInvoices = Invoice::with(['customer', 'customerVehicle', 'items.product'])
-            ->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded'])
+            ->countable()
             ->latest('id')
             ->take(6)
             ->get();

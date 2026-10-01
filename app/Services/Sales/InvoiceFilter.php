@@ -115,13 +115,14 @@ class InvoiceFilter
     }
 
     /**
-     * Apply and also exclude cancelled/refunded by default for financial stats.
+     * Apply and, without an explicit status filter, keep only invoices that count as sales
+     * (cancelled and fully refunded excluded; partially refunded kept and netted by the caller).
      */
     public function applyForStats(Builder $query): Builder
     {
         $this->apply($query);
         if ($this->status === null) {
-            $query->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']);
+            $query->countable();
         }
         return $query;
     }

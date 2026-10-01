@@ -19,9 +19,13 @@ class InvoicePayment extends Model
         'amount' => 'decimal:2',
     ];
 
+    /**
+     * Payments of invoices that still count as sales. Partially refunded invoices are
+     * included: their refund is already recorded as a negative payment, so the sum is net.
+     */
     public function scopeActive($query)
     {
-        return $query->whereHas('invoice', fn($q) => $q->whereNotIn('status', ['cancelled', 'refunded', 'partially_refunded']));
+        return $query->whereHas('invoice', fn($q) => $q->countable());
     }
 
     public function scopeCash($query)
