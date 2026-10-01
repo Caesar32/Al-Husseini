@@ -109,9 +109,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const att = cachedAttendances.find(a => a.employee_id === emp.id);
 
             let status = att ? att.status : 'absent';
-            let punchIn = att?.check_in_time ? att.check_in_time.substring(11, 16) : '-';
-            let punchOut = att?.check_out_time ? att.check_out_time.substring(11, 16) : '-';
-            let lateness = att?.lateness_minutes || 0;
+            let punchIn = att?.check_in ? att.check_in.substring(11, 16) : '-';
+            let punchOut = att?.check_out ? att.check_out.substring(11, 16) : '-';
+            let lateness = att?.late_minutes || 0;
 
             // Status Filter Tab Check
             if (currentFilterTab !== 'all') {
@@ -335,6 +335,9 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             const att = data.attendance;
             const empName = att?.employee?.full_name || 'الموظف';
+            // The API returns the Attendance row (check_in / check_out / late_minutes as datetimes);
+            // show only HH:MM, never "undefined".
+            const clock = (value) => value ? String(value).substring(11, 16) : '—';
 
             if (type === 'check_in') {
                 if (att.status === 'late') {
@@ -344,8 +347,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         html: `
                             <div class="text-start fs-13">
                                 <p class="mb-1">الموظف: <strong class="text-dark">${empName}</strong></p>
-                                <p class="mb-1">وقت البصمة: <strong class="text-primary font-monospace">${att.check_in_time}</strong></p>
-                                <p class="mb-2 text-danger fw-bold fs-14">مدة التأخير: ${att.lateness_minutes} دقيقة</p>
+                                <p class="mb-1">وقت البصمة: <strong class="text-primary font-monospace">${clock(att.check_in)}</strong></p>
+                                <p class="mb-2 text-danger fw-bold fs-14">مدة التأخير: ${att.late_minutes ?? 0} دقيقة</p>
                                 <hr class="my-2">
                                 <p class="mb-0 text-muted fs-12">هل تريد تطبيق خصم إداري فوري على هذا الموظف الآن؟</p>
                             </div>
@@ -373,7 +376,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 Swal.fire({
                     icon: 'info',
                     title: '👋 تم تسجيل بصمة الانصراف',
-                    html: `تم تسجيل انصراف <strong>${empName}</strong> في تمام <strong>${att.check_out_time}</strong>. بالسلامة والتوفيق!`,
+                    html: `تم تسجيل انصراف <strong>${empName}</strong> في تمام <strong>${clock(att.check_out)}</strong>. بالسلامة والتوفيق!`,
                     timer: 2500,
                     timerProgressBar: true
                 });
@@ -415,7 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!emp) return;
 
         const att = cachedAttendances.find(a => a.employee_id == employeeId);
-        const lateness = att?.lateness_minutes || 0;
+        const lateness = att?.late_minutes || 0;
 
         document.getElementById('quickDedEmployeeId').value = emp.id;
         document.getElementById('quickDedEmployeeName').textContent = emp.full_name;

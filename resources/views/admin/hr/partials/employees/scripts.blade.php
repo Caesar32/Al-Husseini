@@ -238,8 +238,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             <tr>
                                 <td>${a.work_date}</td>
                                 <td><span class="badge ${a.status === 'present' ? 'bg-success-subtle text-success' : (a.status === 'late' ? 'bg-warning-subtle text-warning' : 'bg-danger-subtle text-danger')}">${a.status}</span></td>
-                                <td>${a.check_in_time ? a.check_in_time.substring(11, 16) : '—'}</td>
-                                <td>${a.lateness_minutes > 0 ? `<span class="text-danger fw-bold">+${a.lateness_minutes} د</span>` : 'منضبط'}</td>
+                                <td>${a.check_in ? a.check_in.substring(11, 16) : '—'}</td>
+                                <td>${a.late_minutes > 0 ? `<span class="text-danger fw-bold">+${a.late_minutes} د</span>` : 'منضبط'}</td>
                             </tr>
                         `).join('')
                         : '<tr><td colspan="4" class="text-center text-muted">لا توجد حركات بصمة مسجلة مؤخراً</td></tr>';
