@@ -31,27 +31,30 @@
                             <tbody>
                                 @foreach($payrolls as $p)
                                     @php
-                                        $rowBasic = round((float) $p->items->sum('basic_salary'), 2);
-                                        $rowAllowances = round((float) $p->items->sum('total_allowance'), 2);
-                                        $rowDeductions = round((float) $p->items->sum('total_deduction'), 2);
-                                        $rowStoredNet = round((float) $p->items->sum('net_salary'), 2);
-                                        $rowCarriedDebt = round((float) $p->items->sum('carried_debt'), 2);
-                                        $rowExpectedNet = round($rowBasic + $rowAllowances - $rowDeductions + $rowCarriedDebt, 2);
-                                        $rowNet = $rowExpectedNet;
-                                        $rowConsistent = abs($rowStoredNet - $rowExpectedNet) < 0.01;
-                                        $rowHasZeroWithComponents = abs($rowStoredNet) < 0.01 && abs($rowExpectedNet) > 0.01;
-                                        $rowNeedsReview = !$rowConsistent || $rowHasZeroWithComponents;
+                                        // Computed by PayrollService::evaluateConsistency — the same rules approve/disburse enforce.
+                                        $rowCheck = $payrollConsistency[$p->id];
+                                        $rowBasic = $rowCheck['basic'];
+                                        $rowAllowances = $rowCheck['allowances'];
+                                        $rowOvertime = $rowCheck['overtime'];
+                                        $rowDeductions = $rowCheck['deductions'];
+                                        $rowNet = $rowCheck['expected_net'];
+                                        $rowNeedsReview = !$rowCheck['consistent'];
                                     @endphp
                                     <tr class="payroll-batch-row" data-branch="{{ $p->branch_id }}" data-has-debt="{{ $p->items->contains(fn($item) => (float) $item->carried_debt > 0) ? '1' : '0' }}" data-needs-review="{{ $rowNeedsReview ? '1' : '0' }}">
                                         <td><span class="badge bg-dark-subtle text-dark fs-12 fw-bold font-monospace">{{ $p->year }} / {{ sprintf('%02d', $p->month) }}</span></td>
                                         <td><span class="fw-semibold">{{ $p->branch?->name }}</span></td>
                                         <td>{{ number_format($rowBasic) }} ج.م</td>
-                                        <td class="text-info">{{ number_format($rowAllowances) }} ج.م</td>
+                                        <td class="text-info">
+                                            {{ number_format($rowAllowances) }} ج.م
+                                            @if($rowOvertime > 0)
+                                                <small class="d-block text-muted">+ إضافي {{ number_format($rowOvertime) }} ج.م</small>
+                                            @endif
+                                        </td>
                                         <td class="text-danger">-{{ number_format($rowDeductions) }} ج.م</td>
                                         <td class="fw-bold fs-14 {{ $rowNeedsReview ? 'text-warning' : 'text-success' }}">{{ number_format($rowNet) }} ج.م</td>
                                         <td>
                                             @if($rowNeedsReview)
-                                                <span class="badge bg-warning-subtle text-warning fs-12">
+                                                <span class="badge bg-warning-subtle text-warning fs-12" title="{{ implode(' ', $rowCheck['reasons']) }}">
                                                     <i class="ri-error-warning-line me-1"></i>يحتاج مراجعة الأرقام
                                                 </span>
                                             @elseif($p->status === 'draft')
@@ -64,6 +67,9 @@
                                         </td>
                                         <td>{{ $p->approvedBy?->name ?? '—' }}</td>
                                         <td class="text-center">
+                                            <a href="{{ route('admin.hr.payroll.show', $p) }}" class="btn btn-sm btn-soft-secondary me-1" title="تفاصيل المسير">
+                                                <i class="ri-eye-line"></i>
+                                            </a>
                                             @if($rowNeedsReview)
                                                 <span class="text-warning fs-12"><i class="ri-lock-line me-1"></i>ممنوع حتى تصحيح الأرقام</span>
                                             @elseif($p->status === 'draft')

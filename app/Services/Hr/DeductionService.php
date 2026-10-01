@@ -40,6 +40,12 @@ class DeductionService implements DeductionServiceInterface
      */
     public function updateDeductionStatus(EmployeeDeduction $deduction, string $status, ?int $approvedBy = null): bool
     {
+        // An applied deduction was already withheld in a disbursed payroll; changing it would
+        // silently desynchronise the employee's paid salary from the deduction records.
+        if ($deduction->status === 'applied') {
+            throw new \DomainException('لا يمكن تعديل جزاء تم خصمه بالفعل في مسير رواتب مصروف.');
+        }
+
         return $deduction->update([
             'status' => $status,
             'approved_by' => $approvedBy ?? Auth::id(),

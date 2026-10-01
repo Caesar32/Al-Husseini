@@ -39,7 +39,22 @@ class PayrollService implements PayrollServiceInterface
         $payrolls = $query->paginate($perPage);
         $latestPayroll = (clone $query)->first();
 
-        return compact('payrolls', 'branches', 'employees', 'recentDeductions', 'latestPayroll');
+        // Consistency is computed once, server-side, with the same rules used by approve/disburse,
+        // so the register view never re-implements (and drifts from) the payroll formula.
+        $payrollConsistency = $payrolls->getCollection()
+            ->mapWithKeys(fn (Payroll $payroll) => [$payroll->id => $this->evaluateConsistency($payroll)])
+            ->all();
+
+        // Latest stored payroll item per employee (the breakdown and payslip show stored values,
+        // never client-side estimates).
+        $latestItems = PayrollItem::whereIn('employee_id', $employees->pluck('id'))
+            ->with('payroll:id,branch_id,year,month,status')
+            ->get()
+            ->sortByDesc(fn (PayrollItem $item) => [$item->payroll->year, $item->payroll->month, $item->id])
+            ->unique('employee_id')
+            ->keyBy('employee_id');
+
+        return compact('payrolls', 'branches', 'employees', 'recentDeductions', 'latestPayroll', 'payrollConsistency', 'latestItems');
     }
 
     /**
@@ -77,9 +92,11 @@ class PayrollService implements PayrollServiceInterface
             $endDate   = $startDate->copy()->endOfMonth();
             $totalMonthDays = $startDate->daysInMonth;
 
+            // Employees on approved leave are still on payroll: paid and unpaid leave days are
+            // computed below, so excluding status on_leave silently dropped them (BIZ-09).
             $employees = Employee::with(['currentSalary'])
                 ->where('branch_id', $branchId)
-                ->where('status', 'active')
+                ->whereIn('status', ['active', 'on_leave'])
                 ->get();
 
             $employeeIds = $employees->pluck('id');
@@ -214,6 +231,12 @@ class PayrollService implements PayrollServiceInterface
                     'late_minutes_total' => $totalLateMinutes,
                 ]);
 
+                // Link the deductions this item actually withheld (used at disbursal to mark them applied).
+                $withheldDeductionIds = $allDeductions->get($employee->id, collect())->pluck('id');
+                if ($withheldDeductionIds->isNotEmpty()) {
+                    EmployeeDeduction::whereIn('id', $withheldDeductionIds)->update(['payroll_item_id' => $payrollItem->id]);
+                }
+
                 if ($carriedDebt > 0) {
                     EmployeePayrollDebt::create([
                         'employee_id' => $employee->id,
@@ -262,8 +285,36 @@ class PayrollService implements PayrollServiceInterface
      */
     private function assertPayrollTotalsConsistent(Payroll $payroll): void
     {
-        $items = $payroll->items()->get();
+        // Always re-read the items: approve/disburse must not trust a possibly stale loaded relation.
+        $result = $this->computeConsistency($payroll, $payroll->items()->get());
 
+        if (!$result['consistent']) {
+            throw new Exception(
+                "لا يمكن اعتماد أو صرف مسير الرواتب: إجماليات المسير لا تتطابق مع بنوده. " .
+                "المتوقع صافي {$result['expected_net']} ج.م، والمسجل {$result['stored_net']} ج.م. يجب تصحيح المسير قبل المتابعة."
+            );
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function evaluateConsistency(Payroll $payroll): array
+    {
+        $items = $payroll->relationLoaded('items') ? $payroll->items : $payroll->items()->get();
+
+        return $this->computeConsistency($payroll, $items);
+    }
+
+    /**
+     * Single definition of payroll consistency: the item rows are the source of truth;
+     * header totals must match them and the item net must equal
+     * basic + allowances + overtime - deductions + carried debt.
+     *
+     * @param  \Illuminate\Support\Collection<int, PayrollItem>  $items
+     */
+    private function computeConsistency(Payroll $payroll, $items): array
+    {
         $basic = round((float) $items->sum('basic_salary'), 2);
         $allowances = round((float) $items->sum('total_allowance'), 2);
         $overtime = round((float) $items->sum('total_overtime'), 2);
@@ -273,21 +324,43 @@ class PayrollService implements PayrollServiceInterface
 
         $expectedNet = round($basic + $allowances + $overtime - $deductions + $carriedDebt, 2);
 
-        $headerMismatch =
-            abs((float) $payroll->total_basic - $basic) > 0.01 ||
-            abs((float) $payroll->total_allowances - $allowances) > 0.01 ||
-            abs((float) $payroll->total_deductions - $deductions) > 0.01 ||
-            abs((float) $payroll->total_net - $net) > 0.01;
+        $reasons = [];
+
+        if (abs((float) $payroll->total_basic - $basic) > 0.01) {
+            $reasons[] = 'إجمالي الأساسي في رأس المسير لا يطابق البنود.';
+        }
+        if (abs((float) $payroll->total_allowances - $allowances) > 0.01) {
+            $reasons[] = 'إجمالي البدلات في رأس المسير لا يطابق البنود.';
+        }
+        if (abs((float) $payroll->total_deductions - $deductions) > 0.01) {
+            $reasons[] = 'إجمالي الخصومات في رأس المسير لا يطابق البنود.';
+        }
+        if (abs((float) $payroll->total_net - $net) > 0.01) {
+            $reasons[] = 'صافي رأس المسير لا يطابق مجموع صافي البنود.';
+        }
 
         $netMismatch = abs($net - $expectedNet) > 0.01;
-        $zeroWithComponents = abs($net) < 0.01 && ($basic + $allowances > 0 || $deductions > 0);
-
-        if ($headerMismatch || $netMismatch || $zeroWithComponents) {
-            throw new Exception(
-                "لا يمكن اعتماد أو صرف مسير الرواتب: إجماليات المسير لا تتطابق مع بنوده. " .
-                "المتوقع صافي {$expectedNet} ج.م، والمسجل {$net} ج.م. يجب تصحيح المسير قبل المتابعة."
-            );
+        if ($netMismatch) {
+            $reasons[] = "صافي البنود ({$net}) لا يساوي الأساسي + البدلات + الإضافي - الخصومات + الرصيد المرحّل ({$expectedNet}).";
         }
+
+        $zeroWithComponents = abs($net) < 0.01 && ($basic + $allowances > 0 || $deductions > 0);
+        if ($zeroWithComponents) {
+            $reasons[] = 'صافي المسير صفر رغم وجود مستحقات أو خصومات.';
+        }
+
+        return [
+            'basic'                => $basic,
+            'allowances'           => $allowances,
+            'overtime'             => $overtime,
+            'deductions'           => $deductions,
+            'carried_debt'         => $carriedDebt,
+            'expected_net'         => $expectedNet,
+            'stored_net'           => $net,
+            'zero_with_components' => $zeroWithComponents,
+            'consistent'           => $reasons === [],
+            'reasons'              => $reasons,
+        ];
     }
 
     /**
@@ -375,6 +448,13 @@ class PayrollService implements PayrollServiceInterface
                     throw new Exception("تعذر مطابقة كامل سداد دين الرواتب للموظف رقم {$item->employee_id}. لم يتم صرف المسير.");
                 }
             }
+
+            // Deductions withheld by this payroll are now settled: mark them applied so they are
+            // immutable afterwards (DeductionService refuses status changes on applied rows).
+            // Only rows linked at generation and still approved are touched; payroll math is unchanged.
+            EmployeeDeduction::whereIn('payroll_item_id', $items->pluck('id'))
+                ->where('status', 'approved')
+                ->update(['status' => 'applied']);
 
             return $payroll->update([
                 'status' => 'disbursed',
