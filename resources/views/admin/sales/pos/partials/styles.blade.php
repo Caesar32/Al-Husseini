@@ -481,7 +481,7 @@
     [data-bs-theme="dark"] #posTechnicianSelect,
     [data-bs-theme="dark"] #posTechnicianSelectCart,
     [data-bs-theme="dark"] #quickAddProductSelect,
-    [data-bs-theme="dark"] #scrapCapacitySelect,
+    [data-bs-theme="dark"] #scrapCapacityInput,
     [data-bs-theme="dark"] #scrapPriceInput,
     [data-bs-theme="dark"] #scrapCountInput,
     [data-bs-theme="dark"] #cashReceivedInput,

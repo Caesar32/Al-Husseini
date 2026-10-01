@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Invoice;
 use App\Models\Product;
 use App\Models\ScrapPricingTier;
+use App\Services\Sales\CustomerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,31 +24,67 @@ class PosController extends Controller
 
     public function index(): View
     {
+        // The browser receives only the fields the cashier screen needs (no cost prices,
+        // national ids or other internal columns). Ids are the real database ids.
         $products = Product::where('is_active', true)
             ->with([
-                'category',
-                // FIX-5: تحميل بيانات الموردين مع كود السكو الخاص بالمورد لتفعيل البحث بباركود كراتين المورد
-                'suppliers' => function ($q) {
-                    $q->select('suppliers.id', 'suppliers.name')
-                      ->withPivot(['supplier_sku', 'last_purchase_price', 'is_primary_supplier']);
-                },
+                'category:id,slug,name',
+                'suppliers' => fn ($q) => $q->select('suppliers.id')->withPivot('supplier_sku'),
             ])
             ->orderBy('is_battery', 'desc')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn (Product $p) => [
+                'id'              => $p->id,
+                'name'            => $p->name,
+                'brand'           => $p->brand,
+                'sku'             => $p->sku,
+                'barcode'         => $p->barcode,
+                'category'        => $p->category?->slug,
+                'category_name'   => $p->category?->name,
+                'is_battery'      => (bool) $p->is_battery,
+                'capacity_ah'     => $p->capacity_ah,
+                'stock'           => (int) $p->current_stock,
+                'price'           => (float) $p->retail_price,
+                'warranty_months' => (int) $p->warranty_months,
+                // Supplier carton codes so a scanned supplier barcode resolves to the product.
+                'supplier_skus'   => $p->suppliers->pluck('pivot.supplier_sku')->filter()->values()->all(),
+            ])
+            ->values();
 
         $customers = Customer::where('is_active', true)
-            ->with(['vehicles'])
+            ->where('phone', '!=', CustomerService::WALK_IN_PHONE)
+            ->with('vehicles:id,customer_id,plate_number,car_brand,car_model')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn (Customer $c) => [
+                'id'             => $c->id,
+                'name'           => $c->name,
+                'phone'          => $c->phone,
+                'credit_limit'   => (float) $c->credit_limit,
+                'credit_balance' => (float) $c->current_credit_balance,
+                'vehicles'       => $c->vehicles->map(fn ($v) => [
+                    'id'           => $v->id,
+                    'plate_number' => $v->plate_number,
+                    'car'          => trim($v->car_brand . ' ' . $v->car_model),
+                ])->values()->all(),
+            ])
+            ->values();
 
         $technicians = Employee::where('status', 'active')
             ->orderBy('full_name')
-            ->get();
+            ->get(['id', 'full_name', 'employee_code']);
 
         $scrapTiers = ScrapPricingTier::where('is_active', true)
             ->orderBy('capacity_min_ah')
-            ->get();
+            ->get()
+            ->map(fn (ScrapPricingTier $t) => [
+                'min_ah' => (int) $t->capacity_min_ah,
+                'max_ah' => (int) $t->capacity_max_ah,
+                'name'   => $t->tier_name,
+                'price'  => (float) $t->default_scrap_price,
+            ])
+            ->values();
 
         $viewName = view()->exists('admin.pos.index') ? 'admin.pos.index' : 'admin.sales.pos';
         return view($viewName, compact('products', 'customers', 'technicians', 'scrapTiers'));

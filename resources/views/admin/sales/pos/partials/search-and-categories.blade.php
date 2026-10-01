@@ -27,16 +27,16 @@
         <button type="button" class="btn btn-sm btn-primary pos-category-pill text-nowrap" id="cat-tab-all" onclick="filterByCategory('all')">
             الكل (<span id="pillCountAll">0</span>)
         </button>
-        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-batteries" onclick="filterByCategory('بطاريات')">
+        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-batteries" onclick="filterByCategory('batteries')">
             🔋 بطاريات (<span id="pillCountBatteries">0</span>)
         </button>
-        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-oils" onclick="filterByCategory('زيوت')">
+        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-oils" onclick="filterByCategory('oils')">
             🛢️ زيوت وفلاتر (<span id="pillCountOils">0</span>)
         </button>
-        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-greases" onclick="filterByCategory('شحوم وسوائل')">
+        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-greases" onclick="filterByCategory('greases')">
             🧪 شحوم وسوائل (<span id="pillCountGreases">0</span>)
         </button>
-        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-services" onclick="filterByCategory('خدمات وصيانة')">
+        <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-services" onclick="filterByCategory('services')">
             🔧 صيانة الورشة (<span id="pillCountServices">0</span>)
         </button>
     </div>

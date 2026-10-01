@@ -5,7 +5,7 @@
         <div class="d-flex align-items-center gap-1 flex-grow-1" style="min-width: 220px; max-width: 380px;">
             <span class="fs-12 fw-bold text-muted text-nowrap"><i class="ri-user-smile-line text-primary fs-14"></i> العميل:</span>
             <select class="form-select form-select-sm fw-bold fs-12 border-primary" id="posCustomerSelect" onchange="onCustomerSelected()">
-                <option value="CUST-CASH">عميل نقدي مباشر بالمعرض / الورشة</option>
+                <option value="WALK_IN">عميل نقدي مباشر بالمعرض / الورشة</option>
             </select>
         </div>
 
@@ -24,6 +24,7 @@
         <div class="px-2 py-1 bg-body rounded border d-flex align-items-center gap-2 fs-11 flex-grow-1" style="min-width: 170px; max-width: 260px;">
             <span class="text-muted text-nowrap"><i class="ri-car-line me-1"></i>المركبة:</span>
             <span class="fw-bold text-dark text-truncate" id="posCarDetailsDisplay" title="غير محدد">غير محدد</span>
+            <select class="form-select form-select-sm fs-11 py-0 d-none" id="posVehicleSelect" aria-label="مركبة العميل"></select>
         </div>
 
         <!-- Status Indicators & New Customer Modal Trigger -->
