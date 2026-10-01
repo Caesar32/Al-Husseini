@@ -86,6 +86,16 @@ class StorePosInvoiceRequest extends FormRequest
             $batterySerials = [];
             $subtotal = 0.0;
 
+            // Total requested per product across lines (a product may appear on several lines).
+            $requestedPerProduct = [];
+            foreach ($items as $item) {
+                $pid = $item['product_id'] ?? null;
+                if ($pid !== null) {
+                    $requestedPerProduct[$pid] = ($requestedPerProduct[$pid] ?? 0) + (int) ($item['quantity'] ?? 1);
+                }
+            }
+            $stockErrorReported = [];
+
             foreach ($items as $index => $item) {
                 $productId = $item['product_id'] ?? null;
                 $qty = (int) ($item['quantity'] ?? 1);
@@ -95,11 +105,21 @@ class StorePosInvoiceRequest extends FormRequest
                     continue;
                 }
 
-                // Check stock
-                if ($product->current_stock < $qty) {
+                // Check stock against the total requested for this product
+                $requestedTotal = $requestedPerProduct[$productId] ?? $qty;
+                if ($product->current_stock < $requestedTotal && !isset($stockErrorReported[$productId])) {
+                    $stockErrorReported[$productId] = true;
                     $validator->errors()->add(
                         "items.{$index}.quantity",
-                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$qty}."
+                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$requestedTotal}."
+                    );
+                }
+
+                // Each battery unit carries its own serial and warranty, so a battery line covers exactly one unit.
+                if ($product->is_battery && $qty !== 1) {
+                    $validator->errors()->add(
+                        "items.{$index}.quantity",
+                        "كل بطارية تُسجَّل في سطر مستقل بسيريال خاص بها (الكمية في سطر البطارية يجب أن تكون 1)."
                     );
                 }
 

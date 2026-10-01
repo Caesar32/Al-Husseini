@@ -124,6 +124,13 @@ class PosOrderService implements PosOrderServiceInterface
             $subtotal = 0.0;
             $preparedItems = [];
 
+            // Stock is checked against the total requested per product: the same product may
+            // appear on several lines (each battery unit is its own line with its own serial).
+            $requestedPerProduct = [];
+            foreach ($itemsData as $item) {
+                $requestedPerProduct[$item['product_id']] = ($requestedPerProduct[$item['product_id']] ?? 0) + (int) ($item['quantity'] ?? 1);
+            }
+
             foreach ($itemsData as $item) {
                 $productId = $item['product_id'];
                 $product = $products->get($productId);
@@ -133,9 +140,10 @@ class PosOrderService implements PosOrderServiceInterface
                 }
 
                 $qty = (int) ($item['quantity'] ?? 1);
-                if ($product->current_stock < $qty) {
+                $requestedTotal = $requestedPerProduct[$productId];
+                if ($product->current_stock < $requestedTotal) {
                     throw new \DomainException(
-                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، ولا يكفي لصرف {$qty}."
+                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، ولا يكفي لصرف {$requestedTotal}."
                     );
                 }
 
