@@ -64,8 +64,14 @@ class StorePosInvoiceRequest extends FormRequest
             // A retry of an already-committed checkout (same idempotency key) must not be re-validated:
             // its serials and stock were consumed by the original sale. The service returns that invoice.
             $idempotencyKey = trim((string) $this->input('idempotency_key', ''));
-            if ($idempotencyKey !== '' && \App\Models\Invoice::where('idempotency_key', $idempotencyKey)->exists()) {
-                return;
+            if ($idempotencyKey !== '') {
+                $existingCashierId = \App\Models\Invoice::where('idempotency_key', $idempotencyKey)->value('cashier_id');
+                if ($existingCashierId !== null) {
+                    if ((int) $existingCashierId !== (int) $this->user()?->id) {
+                        $validator->errors()->add('idempotency_key', 'مفتاح منع التكرار مستخدم لعملية بيع أخرى.');
+                    }
+                    return;
+                }
             }
 
             $items = $this->input('items', []);

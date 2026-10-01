@@ -75,16 +75,26 @@ class PosOrderService implements PosOrderServiceInterface
             return $this->createPosSale($data, $cashierUserId, $idempotencyKey);
         } catch (UniqueConstraintViolationException $e) {
             // A concurrent submission with the same key committed first: return that invoice.
-            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey))) {
+            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey, $cashierUserId))) {
                 return $existing;
             }
             throw $e;
         }
     }
 
-    private function findByIdempotencyKey(string $key): ?Invoice
+    /**
+     * A retry only resolves to an invoice created by the same cashier; a key that belongs to
+     * another cashier's sale is refused rather than disclosing or reusing that invoice.
+     */
+    private function findByIdempotencyKey(string $key, int $cashierUserId): ?Invoice
     {
-        return Invoice::where('idempotency_key', $key)->first()?->load([
+        $invoice = Invoice::where('idempotency_key', $key)->first();
+
+        if ($invoice && (int) $invoice->cashier_id !== $cashierUserId) {
+            throw new \DomainException('مفتاح منع التكرار مستخدم لعملية بيع أخرى. أعد تحميل شاشة البيع وحاول مرة أخرى.');
+        }
+
+        return $invoice?->load([
             'items.product',
             'customer',
             'customerVehicle',
@@ -98,7 +108,7 @@ class PosOrderService implements PosOrderServiceInterface
     {
         return DB::transaction(function () use ($data, $cashierUserId, $idempotencyKey) {
             // Retried submission (same client key): return the already-created invoice, no side effects.
-            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey))) {
+            if ($idempotencyKey !== null && ($existing = $this->findByIdempotencyKey($idempotencyKey, $cashierUserId))) {
                 return $existing;
             }
 
