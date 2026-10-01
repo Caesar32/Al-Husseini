@@ -43,6 +43,14 @@ class EmployeeDeduction extends Model
         return $this->belongsTo(Attendance::class);
     }
 
+    /**
+     * Payroll item that withheld this deduction (set by PayrollService, not mass assignable).
+     */
+    public function payrollItem(): BelongsTo
+    {
+        return $this->belongsTo(PayrollItem::class);
+    }
+
     public function approvedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');

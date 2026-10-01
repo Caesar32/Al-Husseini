@@ -40,11 +40,18 @@ class DeductionController extends Controller
 
     public function updateStatus(UpdateDeductionStatusRequest $request, EmployeeDeduction $deduction): JsonResponse
     {
-        $this->deductionService->updateDeductionStatus(
-            $deduction,
-            $request->validated('status'),
-            Auth::id()
-        );
+        try {
+            $this->deductionService->updateDeductionStatus(
+                $deduction,
+                $request->validated('status'),
+                Auth::id()
+            );
+        } catch (\DomainException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         return response()->json([
             'success' => true,

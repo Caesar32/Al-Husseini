@@ -78,8 +78,9 @@
                                 </div>
                                 <div class="col-5">
                                     <select class="form-select fw-semibold" id="select-year" onchange="loadReport()">
-                                        <option value="2026" selected>2026</option>
-                                        <option value="2025">2025</option>
+                                        @foreach($years as $year)
+                                            <option value="{{ $year }}" @selected($loop->first)>{{ $year }}</option>
+                                        @endforeach
                                     </select>
                                 </div>
                             </div>
@@ -120,12 +121,9 @@
                             <span class="input-group-text bg-light"><i class="ri-building-line"></i></span>
                             <select class="form-select" id="filter-department" onchange="applyFilters()">
                                 <option value="">جميع الأقسام والورش</option>
-                                <option value="المبيعات والمعرض">المبيعات والمعرض (صالة البيع)</option>
-                                <option value="ورشة الصيانة والشحن">ورشة الصيانة وشحن البطاريات ومياه النار</option>
-                                <option value="فنيو التركيب والكهرباء">فنيو التركيب وكهرباء السيارات وفحص الدينامو</option>
-                                <option value="خدمة الطوارئ والإنقاذ المتنقل">طوارئ وإنقاذ بطاريات الطريق</option>
-                                <option value="المخازن وسلاسل الإمداد">مخزن البطاريات والكهنة المسترجعة</option>
-                                <option value="الإدارة والإشراف">الإدارة والإشراف</option>
+                                @foreach($departments as $departmentName)
+                                    <option value="{{ $departmentName }}">{{ $departmentName }}</option>
+                                @endforeach
                             </select>
                         </div>
                     </div>

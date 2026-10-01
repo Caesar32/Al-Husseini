@@ -27,6 +27,14 @@ interface PayrollServiceInterface
     public function disbursePayroll(Payroll $payroll): bool;
 
     /**
+     * Evaluate a batch against the same consistency rules used by approve/disburse.
+     *
+     * @return array{basic: float, allowances: float, overtime: float, deductions: float, carried_debt: float,
+     *               expected_net: float, stored_net: float, zero_with_components: bool, consistent: bool, reasons: list<string>}
+     */
+    public function evaluateConsistency(Payroll $payroll): array;
+
+    /**
      * Load payroll relations for viewing details.
      */
     public function getPayrollDetails(Payroll $payroll): Payroll;

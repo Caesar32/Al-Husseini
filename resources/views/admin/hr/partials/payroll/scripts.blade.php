@@ -217,18 +217,49 @@ document.addEventListener('DOMContentLoaded', function() {
         };
     });
 
-    // View Payslip Modal
+    // View Payslip Modal — renders the STORED payroll item (from the payroll show JSON endpoint),
+    // never a client-side estimate.
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+
     document.querySelectorAll('.btn-view-payslip').forEach(btn => {
         btn.onclick = function() {
-            const name = this.getAttribute('data-name');
-            const code = this.getAttribute('data-code');
-            const role = this.getAttribute('data-role');
-            const branch = this.getAttribute('data-branch');
-            const base = Number(this.getAttribute('data-base') || 0);
-            const allow = Number(this.getAttribute('data-allow') || 0);
-            const ded = Number(this.getAttribute('data-ded') || 0);
-            const net = Number(this.getAttribute('data-net') || 0);
-            const shortfall = Number(this.getAttribute('data-shortfall') || 0);
+            const payrollId = this.getAttribute('data-payroll-id');
+            const employeeId = Number(this.getAttribute('data-employee-id'));
+            const branchName = this.getAttribute('data-branch') || '';
+            if (!payrollId) return;
+
+            fetch(`{{ url('/admin/hr/payroll') }}/${encodeURIComponent(payrollId)}`, {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || 'تعذر تحميل قسيمة الراتب.');
+                return data;
+            })
+            .then(payroll => {
+                const item = (payroll.items || []).find(i => Number(i.employee_id) === employeeId);
+                if (!item) throw new Error('لا يوجد بند مسجل لهذا الموظف في المسير.');
+                renderPayslip(payroll, item, branchName);
+                payslipModal.show();
+            })
+            .catch(err => Swal.fire('خطأ', err.message, 'error'));
+        };
+    });
+
+    function renderPayslip(payroll, item, branchName) {
+            const emp = item.employee || {};
+            const name = escapeHtml(emp.full_name);
+            const code = escapeHtml(emp.employee_code);
+            const role = escapeHtml(emp.job_title?.title_name || emp.job_title?.title || '');
+            const branch = escapeHtml(payroll.branch?.name || branchName);
+            const base = Number(item.basic_salary || 0);
+            const allow = Number(item.total_allowance || 0);
+            const overtime = Number(item.total_overtime || 0);
+            const ded = Number(item.total_deduction || 0);
+            const debtRepayment = Number(item.debt_repayment || 0);
+            const net = Number(item.net_salary || 0);
+            const shortfall = Number(item.carried_debt || 0);
+            const period = `${Number(payroll.month)} / ${Number(payroll.year)}`;
 
             document.getElementById('payslipPrintArea').innerHTML = `
                 <div class="border p-4 rounded-3 bg-white">
@@ -258,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="col-6">
                             <span class="text-muted fs-12">شهر الاستحقاق:</span>
-                            <div class="fw-semibold font-monospace">${new Date().getMonth() + 1} / ${new Date().getFullYear()}</div>
+                            <div class="fw-semibold font-monospace">${period}</div>
                         </div>
                     </div>
 
@@ -279,14 +310,20 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td class="text-end fw-bold text-danger">-${ded.toLocaleString('ar-EG')}</td>
                             </tr>
                             <tr>
-                                <td>إجمالي البدلات والمكافآت</td>
+                                <td>إجمالي البدلات والعمولات</td>
                                 <td class="text-end fw-bold text-info">${allow.toLocaleString('ar-EG')}</td>
-                                <td>تأمينات واستقطاعات أخرى</td>
-                                <td class="text-end fw-bold text-muted">0</td>
+                                <td>منها سداد رصيد مرحّل سابق</td>
+                                <td class="text-end fw-bold text-muted">${debtRepayment.toLocaleString('ar-EG')}</td>
+                            </tr>
+                            <tr>
+                                <td>العمل الإضافي</td>
+                                <td class="text-end fw-bold text-info">${overtime.toLocaleString('ar-EG')}</td>
+                                <td>أيام الغياب المحتسبة</td>
+                                <td class="text-end fw-bold text-muted">${Number(item.absent_days || 0)}</td>
                             </tr>
                             <tr class="table-light fw-bold">
                                 <td>إجمالي الدخل</td>
-                                <td class="text-end text-success">${(base + allow).toLocaleString('ar-EG')} ج.م</td>
+                                <td class="text-end text-success">${(base + allow + overtime).toLocaleString('ar-EG')} ج.م</td>
                                 <td>إجمالي الاستقطاع</td>
                                 <td class="text-end text-danger">-${ded.toLocaleString('ar-EG')} ج.م</td>
                             </tr>
@@ -311,10 +348,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </div>
             `;
-
-            payslipModal.show();
-        };
-    });
+    }
 
     // -------------------------------------------------------------
     // Universal Arabic Normalization & Fuzzy-Matching Engine

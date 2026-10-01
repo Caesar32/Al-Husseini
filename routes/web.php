@@ -151,10 +151,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/payroll/{payroll}/approve', [PayrollController::class, 'approve'])->name('payroll.approve')->middleware('can:payroll.approve');
             Route::post('/payroll/{payroll}/disburse', [PayrollController::class, 'disburse'])->name('payroll.disburse')->middleware('can:payroll.disburse');
 
-            // تقارير الموارد البشرية
-            Route::get('/reports', function () {
-                return view('admin.hr.reports');
-            })->name('reports')->middleware('can:reports.hr');
+            // ── تقارير الموارد البشرية (Phase 8 / FE-03: بيانات حقيقية من قاعدة البيانات) ──
+            Route::middleware('can:reports.hr')->group(function () {
+                Route::get('/reports', [\App\Http\Controllers\Hr\HrReportController::class, 'index'])->name('reports');
+                Route::get('/reports/daily', [\App\Http\Controllers\Hr\HrReportController::class, 'daily'])->name('reports.daily');
+                Route::get('/reports/monthly', [\App\Http\Controllers\Hr\HrReportController::class, 'monthly'])->name('reports.monthly');
+                Route::get('/reports/range', [\App\Http\Controllers\Hr\HrReportController::class, 'range'])->name('reports.range');
+                Route::get('/reports/employees/{employee}', [\App\Http\Controllers\Hr\HrReportController::class, 'employee'])->name('reports.employee');
+            });
+            // ── نهاية تقارير الموارد البشرية ──
 
             // إشعارات الإدارة
             Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index')->middleware('can:notifications.view');
