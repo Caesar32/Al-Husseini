@@ -4,17 +4,43 @@
 <script>
     'use strict';
 
+    // Reports are built server-side from the database (HrReportController / HrReportService).
+    const REPORT_URLS = {
+        daily: @json(route('admin.hr.reports.daily')),
+        monthly: @json(route('admin.hr.reports.monthly')),
+        range: @json(route('admin.hr.reports.range')),
+        employee: @json(route('admin.hr.reports.employee', ['employee' => '__ID__'])),
+    };
+
     let currentMode = 'daily'; // 'daily' | 'monthly' | 'custom'
     let currentReportData = null;
     let attendancePieChart = null;
     let timelineBarChart = null;
+    let reportRequestSeq = 0;
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch]));
+    const formatCurrency = (amount) => `${Number(amount || 0).toLocaleString('ar-EG')} ج.م`;
+    const DEFAULT_AVATAR = @json(asset('assets/images/users/avatar-1.jpg'));
+
+    function localDateString(date) {
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    }
+
+    async function fetchJson(url, params = {}) {
+        const query = new URLSearchParams(params).toString();
+        const res = await fetch(query ? `${url}?${query}` : url, { headers: { 'Accept': 'application/json' } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            throw new Error(data.message || 'تعذر تحميل بيانات التقرير.');
+        }
+        return data;
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
-        // Initialize Default Values
         const today = new Date();
         const y = today.getFullYear();
         const m = today.getMonth() + 1;
-        const dStr = today.toISOString().split('T')[0];
+        const dStr = localDateString(today);
 
         const dailyInput = document.getElementById('input-daily-date');
         if (dailyInput) dailyInput.value = dStr;
@@ -23,7 +49,7 @@
         if (monthSelect) monthSelect.value = m;
 
         const yearSelect = document.getElementById('select-year');
-        if (yearSelect) yearSelect.value = y;
+        if (yearSelect && [...yearSelect.options].some(o => Number(o.value) === y)) yearSelect.value = y;
 
         const rangeStart = document.getElementById('input-range-start');
         const rangeEnd = document.getElementById('input-range-end');
@@ -37,7 +63,7 @@
             printGenDate.textContent = today.toLocaleDateString('ar-EG', { dateStyle: 'full' });
         }
 
-        // Check URL parameters on page load (e.g. ?search=EMP-0101&department=المبيعات)
+        // URL parameters (e.g. ?search=EMP-0101&department=...&mode=monthly)
         const urlParams = new URLSearchParams(window.location.search);
         const searchParam = urlParams.get('search');
         const deptParam = urlParams.get('department') || urlParams.get('dept');
@@ -54,20 +80,13 @@
         if (modeParam && ['daily', 'monthly', 'custom'].includes(modeParam)) {
             setReportMode(modeParam);
         } else {
-            // Load initial daily report
             loadReport();
         }
-
-        // Listen for external updates
-        window.addEventListener('alhusseini-hr-updated', function () {
-            loadReport();
-        });
     });
 
     function setReportMode(mode) {
         currentMode = mode;
 
-        // Button styles
         ['daily', 'monthly', 'custom'].forEach(m => {
             const btn = document.getElementById(`btn-mode-${m}`);
             const ctrl = document.getElementById(`controls-${m}`);
@@ -81,11 +100,7 @@
                 }
             }
             if (ctrl) {
-                if (m === mode) {
-                    ctrl.classList.remove('d-none');
-                } else {
-                    ctrl.classList.add('d-none');
-                }
+                ctrl.classList.toggle('d-none', m !== mode);
             }
         });
 
@@ -98,62 +113,64 @@
         const parts = input.value.split('-').map(Number);
         const curr = new Date(parts[0], parts[1] - 1, parts[2]);
         curr.setDate(curr.getDate() + offset);
-        const nextY = curr.getFullYear();
-        const nextM = String(curr.getMonth() + 1).padStart(2, '0');
-        const nextD = String(curr.getDate()).padStart(2, '0');
-        input.value = `${nextY}-${nextM}-${nextD}`;
+        input.value = localDateString(curr);
         loadReport();
     }
 
     function setTodayDate() {
         const input = document.getElementById('input-daily-date');
-        const today = new Date();
-        const y = today.getFullYear();
-        const m = String(today.getMonth() + 1).padStart(2, '0');
-        const d = String(today.getDate()).padStart(2, '0');
-        input.value = `${y}-${m}-${d}`;
+        input.value = localDateString(new Date());
         loadReport();
     }
 
-    function loadReport() {
-        if (!window.AlHusseiniHR) return;
-
+    async function loadReport() {
+        const seq = ++reportRequestSeq;
         let periodTitle = '';
         let printPeriodText = '';
+        let data;
 
-        if (currentMode === 'daily') {
-            const targetDate = document.getElementById('input-daily-date')?.value || new Date().toISOString().split('T')[0];
-            currentReportData = window.AlHusseiniHR.getDailyReport(targetDate);
-            
-            const parts = targetDate.split('-').map(Number);
-            const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
-            const dateArabic = dateObj.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            periodTitle = `تقرير يوم: ${dateArabic}`;
-            printPeriodText = `كشف يوم: ${targetDate} (${dateArabic})`;
-        } else if (currentMode === 'monthly') {
-            const m = parseInt(document.getElementById('select-month')?.value || (new Date().getMonth() + 1));
-            const y = parseInt(document.getElementById('select-year')?.value || new Date().getFullYear());
-            currentReportData = window.AlHusseiniHR.getMonthlyReport(y, m);
-            
-            const monthNames = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-            periodTitle = `تقرير شهر: ${monthNames[m]} ${y}`;
-            printPeriodText = `كشف شهر: ${monthNames[m]} ${y} (من ${currentReportData.startDate} إلى ${currentReportData.endDate})`;
-        } else {
-            let start = document.getElementById('input-range-start')?.value;
-            let end = document.getElementById('input-range-end')?.value;
-            if (start && end && start > end) {
-                const temp = start;
-                start = end;
-                end = temp;
-                document.getElementById('input-range-start').value = start;
-                document.getElementById('input-range-end').value = end;
+        try {
+            if (currentMode === 'daily') {
+                const targetDate = document.getElementById('input-daily-date')?.value || localDateString(new Date());
+                data = await fetchJson(REPORT_URLS.daily, { date: targetDate });
+
+                const parts = targetDate.split('-').map(Number);
+                const dateObj = new Date(parts[0], parts[1] - 1, parts[2]);
+                const dateArabic = dateObj.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+                periodTitle = `تقرير يوم: ${dateArabic}`;
+                printPeriodText = `كشف يوم: ${targetDate} (${dateArabic})`;
+            } else if (currentMode === 'monthly') {
+                const m = parseInt(document.getElementById('select-month')?.value || (new Date().getMonth() + 1));
+                const y = parseInt(document.getElementById('select-year')?.value || new Date().getFullYear());
+                data = await fetchJson(REPORT_URLS.monthly, { year: y, month: m });
+
+                const monthNames = ['', 'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+                periodTitle = `تقرير شهر: ${monthNames[m]} ${y}`;
+                printPeriodText = `كشف شهر: ${monthNames[m]} ${y} (من ${data.startDate} إلى ${data.endDate})`;
+            } else {
+                let start = document.getElementById('input-range-start')?.value;
+                let end = document.getElementById('input-range-end')?.value;
+                if (!start || !end) return;
+                if (start > end) {
+                    [start, end] = [end, start];
+                    document.getElementById('input-range-start').value = start;
+                    document.getElementById('input-range-end').value = end;
+                }
+                data = await fetchJson(REPORT_URLS.range, { start, end });
+                periodTitle = `تقرير الفترة: من ${start} إلى ${end}`;
+                printPeriodText = `الفترة من ${start} إلى ${end}`;
             }
-            currentReportData = window.AlHusseiniHR.getRangeReport(start, end);
-            periodTitle = `تقرير الفترة: من ${start} إلى ${end}`;
-            printPeriodText = `الفترة من ${start} إلى ${end}`;
+        } catch (err) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('خطأ', err.message, 'error');
+            }
+            return;
         }
 
-        // Update Period Badges
+        // Ignore responses that arrive after a newer request was issued.
+        if (seq !== reportRequestSeq) return;
+        currentReportData = data;
+
         const periodTextEl = document.getElementById('report-period-text');
         if (periodTextEl) periodTextEl.textContent = periodTitle;
 
@@ -177,8 +194,6 @@
             document.getElementById('kpi-absence-count').textContent = `${summary.absentCount + summary.leaveCount} فرد`;
             document.getElementById('kpi-unexcused-count').textContent = summary.absentCount;
             document.getElementById('kpi-leave-count').textContent = summary.leaveCount;
-            document.getElementById('kpi-deductions-amount').textContent = window.AlHusseiniHR.formatCurrency(summary.totalDeductionsAmount);
-            document.getElementById('kpi-deductions-count').textContent = summary.deductionsCount;
         } else {
             document.getElementById('kpi-attendance-rate').textContent = `${summary.avgAttendanceRate}%`;
             document.getElementById('kpi-present-count').textContent = `${summary.totalPresents} يوم عمل`;
@@ -186,10 +201,10 @@
             document.getElementById('kpi-late-count').textContent = summary.totalLates;
             document.getElementById('kpi-absence-count').textContent = `${summary.totalAbsents} يوم غياب`;
             document.getElementById('kpi-unexcused-count').textContent = summary.totalAbsents;
-            document.getElementById('kpi-leave-count').textContent = summary.staffReport.reduce((s, r) => s + r.leaveDays, 0);
-            document.getElementById('kpi-deductions-amount').textContent = window.AlHusseiniHR.formatCurrency(summary.totalDeductionsAmount);
-            document.getElementById('kpi-deductions-count').textContent = summary.deductionsCount;
+            document.getElementById('kpi-leave-count').textContent = summary.totalLeaveDays;
         }
+        document.getElementById('kpi-deductions-amount').textContent = formatCurrency(summary.totalDeductionsAmount);
+        document.getElementById('kpi-deductions-count').textContent = summary.deductionsCount;
     }
 
     function renderCharts() {
@@ -197,32 +212,19 @@
         const summary = currentReportData.summary;
 
         // 1. Donut Pie Chart
-        let pieSeries = [];
-        if (currentMode === 'daily') {
-            pieSeries = [summary.onTimeCount, summary.lateCount, summary.absentCount, summary.leaveCount];
-        } else {
-            const onTime = summary.totalOnTimes;
-            const late = summary.totalLates;
-            const absent = summary.totalAbsents;
-            const leave = summary.staffReport.reduce((s, r) => s + r.leaveDays, 0);
-            pieSeries = [onTime, late, absent, leave];
-        }
+        const pieSeries = (currentMode === 'daily')
+            ? [summary.onTimeCount, summary.lateCount, summary.absentCount, summary.leaveCount]
+            : [summary.totalOnTimes, summary.totalLates, summary.totalAbsents, summary.totalLeaveDays];
 
         const pieOptions = {
             series: pieSeries,
-            chart: {
-                type: 'donut',
-                height: 250,
-                fontFamily: 'inherit'
-            },
-            labels: ['حاضر في الموعد', 'متأخر عن الوردية', 'غياب بدون إذن', 'إجازة رسمية'],
+            chart: { type: 'donut', height: 250, fontFamily: 'inherit' },
+            labels: ['حاضر في الموعد', 'متأخر عن الوردية', 'غياب مسجل', 'إجازة رسمية'],
             colors: ['#2a9d8f', '#f4a261', '#e63946', '#457b9d'],
             legend: { show: false },
             dataLabels: {
                 enabled: true,
-                formatter: function (val) {
-                    return Math.round(val) + "%";
-                }
+                formatter: function (val) { return Math.round(val) + "%"; }
             },
             plotOptions: {
                 pie: {
@@ -233,9 +235,7 @@
                             total: {
                                 show: true,
                                 label: 'إجمالي السجلات',
-                                formatter: function (w) {
-                                    return w.globals.seriesTotals.reduce((a, b) => a + b, 0);
-                                }
+                                formatter: function (w) { return w.globals.seriesTotals.reduce((a, b) => a + b, 0); }
                             }
                         }
                     }
@@ -257,18 +257,15 @@
         let seriesAbsent = [];
 
         if (currentMode === 'daily') {
-            // Compare Departments on this day
-            const depts = window.AlHusseiniHR.getDepartments();
-            categories = depts.map(d => d.replace('بمركز البطاريات', '').trim());
-
+            // Compare departments on this day (departments come from the database)
+            categories = currentReportData.departments || [];
             categories.forEach(dept => {
-                const staffInDept = currentReportData.employees.filter(e => e.employee.department.includes(dept));
+                const staffInDept = currentReportData.employees.filter(e => e.employee.department === dept);
                 seriesOnTime.push(staffInDept.filter(s => s.status === 'on_time').length);
                 seriesLate.push(staffInDept.filter(s => s.status === 'late').length);
                 seriesAbsent.push(staffInDept.filter(s => s.status === 'absent' || s.status === 'on_leave').length);
             });
         } else {
-            // Daily trend progression across the month
             const dailySeries = currentReportData.dailySeries || [];
             categories = dailySeries.map(d => d.date.split('-').slice(1).join('/'));
             seriesOnTime = dailySeries.map(d => d.present - d.late);
@@ -282,34 +279,12 @@
                 { name: 'حالات تأخير', data: seriesLate },
                 { name: 'غياب', data: seriesAbsent }
             ],
-            chart: {
-                type: 'bar',
-                height: 250,
-                stacked: true,
-                toolbar: { show: false },
-                fontFamily: 'inherit'
-            },
+            chart: { type: 'bar', height: 250, stacked: true, toolbar: { show: false }, fontFamily: 'inherit' },
             colors: ['#2a9d8f', '#f4a261', '#e63946'],
-            plotOptions: {
-                bar: {
-                    horizontal: false,
-                    borderRadius: 4,
-                    columnWidth: '45%'
-                }
-            },
-            xaxis: {
-                categories: categories,
-                labels: {
-                    style: { fontSize: '11px' }
-                }
-            },
-            yaxis: {
-                title: { text: currentMode === 'daily' ? 'عدد الفنيين' : 'سجلات اليوم' }
-            },
-            legend: {
-                position: 'top',
-                horizontalAlign: 'right'
-            },
+            plotOptions: { bar: { horizontal: false, borderRadius: 4, columnWidth: '45%' } },
+            xaxis: { categories: categories, labels: { style: { fontSize: '11px' } } },
+            yaxis: { title: { text: currentMode === 'daily' ? 'عدد الموظفين' : 'سجلات اليوم' } },
+            legend: { position: 'top', horizontalAlign: 'right' },
             dataLabels: { enabled: false }
         };
 
@@ -327,7 +302,7 @@
     function normalizeArabic(text) {
         if (!text) return '';
         return text.toString().toLowerCase()
-            .replace(/[\u064B-\u065F\u0670]/g, '')
+            .replace(/[ً-ٰٟ]/g, '')
             .replace(/[أإآء]/g, 'ا')
             .replace(/ة/g, 'ه')
             .replace(/[يى]/g, 'ي')
@@ -352,6 +327,17 @@
         return strippedTarget.includes(strippedQuery) || strippedQuery.includes(strippedTarget);
     }
 
+    function matchesEmployee(emp, deptFilter, searchKeyword) {
+        if (!emp) return !deptFilter && !searchKeyword;
+        const matchesDept = !deptFilter || emp.department === deptFilter;
+        const matchesSearch = !searchKeyword ||
+            isMatch(emp.name, searchKeyword) ||
+            isMatch(emp.code, searchKeyword) ||
+            isMatch(emp.role, searchKeyword) ||
+            isMatch(emp.department, searchKeyword);
+        return matchesDept && matchesSearch;
+    }
+
     window.clearReportSearch = function() {
         const input = document.getElementById('search-employee');
         if (input) {
@@ -367,12 +353,11 @@
         const deptFilter = (document.getElementById('filter-department')?.value || '').trim();
         const searchKeyword = (document.getElementById('search-employee')?.value || '').trim();
 
-        // 1. Filter Attendance Detailed Records
+        // 1. Attendance detailed records
         let attendanceList = [];
         if (currentMode === 'daily') {
             attendanceList = currentReportData.employees;
         } else {
-            // In Monthly or Range mode, flatten each employee's attendance details
             currentReportData.staffReport.forEach(staff => {
                 staff.attendanceDetails.forEach(att => {
                     attendanceList.push({
@@ -388,21 +373,11 @@
             });
         }
 
-        // Apply Dept & Search Filters to Attendance List
-        const filteredAttendance = attendanceList.filter(item => {
-            const matchesDept = !deptFilter || isMatch(item.employee.department, deptFilter);
-            const matchesSearch = !searchKeyword ||
-                isMatch(item.employee.name, searchKeyword) ||
-                isMatch(item.employee.id, searchKeyword) ||
-                isMatch(item.employee.role, searchKeyword) ||
-                isMatch(item.employee.department, searchKeyword);
-            return matchesDept && matchesSearch;
-        });
-
+        const filteredAttendance = attendanceList.filter(item => matchesEmployee(item.employee, deptFilter, searchKeyword));
         renderAttendanceTable(filteredAttendance);
 
-        // 2. Filter Staff Summary Table
-        let staffList = (currentMode === 'daily') ? currentReportData.employees.map(r => ({
+        // 2. Staff summary
+        const staffList = (currentMode === 'daily') ? currentReportData.employees.map(r => ({
             employee: r.employee,
             totalWorkDays: 1,
             presentDays: (r.status === 'on_time' || r.status === 'late') ? 1 : 0,
@@ -415,37 +390,44 @@
             attendanceRate: (r.status === 'on_time' || r.status === 'late') ? 100 : 0
         })) : currentReportData.staffReport;
 
-        const filteredStaff = staffList.filter(item => {
-            const matchesDept = !deptFilter || isMatch(item.employee.department, deptFilter);
-            const matchesSearch = !searchKeyword ||
-                isMatch(item.employee.name, searchKeyword) ||
-                isMatch(item.employee.id, searchKeyword) ||
-                isMatch(item.employee.role, searchKeyword) ||
-                isMatch(item.employee.department, searchKeyword);
-            return matchesDept && matchesSearch;
-        });
-
+        const filteredStaff = staffList.filter(item => matchesEmployee(item.employee, deptFilter, searchKeyword));
         renderStaffSummaryTable(filteredStaff);
 
-        // 3. Filter Deductions Register
+        // 3. Deductions register
         const deductionsList = currentReportData.deductionsList || [];
-        const filteredDeductions = deductionsList.filter(ded => {
-            const emp = window.AlHusseiniHR.getEmployeeById(ded.employeeId);
-            if (!emp) return true;
-            const matchesDept = !deptFilter || isMatch(emp.department, deptFilter);
-            const matchesSearch = !searchKeyword ||
-                isMatch(emp.name, searchKeyword) ||
-                isMatch(emp.id, searchKeyword) ||
-                isMatch(ded.reason, searchKeyword);
-            return matchesDept && matchesSearch;
-        });
-
+        const filteredDeductions = deductionsList.filter(ded =>
+            matchesEmployee(ded.employee, deptFilter, searchKeyword) || (searchKeyword && isMatch(ded.reason, searchKeyword))
+        );
         renderDeductionsTable(filteredDeductions);
 
-        // Update Badges
         document.getElementById('badge-count-attendance').textContent = filteredAttendance.length;
         document.getElementById('badge-count-staff').textContent = filteredStaff.length;
         document.getElementById('badge-count-deductions').textContent = filteredDeductions.length;
+    }
+
+    function statusBadge(status) {
+        switch (status) {
+            case 'on_time': return '<span class="badge badge-status-on_time px-2 py-1"><i class="ri-check-line me-1"></i>في الموعد</span>';
+            case 'late': return '<span class="badge badge-status-late px-2 py-1"><i class="ri-alarm-warning-line me-1"></i>متأخر</span>';
+            case 'on_leave': return '<span class="badge badge-status-on_leave px-2 py-1"><i class="ri-calendar-line me-1"></i>إجازة رسمية</span>';
+            case 'absent': return '<span class="badge badge-status-absent px-2 py-1"><i class="ri-close-line me-1"></i>غياب مسجل</span>';
+            default: return '<span class="badge bg-light text-muted px-2 py-1"><i class="ri-question-line me-1"></i>لا يوجد سجل</span>';
+        }
+    }
+
+    function statusLabel(status) {
+        return {on_time: 'في الموعد', late: 'متأخر', on_leave: 'إجازة', absent: 'غياب', not_recorded: 'لا يوجد سجل'}[status] || status;
+    }
+
+    function employeeCell(emp) {
+        return `
+            <div class="d-flex align-items-center">
+                <img src="${DEFAULT_AVATAR}" alt="" class="avatar-xs rounded-circle me-2 border">
+                <div>
+                    <h6 class="fs-13 mb-0 fw-bold text-dark">${escapeHtml(emp?.name || 'موظف غير محدد')}</h6>
+                    <span class="badge bg-light text-secondary fs-11">${escapeHtml(emp?.code || '-')}</span>
+                </div>
+            </div>`;
     }
 
     function renderAttendanceTable(records) {
@@ -457,55 +439,32 @@
             return;
         }
 
-        let html = '';
-        records.forEach(r => {
+        tbody.innerHTML = records.map(r => {
             const emp = r.employee;
-            let statusBadge = '';
-            let lateBadge = '-';
+            const lateBadge = r.status === 'late'
+                ? `<span class="badge bg-warning-subtle text-warning fw-bold fs-12">${Number(r.latenessMinutes)} دقيقة</span>`
+                : '-';
+            const punchInDisplay = r.punchIn && r.punchIn !== '-' ? `<span class="fw-semibold text-dark">${escapeHtml(r.punchIn)}</span>` : '<span class="text-muted">لم يبصم</span>';
+            const punchOutDisplay = r.punchOut && r.punchOut !== '-' ? `<span class="fw-semibold text-dark">${escapeHtml(r.punchOut)}</span>` : '<span class="text-muted">-</span>';
 
-            if (r.status === 'on_time') {
-                statusBadge = '<span class="badge badge-status-on_time px-2 py-1"><i class="ri-check-line me-1"></i>في الموعد</span>';
-            } else if (r.status === 'late') {
-                statusBadge = '<span class="badge badge-status-late px-2 py-1"><i class="ri-alarm-warning-line me-1"></i>متأخر</span>';
-                lateBadge = `<span class="badge bg-warning-subtle text-warning fw-bold fs-12">${r.latenessMinutes} دقيقة</span>`;
-            } else if (r.status === 'on_leave') {
-                statusBadge = '<span class="badge badge-status-on_leave px-2 py-1"><i class="ri-calendar-line me-1"></i>إجازة رسمية</span>';
-            } else {
-                statusBadge = '<span class="badge badge-status-absent px-2 py-1"><i class="ri-close-line me-1"></i>غياب بدون إذن</span>';
-            }
-
-            const punchInDisplay = r.punchIn !== '-' ? `<span class="fw-semibold text-dark">${r.punchIn}</span>` : '<span class="text-muted">لم يبصم</span>';
-            const punchOutDisplay = r.punchOut !== '-' ? `<span class="fw-semibold text-dark">${r.punchOut}</span>` : '<span class="text-muted">-</span>';
-
-            html += `
+            return `
                 <tr>
+                    <td>${employeeCell(emp)}</td>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <img src="${emp.avatar || '/assets/images/users/avatar-1.jpg'}" alt="" class="avatar-xs rounded-circle me-2 border">
-                            <div>
-                                <h6 class="fs-13 mb-0 fw-bold text-dark">${emp.name}</h6>
-                                <span class="badge bg-light text-secondary fs-11">${emp.id}</span>
-                            </div>
-                        </div>
+                        <span class="fw-semibold fs-12 d-block">${escapeHtml(emp.role)}</span>
+                        <span class="text-muted fs-11">${escapeHtml(emp.department)}</span>
                     </td>
-                    <td>
-                        <span class="fw-semibold fs-12 d-block">${emp.role}</span>
-                        <span class="text-muted fs-11">${emp.department}</span>
-                    </td>
-                    <td><span class="fs-12 fw-medium text-dark">${r.date || '-'}</span></td>
-                    <td><span class="badge bg-light text-muted fs-11">${emp.startTime || '09:00'} - ${emp.endTime || '18:00'}</span></td>
+                    <td><span class="fs-12 fw-medium text-dark">${escapeHtml(r.date || '-')}</span></td>
+                    <td><span class="badge bg-light text-muted fs-11">${escapeHtml(emp.startTime)} - ${escapeHtml(emp.endTime)}</span></td>
                     <td>${punchInDisplay}</td>
                     <td>${punchOutDisplay}</td>
                     <td>${lateBadge}</td>
-                    <td>${statusBadge}</td>
+                    <td>${statusBadge(r.status)}</td>
                     <td class="no-print">
-                        ${r.totalDeductions > 0 ? `<span class="badge bg-danger text-white fs-11">${window.AlHusseiniHR.formatCurrency(r.totalDeductions)}</span>` : '<span class="text-muted fs-11">-</span>'}
+                        ${r.totalDeductions > 0 ? `<span class="badge bg-danger text-white fs-11">${formatCurrency(r.totalDeductions)}</span>` : '<span class="text-muted fs-11">-</span>'}
                     </td>
-                </tr>
-            `;
-        });
-
-        tbody.innerHTML = html;
+                </tr>`;
+        }).join('');
     }
 
     function renderStaffSummaryTable(staffList) {
@@ -517,53 +476,46 @@
             return;
         }
 
-        let html = '';
-        staffList.forEach(s => {
+        tbody.innerHTML = staffList.map(s => {
             const emp = s.employee;
-            const rateColor = s.attendanceRate >= 90 ? 'bg-success' : (s.attendanceRate >= 75 ? 'bg-warning' : 'bg-danger');
+            const rate = Number(s.attendanceRate) || 0;
+            const rateColor = rate >= 90 ? 'bg-success' : (rate >= 75 ? 'bg-warning' : 'bg-danger');
 
-            html += `
+            return `
                 <tr>
+                    <td>${employeeCell(emp)}</td>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <img src="${emp.avatar || '/assets/images/users/avatar-1.jpg'}" alt="" class="avatar-xs rounded-circle me-2 border">
-                            <div>
-                                <h6 class="fs-13 mb-0 fw-bold text-dark">${emp.name}</h6>
-                                <span class="badge bg-light text-secondary fs-11">${emp.id}</span>
-                            </div>
-                        </div>
+                        <span class="fw-semibold fs-12 d-block">${escapeHtml(emp.role)}</span>
+                        <span class="text-muted fs-11">${escapeHtml(emp.department)}</span>
                     </td>
-                    <td>
-                        <span class="fw-semibold fs-12 d-block">${emp.role}</span>
-                        <span class="text-muted fs-11">${emp.department}</span>
-                    </td>
-                    <td><span class="fw-bold">${s.totalWorkDays}</span></td>
-                    <td><span class="badge bg-success-subtle text-success fs-12 fw-bold">${s.presentDays}</span></td>
-                    <td><span class="badge ${s.lateDays > 0 ? 'bg-warning-subtle text-warning' : 'bg-light text-muted'} fs-12 fw-bold">${s.lateDays}</span></td>
-                    <td><span class="fw-bold text-warning">${s.totalLateMinutes} دقيقة</span></td>
-                    <td><span class="badge ${s.absentDays > 0 ? 'bg-danger-subtle text-danger' : 'bg-light text-muted'} fs-12 fw-bold">${s.absentDays}</span></td>
-                    <td><span class="badge ${s.leaveDays > 0 ? 'bg-info-subtle text-info' : 'bg-light text-muted'} fs-12">${s.leaveDays}</span></td>
+                    <td><span class="fw-bold">${Number(s.totalWorkDays)}</span></td>
+                    <td><span class="badge bg-success-subtle text-success fs-12 fw-bold">${Number(s.presentDays)}</span></td>
+                    <td><span class="badge ${s.lateDays > 0 ? 'bg-warning-subtle text-warning' : 'bg-light text-muted'} fs-12 fw-bold">${Number(s.lateDays)}</span></td>
+                    <td><span class="fw-bold text-warning">${Number(s.totalLateMinutes)} دقيقة</span></td>
+                    <td><span class="badge ${s.absentDays > 0 ? 'bg-danger-subtle text-danger' : 'bg-light text-muted'} fs-12 fw-bold">${Number(s.absentDays)}</span></td>
+                    <td><span class="badge ${s.leaveDays > 0 ? 'bg-info-subtle text-info' : 'bg-light text-muted'} fs-12">${Number(s.leaveDays)}</span></td>
                     <td style="min-width: 140px;">
                         <div class="d-flex align-items-center gap-2">
                             <div class="progress progress-sm flex-grow-1" style="height: 6px;">
-                                <div class="progress-bar ${rateColor}" role="progressbar" style="width: ${s.attendanceRate}%"></div>
+                                <div class="progress-bar ${rateColor}" role="progressbar" style="width: ${rate}%"></div>
                             </div>
-                            <span class="fs-12 fw-bold text-dark">${s.attendanceRate}%</span>
+                            <span class="fs-12 fw-bold text-dark">${rate}%</span>
                         </div>
                     </td>
-                    <td>
-                        <span class="fw-bold text-danger">${window.AlHusseiniHR.formatCurrency(s.totalDeductionsAmount)}</span>
-                    </td>
+                    <td><span class="fw-bold text-danger">${formatCurrency(s.totalDeductionsAmount)}</span></td>
                     <td class="no-print">
-                        <button type="button" class="btn btn-sm btn-soft-primary" onclick="openEmployeeCard('${emp.id}')" title="عرض السجل الشخصي">
+                        <button type="button" class="btn btn-sm btn-soft-primary" onclick="openEmployeeCard(${Number(emp.id)})" title="عرض السجل الشخصي">
                             <i class="ri-eye-line align-middle"></i> التفاصيل
                         </button>
                     </td>
-                </tr>
-            `;
-        });
+                </tr>`;
+        }).join('');
+    }
 
-        tbody.innerHTML = html;
+    function deductionStatusBadge(status) {
+        return status === 'applied'
+            ? '<span class="badge bg-success-subtle text-success fs-11"><i class="ri-checkbox-circle-line me-1"></i>معتمد ومخصوم في مسير مصروف</span>'
+            : '<span class="badge bg-info-subtle text-info fs-11"><i class="ri-time-line me-1"></i>معتمد — يُخصم في المسير</span>';
     }
 
     function renderDeductionsTable(deductions) {
@@ -575,123 +527,83 @@
             return;
         }
 
-        let html = '';
-        deductions.forEach(d => {
-            const emp = window.AlHusseiniHR.getEmployeeById(d.employeeId);
-            const empName = emp ? emp.name : 'موظف غير محدد';
-            const empRole = emp ? emp.role : '-';
-            const empDept = emp ? emp.department : '-';
-
-            html += `
+        tbody.innerHTML = deductions.map(d => {
+            const emp = d.employee;
+            return `
                 <tr>
-                    <td><span class="badge bg-danger-subtle text-danger fs-12 fw-bold">${d.decisionNo || d.id}</span></td>
+                    <td><span class="badge bg-danger-subtle text-danger fs-12 fw-bold">${escapeHtml(d.decisionNo)}</span></td>
+                    <td>${employeeCell(emp)}</td>
                     <td>
-                        <div class="d-flex align-items-center">
-                            <img src="${emp?.avatar || '/assets/images/users/avatar-1.jpg'}" alt="" class="avatar-xs rounded-circle me-2 border">
-                            <div>
-                                <h6 class="fs-13 mb-0 fw-bold text-dark">${empName}</h6>
-                                <span class="badge bg-light text-secondary fs-11">${d.employeeId}</span>
-                            </div>
-                        </div>
+                        <span class="fs-12 fw-semibold d-block">${escapeHtml(emp?.role || '-')}</span>
+                        <span class="text-muted fs-11">${escapeHtml(emp?.department || '-')}</span>
                     </td>
-                    <td>
-                        <span class="fs-12 fw-semibold d-block">${empRole}</span>
-                        <span class="text-muted fs-11">${empDept}</span>
-                    </td>
-                    <td><span class="fs-12 text-muted">${d.date}</span></td>
-                    <td><span class="fs-13 fw-bold text-danger">${window.AlHusseiniHR.formatCurrency(d.amount)}</span></td>
-                    <td><span class="fw-semibold text-dark fs-12">${d.reason}</span></td>
-                    <td><span class="text-muted fs-12">${d.managerNotes || '-'}</span></td>
-                    <td><span class="badge bg-success-subtle text-success fs-11"><i class="ri-checkbox-circle-line me-1"></i>معتمد ومخصوم</span></td>
-                </tr>
-            `;
-        });
-
-        tbody.innerHTML = html;
+                    <td><span class="fs-12 text-muted">${escapeHtml(d.date)}</span></td>
+                    <td><span class="fs-13 fw-bold text-danger">${formatCurrency(d.amount)}</span></td>
+                    <td><span class="fw-semibold text-dark fs-12">${escapeHtml(d.reason)}</span></td>
+                    <td><span class="text-muted fs-12">-</span></td>
+                    <td>${deductionStatusBadge(d.status)}</td>
+                </tr>`;
+        }).join('');
     }
 
-    // Modal for Single Employee Performance & Deductions History
-    function openEmployeeCard(empId) {
-        const emp = window.AlHusseiniHR.getEmployeeById(empId);
-        if (!emp) return;
+    // Modal: single employee discipline history (from the database)
+    async function openEmployeeCard(empId) {
+        let history;
+        try {
+            history = await fetchJson(REPORT_URLS.employee.replace('__ID__', encodeURIComponent(empId)));
+        } catch (err) {
+            if (typeof Swal !== 'undefined') Swal.fire('خطأ', err.message, 'error');
+            return;
+        }
 
-        const allAtt = window.AlHusseiniHR.getAllAttendance().filter(a => a.employeeId === empId);
-        const allDeds = window.AlHusseiniHR.getDeductions().filter(d => d.employeeId === empId);
-
-        const totalLate = allAtt.reduce((sum, a) => sum + (a.latenessMinutes || 0), 0);
-        const totalDedAmount = allDeds.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+        const emp = history.employee;
+        const deds = history.deductions || [];
 
         document.getElementById('employeeModalTitle').textContent = `كشف انضباط: ${emp.name} (${emp.role})`;
 
-        let dedsHtml = '';
-        if (allDeds.length === 0) {
-            dedsHtml = '<p class="text-muted text-center fs-12 mb-0 py-2">سجل الموظف نظيف من الخصومات الإدارية ✨</p>';
-        } else {
-            dedsHtml = `
+        const dedsHtml = deds.length === 0
+            ? '<p class="text-muted text-center fs-12 mb-0 py-2">سجل الموظف نظيف من الخصومات الإدارية ✨</p>'
+            : `
                 <div class="table-responsive">
                     <table class="table table-sm table-bordered align-middle fs-12 mb-0">
                         <thead class="table-light">
-                            <tr><th>القرار</th><th>التاريخ</th><th>المبلغ</th><th>السبب</th><th>ملاحظات المدير</th></tr>
+                            <tr><th>القرار</th><th>التاريخ</th><th>المبلغ</th><th>السبب</th><th>الحالة</th></tr>
                         </thead>
                         <tbody>
-                            ${allDeds.map(d => `
+                            ${deds.map(d => `
                                 <tr>
-                                    <td><span class="badge bg-danger-subtle text-danger">${d.decisionNo || d.id}</span></td>
-                                    <td>${d.date}</td>
-                                    <td class="text-danger fw-bold">${window.AlHusseiniHR.formatCurrency(d.amount)}</td>
-                                    <td>${d.reason}</td>
-                                    <td class="text-muted">${d.managerNotes || '-'}</td>
+                                    <td><span class="badge bg-danger-subtle text-danger">${escapeHtml(d.decisionNo)}</span></td>
+                                    <td>${escapeHtml(d.date)}</td>
+                                    <td class="text-danger fw-bold">${formatCurrency(d.amount)}</td>
+                                    <td>${escapeHtml(d.reason)}</td>
+                                    <td>${deductionStatusBadge(d.status)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
-                </div>
-            `;
-        }
+                </div>`;
 
-        const modalBody = document.getElementById('employeeModalBody');
-        modalBody.innerHTML = `
+        document.getElementById('employeeModalBody').innerHTML = `
             <div class="d-flex align-items-center gap-3 p-3 bg-light rounded mb-3">
-                <img src="${emp.avatar}" class="avatar-md rounded-circle border shadow-sm" alt="">
+                <img src="${DEFAULT_AVATAR}" class="avatar-md rounded-circle border shadow-sm" alt="">
                 <div>
-                    <h5 class="fw-bold mb-1 text-dark">${emp.name}</h5>
-                    <p class="text-muted mb-1 fs-13"><i class="ri-briefcase-line me-1"></i> ${emp.role} - <span class="text-primary">${emp.department}</span></p>
+                    <h5 class="fw-bold mb-1 text-dark">${escapeHtml(emp.name)}</h5>
+                    <p class="text-muted mb-1 fs-13"><i class="ri-briefcase-line me-1"></i> ${escapeHtml(emp.role)} - <span class="text-primary">${escapeHtml(emp.department)}</span></p>
                     <div class="d-flex gap-2">
-                        <span class="badge bg-primary-subtle text-primary">كود: ${emp.id}</span>
-                        <span class="badge bg-success-subtle text-success">الوردية: ${emp.startTime} - ${emp.endTime}</span>
-                        <span class="badge bg-info-subtle text-info">الراتب الأساسي: ${window.AlHusseiniHR.formatCurrency(emp.baseSalary)}</span>
+                        <span class="badge bg-primary-subtle text-primary">كود: ${escapeHtml(emp.code)}</span>
+                        <span class="badge bg-success-subtle text-success">الوردية: ${escapeHtml(emp.startTime)} - ${escapeHtml(emp.endTime)}</span>
                     </div>
                 </div>
             </div>
 
             <div class="row g-2 mb-3 text-center">
-                <div class="col-3">
-                    <div class="p-2 border rounded">
-                        <p class="text-muted fs-11 mb-1">أيام الحضور</p>
-                        <h6 class="text-success fw-bold mb-0">${allAtt.filter(a => a.status === 'on_time' || a.status === 'late').length} يوم</h6>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="p-2 border rounded">
-                        <p class="text-muted fs-11 mb-1">مرات التأخير</p>
-                        <h6 class="text-warning fw-bold mb-0">${allAtt.filter(a => a.status === 'late').length} مرة</h6>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="p-2 border rounded">
-                        <p class="text-muted fs-11 mb-1">إجمالي التأخير</p>
-                        <h6 class="text-danger fw-bold mb-0">${totalLate} دقيقة</h6>
-                    </div>
-                </div>
-                <div class="col-3">
-                    <div class="p-2 border rounded">
-                        <p class="text-muted fs-11 mb-1">إجمالي الخصومات</p>
-                        <h6 class="text-danger fw-bold mb-0">${window.AlHusseiniHR.formatCurrency(totalDedAmount)}</h6>
-                    </div>
-                </div>
+                <div class="col-3"><div class="p-2 border rounded"><p class="text-muted fs-11 mb-1">أيام الحضور</p><h6 class="text-success fw-bold mb-0">${Number(history.presentDays)} يوم</h6></div></div>
+                <div class="col-3"><div class="p-2 border rounded"><p class="text-muted fs-11 mb-1">مرات التأخير</p><h6 class="text-warning fw-bold mb-0">${Number(history.lateDays)} مرة</h6></div></div>
+                <div class="col-3"><div class="p-2 border rounded"><p class="text-muted fs-11 mb-1">إجمالي التأخير</p><h6 class="text-danger fw-bold mb-0">${Number(history.totalLateMinutes)} دقيقة</h6></div></div>
+                <div class="col-3"><div class="p-2 border rounded"><p class="text-muted fs-11 mb-1">إجمالي الخصومات</p><h6 class="text-danger fw-bold mb-0">${formatCurrency(history.totalDeductionsAmount)}</h6></div></div>
             </div>
 
-            <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-file-warning-line text-danger me-1"></i> سجل الخصومات والجزاءات المحررة:</h6>
+            <h6 class="fw-bold fs-13 text-dark mb-2"><i class="ri-file-warning-line text-danger me-1"></i> سجل الخصومات والجزاءات المعتمدة:</h6>
             ${dedsHtml}
         `;
 
@@ -707,49 +619,42 @@
         window.print();
     }
 
+    function exportToCSV(filename, headers, rows) {
+        const cell = (value) => `"${(value === null || value === undefined ? '' : String(value)).replace(/"/g, '""')}"`;
+        let csvContent = '﻿'; // UTF-8 BOM for Arabic text in Excel
+        csvContent += headers.map(cell).join(',') + '\r\n';
+        rows.forEach(row => { csvContent += row.map(cell).join(',') + '\r\n'; });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${filename}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+
     function exportReportCSV() {
         if (!currentReportData) return;
 
-        let filename = `تقرير_مركز_الحسيني_${currentMode}_${new Date().toISOString().split('T')[0]}`;
+        const filename = `تقرير_مركز_الحسيني_${currentMode}_${localDateString(new Date())}`;
         const headers = ['كود الموظف', 'اسم الموظف', 'الوظيفة', 'القسم', 'التاريخ', 'وقت الحضور الفعلي', 'وقت الانصراف', 'دقائق التأخير', 'الحالة', 'الخصومات المطبقة (ج.م)'];
-
         const rows = [];
+
         if (currentMode === 'daily') {
             currentReportData.employees.forEach(r => {
-                const statusLabel = r.status === 'on_time' ? 'في الموعد' : (r.status === 'late' ? 'متأخر' : (r.status === 'on_leave' ? 'إجازة' : 'غياب'));
-                rows.push([
-                    r.employee.id,
-                    r.employee.name,
-                    r.employee.role,
-                    r.employee.department,
-                    r.date,
-                    r.punchIn,
-                    r.punchOut,
-                    r.latenessMinutes,
-                    statusLabel,
-                    r.totalDeductions
-                ]);
+                rows.push([r.employee.code, r.employee.name, r.employee.role, r.employee.department, r.date, r.punchIn, r.punchOut, r.latenessMinutes, statusLabel(r.status), r.totalDeductions]);
             });
         } else {
             currentReportData.staffReport.forEach(s => {
                 s.attendanceDetails.forEach(att => {
-                    const statusLabel = att.status === 'on_time' ? 'في الموعد' : (att.status === 'late' ? 'متأخر' : (att.status === 'on_leave' ? 'إجازة' : 'غياب'));
-                    rows.push([
-                        s.employee.id,
-                        s.employee.name,
-                        s.employee.role,
-                        s.employee.department,
-                        att.date,
-                        att.punchIn || '-',
-                        att.punchOut || '-',
-                        att.latenessMinutes || 0,
-                        statusLabel,
-                        0
-                    ]);
+                    rows.push([s.employee.code, s.employee.name, s.employee.role, s.employee.department, att.date, att.punchIn || '-', att.punchOut || '-', att.latenessMinutes || 0, statusLabel(att.status), 0]);
                 });
             });
         }
 
-        window.AlHusseiniHR.exportToCSV(filename, headers, rows);
+        exportToCSV(filename, headers, rows);
     }
 </script>
