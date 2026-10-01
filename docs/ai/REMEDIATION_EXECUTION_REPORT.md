@@ -64,6 +64,21 @@ Branch `remediation/2026-10` (from `main` 45b9ccc). The plan is in MASTER_REMEDI
 - Phase 8 (HR/payroll/reports): agent still running on branch batch/phase8-hr. Not merged.
 - Phase 4 (POS/credit UI on real data): agent started on branch batch/phase4-pos from 0503eb4. Not merged.
 
+### Batch 4: Phase 8 merge and follow-ups (COMPLETE)
+- 414bda9: Phase 8 merged (payroll consistency single source, payroll_show view, stored-value payslip, on_leave included in payroll, attendance observer/notification fixes, deductions marked applied, HR reports from the DB). Report: batch-phase8.md.
+- 1ec18f5: diagnostics payroll check uses PayrollService::evaluateConsistency().
+- 37e2530: dead mock-store loaders removed from the dashboard script (FE-05). The unused invoice-modal partial was NOT deleted (file deletion needs owner approval).
+- ca3b08c: settings wired where the seeded value equals current behaviour (monthly_working_days, daily_working_hours, overtime_rate_multiplier, warranty_months_default, invoice_prefix); Setting::get no longer caches defaults.
+  - Not wired, owner decision: vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), allow_negative_stock (unsigned stock column on MySQL), scrap_prefix.
+- ff3df99: migration 000002 made idempotent with a working down() (DB-02). A full rollback and re-migrate of all 10 remediation migrations on isolated SQLite passes (integrity_check ok, foreign_key_check clean).
+- Tests: 275 passed / 1675 assertions.
+
+### Batch 5: Phase 4 POS and credit UI (IN PROGRESS)
+- Agent af9b991e70525541a on branch batch/phase4-pos.
+  - Committed: b15e343 (POS stock check per product), f4aa7f9 (POS screen on real data).
+  - In progress: credit page payments endpoint and view (uncommitted in its worktree).
+- Not merged. After merging, run the full suite.
+
 ## Stopping point (2026-10-01)
 - Branch remediation/2026-10 at 6d0594a (plus this report commit). Full suite: 253 passed / 1548 assertions, 0 failed, 0 skipped, constraints enforced.
 - Pending migrations on dev MySQL, not run (owner action: `php artisan migrate`):
