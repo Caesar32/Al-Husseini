@@ -40,10 +40,17 @@
                                     تحصيل آجل: <span id="dashCreditCollected">{{ $selectedPeriod['credit_collected_fmt'] ?? '0 ج.م' }}</span>
                                 </span>
                             </div>
+                            @can('invoices.view')
                             <a href="{{ $selectedPeriod['invoices_url'] ?? route('admin.sales.invoices') }}" id="dashInvoicesLink" class="text-decoration-underline text-muted fs-11" title="عرض فواتير هذه الفترة">
                                 <span id="dashInvoicesCount" class="fw-bold">{{ $selectedPeriod['count'] ?? $invoicesCount }}</span> فاتورة معتمدة
                                 <span class="text-secondary small">(<span id="dashInvoicesSublabel">{{ $selectedPeriod['sublabel'] ?? 'منذ البداية' }}</span>)</span>
                             </a>
+                            @else
+                            <span id="dashInvoicesLink" class="text-muted fs-11">
+                                <span id="dashInvoicesCount" class="fw-bold">{{ $selectedPeriod['count'] ?? $invoicesCount }}</span> فاتورة معتمدة
+                                <span class="text-secondary small">(<span id="dashInvoicesSublabel">{{ $selectedPeriod['sublabel'] ?? 'منذ البداية' }}</span>)</span>
+                            </span>
+                            @endcan
                         </div>
                         <div class="avatar-sm shrink-0">
                             <span class="avatar-title bg-success-subtle rounded-3 fs-3 text-success shadow-xs">
@@ -91,9 +98,15 @@
                     <div class="d-flex align-items-end justify-content-between mt-2">
                         <div>
                             <h3 class="fs-22 fw-extrabold text-warning mb-1 font-monospace" id="dashTotalCredit">{{ number_format(round($totalCredit), 0) }} ج.م</h3>
+                            @can('credit.view')
                             <a href="{{ route('admin.sales.credit') }}" class="text-decoration-underline text-muted fs-11">
                                 <span id="dashCreditCustomersCount" class="fw-bold">{{ $creditCustomersCount }}</span> عملاء عليهم آجل
                             </a>
+                            @else
+                            <span class="text-muted fs-11">
+                                <span id="dashCreditCustomersCount" class="fw-bold">{{ $creditCustomersCount }}</span> عملاء عليهم آجل
+                            </span>
+                            @endcan
                         </div>
                         <div class="avatar-sm flex-shrink-0">
                             <span class="avatar-title bg-warning-subtle rounded-3 fs-3 text-warning shadow-xs">
@@ -104,9 +117,11 @@
                 </div>
                 <div class="mt-3 pt-2 border-top border-light-subtle d-flex align-items-center justify-content-between fs-11 text-muted">
                     <span>متابعة مديونيات العملاء</span>
+                    @can('credit.view')
                     <a href="{{ route('admin.sales.credit') }}" class="fw-semibold text-warning text-decoration-none">
                         تحصيل الآجل <i class="ri-arrow-left-s-line align-middle"></i>
                     </a>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -132,9 +147,15 @@
                     <div class="d-flex align-items-end justify-content-between mt-2.5">
                         <div>
                             <h3 class="fs-22 fw-extrabold text-primary mb-1 font-monospace" id="dashCustomersCount">{{ $customersCount }}</h3>
+                            @can('customers.view')
                             <a href="{{ route('admin.sales.customers') }}" class="text-decoration-underline text-muted fs-11">
                                 <span class="fw-bold">{{ $vehiclesCount }}</span> سيارات ولوحات مسجلة
                             </a>
+                            @else
+                            <span class="text-muted fs-11">
+                                <span class="fw-bold">{{ $vehiclesCount }}</span> سيارات ولوحات مسجلة
+                            </span>
+                            @endcan
                         </div>
                         <div class="avatar-sm flex-shrink-0">
                             <span class="avatar-title bg-primary-subtle rounded-3 fs-3 text-primary shadow-xs">
@@ -145,9 +166,11 @@
                 </div>
                 <div class="mt-3 pt-2 border-top border-light-subtle d-flex align-items-center justify-content-between fs-11 text-muted">
                     <span>قاعدة بيانات المركبات</span>
+                    @can('customers.view')
                     <a href="{{ route('admin.sales.customers') }}" class="fw-semibold text-primary text-decoration-none">
                         دليل العملاء <i class="ri-arrow-left-s-line align-middle"></i>
                     </a>
+                    @endcan
                 </div>
             </div>
         </div>
@@ -173,9 +196,15 @@
                     <div class="d-flex align-items-end justify-content-between mt-2.5">
                         <div>
                             <h3 class="fs-22 fw-extrabold text-info mb-1 font-monospace" id="dashProductsCount">{{ $productsCount }}</h3>
+                            @can('products.view')
                             <a href="{{ route('admin.sales.products') }}" class="text-decoration-underline text-muted fs-11">
                                 <span class="text-danger fw-bold" id="dashLowStockCount">{{ $lowStockCount }}</span> أصناف أوشكت على النفاد
                             </a>
+                            @else
+                            <span class="text-muted fs-11">
+                                <span class="text-danger fw-bold" id="dashLowStockCount">{{ $lowStockCount }}</span> أصناف أوشكت على النفاد
+                            </span>
+                            @endcan
                         </div>
                         <div class="avatar-sm flex-shrink-0">
                             <span class="avatar-title bg-info-subtle rounded-3 fs-3 text-info shadow-xs">
@@ -186,9 +215,11 @@
                 </div>
                 <div class="mt-3 pt-2 border-top border-light-subtle d-flex align-items-center justify-content-between fs-11 text-muted">
                     <span>حركة وجرد المخزون</span>
+                    @can('products.view')
                     <a href="{{ route('admin.sales.products') }}" class="fw-semibold text-info text-decoration-none">
                         إدارة الأصناف <i class="ri-arrow-left-s-line align-middle"></i>
                     </a>
+                    @endcan
                 </div>
             </div>
         </div>

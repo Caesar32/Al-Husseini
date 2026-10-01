@@ -3,7 +3,7 @@
     <!-- LOGO -->
     <div class="navbar-brand-box">
         <!-- Dark Logo-->
-        <a href="{{ route('admin.dashboard') }}" class="logo logo-dark">
+        <a href="{{ route(auth()->user()->homeRouteName()) }}" class="logo logo-dark">
             <span class="logo-sm">
                 <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
             </span>
@@ -15,7 +15,7 @@
             </span>
         </a>
         <!-- Light Logo-->
-        <a href="{{ route('admin.dashboard') }}" class="logo logo-light">
+        <a href="{{ route(auth()->user()->homeRouteName()) }}" class="logo logo-light">
             <span class="logo-sm">
                 <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
             </span>
@@ -39,6 +39,7 @@
             <ul class="navbar-nav" id="navbar-nav">
 
                 <!-- 1. الرئيسية والمؤشرات -->
+                @can('dashboard.view')
                 <li class="menu-title"><span>الرئيسية والمؤشرات</span></li>
 
                 <li class="nav-item">
@@ -46,9 +47,12 @@
                         <i class="ri-dashboard-2-line"></i> <span>لوحة التحكم والمؤشرات</span>
                     </a>
                 </li>
+                @endcan
 
                 <!-- 2. المبيعات ونقاط البيع -->
+                @canany(['pos.access', 'invoices.view', 'credit.view', 'customers.view'])
                 <li class="menu-title"><span>المبيعات ونقاط البيع</span></li>
+                @endcanany
 
                 @can('pos.access')
                 <li class="nav-item">
@@ -85,7 +89,9 @@
                 @endcan
 
                 <!-- 3. المشتريات والتوريدات -->
+                @canany(['purchases.view', 'suppliers.view'])
                 <li class="menu-title"><span>المشتريات والتوريدات</span></li>
+                @endcanany
 
                 @can('purchases.view')
                 <li class="nav-item">
@@ -104,7 +110,9 @@
                 @endcan
 
                 <!-- 4. المخزون وتجارة الرصاص -->
+                @canany(['products.view', 'scrap.view'])
                 <li class="menu-title"><span>المخزون وتجارة الرصاص</span></li>
+                @endcanany
 
                 @can('products.view')
                 <li class="nav-item">
@@ -124,7 +132,9 @@
                 @endcan
 
                 <!-- 5. الضمان وما بعد البيع -->
+                @canany(['warranties.view'])
                 <li class="menu-title"><span>الضمان وما بعد البيع</span></li>
+                @endcanany
 
                 @can('warranties.view')
                 <li class="nav-item">
@@ -142,7 +152,9 @@
                 @endcan
 
                 <!-- 6. الموارد البشرية والورشة -->
+                @canany(['employees.view', 'attendance.view', 'payroll.generate', 'reports.hr'])
                 <li class="menu-title"><span>الموارد البشرية والورشة</span></li>
+                @endcanany
 
                 @can('employees.view')
                 <li class="nav-item">

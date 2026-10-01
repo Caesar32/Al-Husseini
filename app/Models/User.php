@@ -59,6 +59,43 @@ class User extends Authenticatable
     }
 
     /**
+     * First module the user may actually open, by existing permissions (never a route that would
+     * answer 403). Used for the logo link and for redirects after login / on "/".
+     * Cashiers keep landing on the POS, as before.
+     */
+    public function homeRouteName(): string
+    {
+        if ($this->hasRole('cashier') && $this->can('pos.access')) {
+            return 'admin.pos.index';
+        }
+
+        $landing = [
+            'dashboard.view'   => 'admin.dashboard',
+            'pos.access'       => 'admin.pos.index',
+            'invoices.view'    => 'admin.invoices.index',
+            'credit.view'      => 'admin.credit.index',
+            'customers.view'   => 'admin.sales.customers',
+            'products.view'    => 'admin.sales.products',
+            'scrap.view'       => 'admin.scrap.index',
+            'purchases.view'   => 'admin.purchases.index',
+            'suppliers.view'   => 'admin.suppliers.index',
+            'warranties.view'  => 'admin.warranties.index',
+            'employees.view'   => 'admin.hr.employees',
+            'attendance.view'  => 'admin.hr.attendance',
+            'payroll.generate' => 'admin.hr.payroll',
+            'reports.hr'       => 'admin.hr.reports',
+        ];
+
+        foreach ($landing as $permission => $routeName) {
+            if ($this->can($permission)) {
+                return $routeName;
+            }
+        }
+
+        return 'admin.profile'; // every authenticated user may open their own profile
+    }
+
+    /**
      * Avatars are stored on the private "local" disk under avatars/ and served through an
      * authenticated route. Older avatars were written to public/uploads/avatars with names
      * like avatar_{id}_{time}.{ext}; only names matching that image pattern are still shown.

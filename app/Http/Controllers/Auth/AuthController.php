@@ -20,10 +20,7 @@ class AuthController extends Controller
         if (Auth::check()) {
             /** @var \App\Models\User $user */
             $user = Auth::user();
-            if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
-                return redirect()->route('admin.pos.index');
-            }
-            return redirect()->route('admin.dashboard');
+            return redirect()->route($user->homeRouteName());
         }
 
         $lockoutSeconds = session('lockout_seconds') ?? 0;
@@ -95,11 +92,7 @@ class AuthController extends Controller
             session()->forget('lockout_seconds');
             $request->session()->regenerate();
 
-            if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
-                return redirect()->intended(route('admin.pos.index'));
-            }
-
-            return redirect()->intended(route('admin.dashboard'));
+            return redirect()->intended(route($user->homeRouteName()));
         }
 
         RateLimiter::hit($throttleKey, 300);

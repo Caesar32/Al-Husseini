@@ -6,9 +6,11 @@
             </h5>
             <small class="text-muted fs-11">متابعة نوبات العمل وفنيي الصيانة والكهرباء</small>
         </div>
+        @can('attendance.view')
         <a href="{{ route('admin.hr.attendance') }}" class="btn btn-sm btn-soft-success rounded-pill px-3 fw-semibold">
             كشف الحضور <i class="ri-arrow-left-s-line align-middle"></i>
         </a>
+        @endcan
     </div>
 
     <div class="card-body p-3 flex-grow-1 d-flex flex-column overflow-hidden">

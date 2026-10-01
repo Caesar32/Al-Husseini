@@ -36,10 +36,7 @@ Route::get('/', function () {
     }
     /** @var \App\Models\User $user */
     $user = \Illuminate\Support\Facades\Auth::user();
-    if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
-        return redirect()->route('admin.pos.index');
-    }
-    return redirect()->route('admin.dashboard');
+    return redirect()->route($user->homeRouteName());
 });
 
 // تبديل اللغة (Language Switcher)
