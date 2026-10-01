@@ -2,70 +2,50 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
+    private const TABLE = 'credit_ledger_entries';
+    private const UNIQUE = 'credit_ledger_entries_receipt_number_unique';
+    private const INDEX = 'credit_ledger_entries_receipt_number_index';
+
+    /**
+     * receipt_number is no longer unique: one collection receipt may be referenced by several
+     * entries. Duplicate-receipt protection is enforced in PosOrderService::settleCustomerDebt.
+     * Idempotent on every driver: acts only on the indexes that actually exist.
+     */
     public function up(): void
     {
-        $driver = DB::connection()->getDriverName();
+        if (Schema::hasIndex(self::TABLE, self::UNIQUE)) {
+            Schema::table(self::TABLE, fn (Blueprint $table) => $table->dropUnique(self::UNIQUE));
+        }
 
-        if ($driver === 'mysql') {
-            // Drop existing unique index if exists, replace with plain index
-            // The unique index name is typically credit_ledger_entries_receipt_number_unique
-            try {
-                Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                    $table->dropUnique(['receipt_number']);
-                });
-            } catch (\Throwable $e) {
-                // Ignore if index does not exist or has different name
-                try {
-                    DB::statement('ALTER TABLE credit_ledger_entries DROP INDEX credit_ledger_entries_receipt_number_unique');
-                } catch (\Throwable $e2) {
-                }
-            }
-
-            Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                $table->index('receipt_number');
-            });
-        } else {
-            // For sqlite, unique was not strictly enforced in :memory: tests; ensure index exists
-            // No action needed for sqlite, but ensure we don't have unique constraint
-            try {
-                // Try to drop unique if exists (sqlite will ignore)
-                Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                    $table->dropUnique(['receipt_number']);
-                });
-            } catch (\Throwable $e) {}
-            Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                $table->index('receipt_number');
-            });
+        if (!Schema::hasIndex(self::TABLE, self::INDEX)) {
+            Schema::table(self::TABLE, fn (Blueprint $table) => $table->index('receipt_number', self::INDEX));
         }
     }
 
     public function down(): void
     {
-        $driver = DB::connection()->getDriverName();
+        $duplicates = DB::table(self::TABLE)
+            ->select('receipt_number')
+            ->whereNotNull('receipt_number')
+            ->groupBy('receipt_number')
+            ->havingRaw('COUNT(*) > 1')
+            ->exists();
 
-        if ($driver === 'mysql') {
-            // Only re-add unique if no duplicates exist
-            $dupCount = DB::table('credit_ledger_entries')
-                ->select('receipt_number')
-                ->whereNotNull('receipt_number')
-                ->groupBy('receipt_number')
-                ->havingRaw('COUNT(*) > 1')
-                ->count();
+        if ($duplicates) {
+            // Refuse instead of silently skipping: the unique index cannot be restored over duplicates.
+            throw new RuntimeException('Cannot roll back: duplicate credit_ledger_entries.receipt_number values exist.');
+        }
 
-            if ($dupCount === 0) {
-                try {
-                    Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                        $table->dropIndex(['receipt_number']);
-                    });
-                } catch (\Throwable $e) {}
-                Schema::table('credit_ledger_entries', function (Blueprint $table) {
-                    $table->unique('receipt_number');
-                });
-            }
+        if (Schema::hasIndex(self::TABLE, self::INDEX)) {
+            Schema::table(self::TABLE, fn (Blueprint $table) => $table->dropIndex(self::INDEX));
+        }
+
+        if (!Schema::hasIndex(self::TABLE, self::UNIQUE)) {
+            Schema::table(self::TABLE, fn (Blueprint $table) => $table->unique('receipt_number', self::UNIQUE));
         }
     }
 };
