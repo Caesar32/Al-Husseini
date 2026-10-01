@@ -9,9 +9,6 @@
 <script src="{{ asset('assets/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
 <script src="{{ asset('assets/js/plugins.js') }}"></script>
 
-<!-- Al-Husseini Core Stores (Available to all views) -->
-<script src="{{ asset('assets/js/sales-store.js') }}"></script>
-<script src="{{ asset('assets/js/hr-store.js') }}"></script>
 
 <!-- App js -->
 <script src="{{ asset('assets/js/app.js') }}"></script>

@@ -103,49 +103,8 @@ document.addEventListener('DOMContentLoaded', function () {
         changeSalesPeriod(targetPeriod);
     }
 
-    window.addEventListener('alhusseini-sales-updated', function () {
-        // ⚠️ الجداول والكروت (الفواتير الأخيرة / الآجل / المخزون) مرندَّرة من السيرفر ببيانات DB حقيقية
-        // لا نسمح لـ Mock JS Store بالكتابة فوقها لمنع ظاهرة "flash ثم رجوع".
-        // loadKPIStats يقرأ من salesPeriodsData (بيانات السيرفر) فقط.
-        loadKPIStats();
-    });
 
 });
-
-function initAlHusseiniDashboard() {
-    renderDashboardCharts();
-}
-
-// 1. KPI Stats
-function loadKPIStats() {
-    // المبيعات والإيراد: نستخدم دائماً بيانات السيرفر (salesPeriodsData) وليس الـ mock store
-    const activePeriodBtn = document.querySelector('.sales-period-pill.active');
-    const activePeriod    = activePeriodBtn ? activePeriodBtn.dataset.period : '{{ $selectedPeriodKey ?? "all" }}';
-    if (activePeriod && salesPeriodsData && salesPeriodsData[activePeriod]) {
-        const p = salesPeriodsData[activePeriod];
-        const revenueEl = document.getElementById('dashTotalRevenue');
-        const salesEl   = document.getElementById('dashTotalSales');
-        if (revenueEl) revenueEl.textContent = p.revenue_formatted || p.total_formatted;
-        if (salesEl)   salesEl.textContent   = p.total_formatted;
-        const countEl = document.getElementById('dashInvoicesCount');
-        if (countEl) countEl.textContent = p.count;
-
-        // تحصيلات الآجل للفترة
-        const creditCollectedEl   = document.getElementById('dashCreditCollected');
-        const creditCollectedWrap = document.getElementById('dashCreditCollectedWrap');
-        if (creditCollectedEl && creditCollectedWrap) {
-            const creditAmt = p.credit_collected || 0;
-            if (creditAmt > 0) {
-                creditCollectedEl.textContent = p.credit_collected_fmt || (creditAmt.toLocaleString('ar-EG') + ' ج.م');
-                creditCollectedWrap.style.display = '';
-            } else {
-                creditCollectedWrap.style.display = 'none';
-            }
-        }
-    }
-    // ⚠️ باقي الكروت (الآجل، العملاء، المخزون) مرندَّرة من السيرفر ببيانات DB صحيحة.
-    // لا نكتب عليها من mock store لمنع ظاهرة Flash-then-Revert.
-}
 
 
 // 6. ApexCharts: Sales Trend & Donut
