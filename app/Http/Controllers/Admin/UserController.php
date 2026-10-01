@@ -9,6 +9,7 @@ use App\Services\PermissionRegistry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -70,15 +71,19 @@ class UserController extends Controller
             'phone'     => ['nullable', 'string', 'max:20'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'role'      => ['required', 'string', 'exists:roles,name'],
-            'password'  => ['required', 'string', 'min:6'],
+            'password'  => ['required', 'string', 'min:8'],
         ], [
             'name.required'     => 'اسم المستخدم مطلوب.',
             'email.required'    => 'البريد الإلكتروني مطلوب.',
             'email.unique'      => 'هذا البريد الإلكتروني مسجل لمستخدم آخر بالفعل.',
             'role.required'     => 'يرجى اختيار الدور والصلاحيات للمستخدم.',
             'password.required' => 'كلمة المرور مطلوبة.',
-            'password.min'      => 'كلمة المرور يجب ألا تقل عن 6 أحرف.',
+            'password.min'      => 'كلمة المرور يجب ألا تقل عن 8 أحرف.',
         ]);
+
+        if ($response = $this->denySuperAdminEscalation($request->input('role'))) {
+            return $response;
+        }
 
         $user = User::create([
             'name'      => $request->input('name'),
@@ -106,14 +111,18 @@ class UserController extends Controller
             'phone'     => ['nullable', 'string', 'max:20'],
             'branch_id' => ['nullable', 'exists:branches,id'],
             'role'      => ['required', 'string', 'exists:roles,name'],
-            'password'  => ['nullable', 'string', 'min:6'],
+            'password'  => ['nullable', 'string', 'min:8'],
         ], [
             'name.required'  => 'اسم المستخدم مطلوب.',
             'email.required' => 'البريد الإلكتروني مطلوب.',
             'email.unique'   => 'هذا البريد مسجل لمستخدم آخر.',
             'role.required'  => 'يرجى اختيار الدور للمستخدم.',
-            'password.min'   => 'كلمة المرور يجب ألا تقل عن 6 أحرف.',
+            'password.min'   => 'كلمة المرور يجب ألا تقل عن 8 أحرف.',
         ]);
+
+        if ($response = $this->denySuperAdminEscalation($request->input('role'), $user)) {
+            return $response;
+        }
 
         // Guard against removing the last super-admin
         if ($user->hasRole('super-admin') && $request->input('role') !== 'super-admin') {
@@ -153,6 +162,10 @@ class UserController extends Controller
             'role' => ['required', 'string', 'exists:roles,name'],
         ]);
 
+        if ($response = $this->denySuperAdminEscalation($request->input('role'), $user)) {
+            return $response;
+        }
+
         // Guard against removing the last super-admin
         if ($user->hasRole('super-admin') && $request->input('role') !== 'super-admin') {
             $superAdminsCount = User::role('super-admin')->count();
@@ -186,8 +199,17 @@ class UserController extends Controller
             }
         }
 
+        if ($response = $this->denySuperAdminEscalation(null, $user)) {
+            return $response;
+        }
+
         $user->is_active = !$user->is_active;
         $user->save();
+
+        // A deactivated user must not keep working in an existing session (SEC-04).
+        if (!$user->is_active && config('session.driver') === 'database') {
+            DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+        }
 
         $state = $user->is_active ? 'تفعيل' : 'تعطيل';
 
@@ -201,11 +223,15 @@ class UserController extends Controller
     public function resetPassword(Request $request, User $user): RedirectResponse
     {
         $request->validate([
-            'password' => ['required', 'string', 'min:6'],
+            'password' => ['required', 'string', 'min:8'],
         ], [
             'password.required' => 'يرجى إدخال كلمة المرور الجديدة.',
-            'password.min'      => 'كلمة المرور يجب ألا تقل عن 6 أحرف.',
+            'password.min'      => 'كلمة المرور يجب ألا تقل عن 8 أحرف.',
         ]);
+
+        if ($response = $this->denySuperAdminEscalation(null, $user)) {
+            return $response;
+        }
 
         $user->update([
             'password' => Hash::make($request->input('password')),
@@ -213,5 +239,23 @@ class UserController extends Controller
 
         return redirect()->route('admin.users.index')
             ->with('status', "تم تعيين كلمة المرور الجديدة للمستخدم ({$user->name}) بنجاح.");
+    }
+
+    /**
+     * Only a super-admin may grant the super-admin role or change, deactivate or reset the
+     * password of an existing super-admin account (SEC-06). users.manage alone is not enough.
+     */
+    private function denySuperAdminEscalation(?string $requestedRole, ?User $target = null): ?RedirectResponse
+    {
+        if (Auth::user()?->hasRole('super-admin')) {
+            return null;
+        }
+
+        if ($requestedRole === 'super-admin' || ($target && $target->hasRole('super-admin'))) {
+            return redirect()->route('admin.users.index')
+                ->withErrors(['user_error' => 'إدارة حسابات المشرف العام ومنح دوره مقصورة على المشرف العام فقط.']);
+        }
+
+        return null;
     }
 }

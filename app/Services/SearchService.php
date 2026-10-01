@@ -12,13 +12,37 @@ use App\Models\PurchaseInvoice;
 use App\Models\Warranty;
 use App\Models\WarrantyClaim;
 use App\Models\Supplier;
+use App\Models\User;
 
 class SearchService implements SearchServiceInterface
 {
+    /** Permission required to see each result section (SEC-05). */
+    public const SECTION_PERMISSIONS = [
+        'employees'         => 'employees.view',
+        'customers'         => 'customers.view',
+        'vehicles'          => 'customers.view',
+        'products'          => 'products.view',
+        'invoices'          => 'invoices.view',
+        'warranties'        => 'warranties.view',
+        'suppliers'         => 'suppliers.view',
+        'purchase_invoices' => 'purchases.view',
+        'warranty_claims'   => 'warranties.view',
+    ];
+
+    /** @return list<string> sections the given user may search */
+    public static function sectionsVisibleTo(?User $user): array
+    {
+        if (!$user) {
+            return [];
+        }
+
+        return array_keys(array_filter(self::SECTION_PERMISSIONS, fn (string $permission) => $user->can($permission)));
+    }
+
     /**
      * {@inheritDoc}
      */
-    public function search(string $query, int $limitPerSection = 5): array
+    public function search(string $query, int $limitPerSection = 5, ?array $sections = null): array
     {
         $term = trim($query);
 
@@ -33,15 +57,18 @@ class SearchService implements SearchServiceInterface
         $variants = $this->getSearchVariants($term);
         $cleanPhoneOrCode = preg_replace('/[^\d\w]/u', '', $term);
 
-        $employees = $this->searchEmployees($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $customers = $this->searchCustomers($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $vehicles  = $this->searchVehicles($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $products  = $this->searchProducts($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $invoices  = $this->searchInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $warranties = $this->searchWarranties($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $suppliers = $this->searchSuppliers($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $purchaseInvoices = $this->searchPurchaseInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection);
-        $warrantyClaims = $this->searchWarrantyClaims($term, $variants, $cleanPhoneOrCode, $limitPerSection);
+        // Sections the caller may not see are never queried.
+        $allowed = fn (string $key) => $sections === null || in_array($key, $sections, true);
+
+        $employees = $allowed('employees') ? $this->searchEmployees($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $customers = $allowed('customers') ? $this->searchCustomers($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $vehicles  = $allowed('vehicles') ? $this->searchVehicles($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $products  = $allowed('products') ? $this->searchProducts($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $invoices  = $allowed('invoices') ? $this->searchInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $warranties = $allowed('warranties') ? $this->searchWarranties($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $suppliers = $allowed('suppliers') ? $this->searchSuppliers($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $purchaseInvoices = $allowed('purchase_invoices') ? $this->searchPurchaseInvoices($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
+        $warrantyClaims = $allowed('warranty_claims') ? $this->searchWarrantyClaims($term, $variants, $cleanPhoneOrCode, $limitPerSection) : [];
 
         $sections = array_filter([
             'employees' => [

@@ -11,6 +11,7 @@ use App\Models\SalaryStructure;
 use App\Models\DeductionRule;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class InitialDataSeeder extends Seeder
 {
@@ -51,38 +52,12 @@ class InitialDataSeeder extends Seeder
             'description' => 'خصم يوم كامل للغياب غير المبرر',
         ]);
 
-        // 5. حساب المشرف العام للتجربة
-        $superAdminUser = User::updateOrCreate(['email' => 'admin@alhusseini.com'], [
-            'name' => 'المهندس أحمد الحسيني',
-            'password' => Hash::make('12345678'),
-            'branch_id' => $mainBranch->id,
-            'is_active' => true,
-        ]);
-        if (!$superAdminUser->hasRole('super-admin')) {
-            $superAdminUser->assignRole('super-admin');
-        }
-
-        // 6. حساب المحاسب للتجربة
-        $accountantUser = User::updateOrCreate(['email' => 'accountant@alhusseini.com'], [
-            'name' => 'محمد كمال - محاسب الفرع',
-            'password' => Hash::make('12345678'),
-            'branch_id' => $mainBranch->id,
-            'is_active' => true,
-        ]);
-        if (!$accountantUser->hasRole('accountant')) {
-            $accountantUser->assignRole('accountant');
-        }
-
-        // 7. حساب الكاشير للتجربة
-        $cashierUser = User::updateOrCreate(['email' => 'cashier@alhusseini.com'], [
-            'name' => 'أحمد سمير - كاشير المبيعات',
-            'password' => Hash::make('12345678'),
-            'branch_id' => $mainBranch->id,
-            'is_active' => true,
-        ]);
-        if (!$cashierUser->hasRole('cashier')) {
-            $cashierUser->assignRole('cashier');
-        }
+        // 5-7. الحسابات الافتراضية (مشرف عام / محاسب / كاشير)
+        // تُنشأ مرة واحدة فقط: إعادة تشغيل الـ seeder لا تعيد ضبط كلمة المرور أو تعيد تفعيل حساب معطل.
+        // كلمة المرور الأولية من SEED_DEFAULT_PASSWORD، وإلا تُولَّد عشوائياً وتُطبع مرة واحدة.
+        $superAdminUser = $this->seedAccount('admin@alhusseini.com', 'المهندس أحمد الحسيني', $mainBranch->id, 'super-admin');
+        $accountantUser = $this->seedAccount('accountant@alhusseini.com', 'محمد كمال - محاسب الفرع', $mainBranch->id, 'accountant');
+        $cashierUser = $this->seedAccount('cashier@alhusseini.com', 'أحمد سمير - كاشير المبيعات', $mainBranch->id, 'cashier');
 
         // 8. موظفون تجريبيون
         $emp1 = Employee::firstOrCreate(['employee_code' => 'EMP-001'], [
@@ -142,5 +117,35 @@ class InitialDataSeeder extends Seeder
             'housing_allowance' => 500,
             'effective_from' => '2024-05-10',
         ]);
+    }
+
+    private function seedAccount(string $email, string $name, int $branchId, string $role): User
+    {
+        $user = User::firstOrNew(['email' => $email]);
+
+        if (!$user->exists) {
+            $password = (string) env('SEED_DEFAULT_PASSWORD', '');
+            $generated = $password === '';
+            if ($generated) {
+                $password = Str::password(16);
+            }
+
+            $user->fill([
+                'name'      => $name,
+                'password'  => Hash::make($password),
+                'branch_id' => $branchId,
+                'is_active' => true,
+            ])->save();
+
+            if ($generated) {
+                $this->command?->warn("Initial password for {$email}: {$password} (change it after first login)");
+            }
+        }
+
+        if (!$user->hasRole($role)) {
+            $user->assignRole($role);
+        }
+
+        return $user;
     }
 }

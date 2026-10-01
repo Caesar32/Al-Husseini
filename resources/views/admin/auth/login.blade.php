@@ -176,6 +176,8 @@
                                         </div>
                                     @endif
 
+                                    {{-- Demo quick-fill exposes seeded credentials: local development only (SEC-14). --}}
+                                    @if (app()->environment('local'))
                                     <!-- Quick Demo Testing Buttons -->
                                     <div class="mb-3 p-2 bg-light rounded border">
                                         <div class="d-flex align-items-center justify-content-between mb-1">
@@ -193,13 +195,14 @@
                                             </button>
                                         </div>
                                     </div>
+                                    @endif
 
                                     <form action="{{ route('admin.login.submit') }}" method="POST" id="login-form">
                                         @csrf
                                         <div class="mb-3">
                                             <label for="loginInput" class="form-label fw-semibold fs-13">اسم المستخدم أو البريد أو الهاتف</label>
                                             <div class="position-relative">
-                                                <input type="text" name="login" class="form-control @error('email') is-invalid @enderror" id="loginInput" placeholder="أدخل البريد أو الهاتف أو الاسم" value="{{ old('login', old('email', 'admin@alhusseini.com')) }}" @if($effectiveLockout > 0) disabled @else autofocus @endif required>
+                                                <input type="text" name="login" class="form-control @error('email') is-invalid @enderror" id="loginInput" placeholder="أدخل البريد أو الهاتف أو الاسم" value="{{ old('login', old('email')) }}" @if($effectiveLockout > 0) disabled @else autofocus @endif required>
                                                 <span class="position-absolute end-0 top-50 translate-middle-y me-3 text-muted"><i class="ri-user-line"></i></span>
                                             </div>
                                             @error('email')
@@ -216,7 +219,7 @@
                                         <div class="mb-3">
                                             <label class="form-label fw-semibold fs-13" for="password-input">كلمة المرور</label>
                                             <div class="position-relative auth-pass-inputgroup mb-3">
-                                                <input type="password" name="password" class="form-control pe-5 password-input @error('password') is-invalid @enderror" placeholder="أدخل كلمة المرور" id="password-input" value="12345678" @if($effectiveLockout > 0) disabled @endif required>
+                                                <input type="password" name="password" class="form-control pe-5 password-input @error('password') is-invalid @enderror" placeholder="أدخل كلمة المرور" id="password-input" @if($effectiveLockout > 0) disabled @endif required>
                                                 <button class="btn btn-link position-absolute end-0 top-0 text-decoration-none text-muted password-addon material-shadow-none" type="button" id="password-addon"><i class="ri-eye-fill align-middle"></i></button>
                                                 @error('password')
                                                     <div class="invalid-feedback">{{ $message }}</div>

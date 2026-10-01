@@ -9,7 +9,8 @@ interface SearchServiceInterface
      *
      * @param string $query
      * @param int $limitPerSection
+     * @param list<string>|null $sections Sections to search (keys of SearchService::SECTION_PERMISSIONS); null = all
      * @return array
      */
-    public function search(string $query, int $limitPerSection = 5): array;
+    public function search(string $query, int $limitPerSection = 5, ?array $sections = null): array;
 }

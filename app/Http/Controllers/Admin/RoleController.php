@@ -74,6 +74,10 @@ class RoleController extends Controller
             'name.regex'    => 'المعرف البرمجي يجب أن يحتوي فقط على أحرف وأرقام وشرطات (a-z, 0-9, -).',
         ]);
 
+        if ($response = $this->denyPrivilegedGrant($request->input('permissions', []))) {
+            return $response;
+        }
+
         $roleSlug = Str::slug($request->input('name'));
 
         $role = Role::create([
@@ -138,6 +142,10 @@ class RoleController extends Controller
             'name.unique'   => 'اسم الدور مستخدم مسبقاً.',
         ]);
 
+        if ($response = $this->denyPrivilegedGrant($request->input('permissions', []), $role)) {
+            return $response;
+        }
+
         if (!$isSystem && $request->filled('name')) {
             $role->name = Str::slug($request->input('name'));
             $role->save();
@@ -173,5 +181,28 @@ class RoleController extends Controller
 
         return redirect()->route('admin.roles.index')
             ->with('status', "تم حذف الدور ({$roleName}) بنجاح.");
+    }
+
+    /**
+     * Permissions that manage privileges themselves. Only a super-admin may add them to a
+     * role, otherwise a roles.manage holder could grant itself users.manage and escalate (SEC-06).
+     */
+    private const PRIVILEGED_PERMISSIONS = ['roles.manage', 'users.manage', 'settings.manage'];
+
+    private function denyPrivilegedGrant(array $requested, ?Role $role = null): ?RedirectResponse
+    {
+        if (auth()->user()?->hasRole('super-admin')) {
+            return null;
+        }
+
+        $alreadyGranted = $role ? $role->permissions->pluck('name')->all() : [];
+        $newlyPrivileged = array_diff(array_intersect($requested, self::PRIVILEGED_PERMISSIONS), $alreadyGranted);
+
+        if ($newlyPrivileged !== []) {
+            return redirect()->route('admin.roles.index')
+                ->withErrors(['role_error' => 'منح صلاحيات إدارة الأدوار والمستخدمين والإعدادات مقصور على المشرف العام فقط.']);
+        }
+
+        return null;
     }
 }
