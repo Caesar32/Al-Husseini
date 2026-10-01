@@ -384,7 +384,7 @@ class PosOrderService implements PosOrderServiceInterface
                         'scrap_value'    => $unitScrapValue,
                         'lead_weight_kg' => round($scrapAh * 0.17, 2), // Standard average lead yield per Ah
                         'status'         => 'in_stock',
-                        'received_by'    => $data['technician_id'] ?? 1,
+                        'received_by'    => (int) $data['technician_id'], // validated non-empty at the start of the sale
                     ]);
                 }
             }
