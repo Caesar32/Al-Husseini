@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $fillable = [
         'invoice_number',
         'branch_id',

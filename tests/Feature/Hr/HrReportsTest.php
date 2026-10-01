@@ -15,8 +15,10 @@ beforeEach(function () {
     $this->seed(\Database\Seeders\InitialDataSeeder::class);
     $this->admin = User::first();
 
-    $this->late = Employee::factory()->create(['full_name' => 'موظف متأخر للتقرير']);
-    $this->absent = Employee::factory()->create(['full_name' => 'موظف غائب للتقرير']);
+    // Same branch as the seeded users, so branch isolation does not hide the fixtures.
+    $mainBranchId = \App\Models\Branch::where('code', 'MAIN')->value('id');
+    $this->late = Employee::factory()->create(['full_name' => 'موظف متأخر للتقرير', 'branch_id' => $mainBranchId]);
+    $this->absent = Employee::factory()->create(['full_name' => 'موظف غائب للتقرير', 'branch_id' => $mainBranchId]);
 
     Attendance::create([
         'employee_id' => $this->late->id,

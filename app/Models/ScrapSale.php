@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ScrapSale extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $fillable = [
         'batch_number',
         'branch_id',

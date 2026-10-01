@@ -14,7 +14,7 @@ class GeneratePayrollRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'exists:branches,id'],
+            'branch_id' => ['required', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'year' => ['required', 'integer', 'min:2024', 'max:2035'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
         ];

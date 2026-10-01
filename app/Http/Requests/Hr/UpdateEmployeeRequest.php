@@ -17,7 +17,7 @@ class UpdateEmployeeRequest extends FormRequest
         $employeeId = $this->route('employee')?->id ?? $this->input('employee_id');
 
         return [
-            'branch_id' => ['required', 'exists:branches,id'],
+            'branch_id' => ['required', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'job_title_id' => ['required', 'exists:job_titles,id'],
             'employee_code' => ['required', 'string', 'max:30', Rule::unique('employees', 'employee_code')->ignore($employeeId)],
             'full_name' => ['required', 'string', 'max:150'],

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WarrantyClaim extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $fillable = [
         'claim_number',
         'warranty_id',

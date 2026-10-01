@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScrapBatteriesInventory extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $table = 'scrap_batteries_inventory';
 
     protected $fillable = [

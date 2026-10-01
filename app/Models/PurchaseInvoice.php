@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseInvoice extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $fillable = [
         'invoice_number',
         'supplier_id',

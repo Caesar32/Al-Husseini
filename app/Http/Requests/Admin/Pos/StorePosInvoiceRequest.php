@@ -21,7 +21,7 @@ class StorePosInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id'             => ['nullable', 'exists:branches,id'],
+            'branch_id'             => ['nullable', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'customer_id'           => ['nullable', 'exists:customers,id'],
             'customer_vehicle_id'   => ['nullable', 'exists:customer_vehicles,id'],
             'technician_id'         => ['required', 'exists:employees,id'],
