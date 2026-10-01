@@ -140,9 +140,10 @@ class AttendanceService implements AttendanceServiceInterface
                 $attendance->check_in = $punchTime;
                 $this->calculateLateness($attendance, $employee, $punchTime);
 
-                // الموظف في إجازة معتمدة: لا نلغي الإجازة، بل نجعل الحالة holiday
+                // الموظف في إجازة معتمدة: لا نلغي الإجازة، بل نجعل الحالة holiday (بدون تأخير؛ الساعات تُحتسب إضافي)
                 if ($isOnLeave) {
                     $attendance->status = 'holiday';
+                    $attendance->late_minutes = 0;
                 }
 
             } elseif ($isCheckOut) {
@@ -180,8 +181,8 @@ class AttendanceService implements AttendanceServiceInterface
 
             $attendance->save();
 
-            // إرسال إشعار فوري في حالة التأخير
-            if ($attendance->late_minutes > 0) {
+            // إرسال إشعار فوري في حالة التأخير — مرة واحدة فقط عند تسجيل التأخير، لا عند بصمة الانصراف
+            if ($attendance->late_minutes > 0 && $attendance->wasChanged('late_minutes')) {
                 $this->notifyAdminsAboutLateness($attendance);
             }
 
