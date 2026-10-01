@@ -204,12 +204,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/credit', [CreditCustomerController::class, 'index'])->name('credit')->middleware('can:credit.view');
             Route::post('/credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
             Route::get('/credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
-            Route::get('/customers', function () {
-                return view('admin.sales.customers');
-            })->name('customers')->middleware('can:customers.view');
-            Route::get('/products', function () {
-                return view('admin.sales.products');
-            })->name('products')->middleware('can:products.view');
+            Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers')->middleware('can:customers.view');
+            Route::get('/products', [\App\Http\Controllers\Admin\ProductController::class, 'index'])->name('products')->middleware('can:products.view');
         });
+
+        // ─── BEGIN Phase 3: catalog backend (products / customers / vehicles) ───────────────
+        Route::get('products/search', [\App\Http\Controllers\Admin\ProductController::class, 'search'])->name('products.search')->middleware('can:products.view');
+        Route::post('products', [\App\Http\Controllers\Admin\ProductController::class, 'store'])->name('products.store')->middleware('can:products.create');
+        Route::put('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'update'])->name('products.update')->middleware('can:products.edit');
+        Route::delete('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'destroy'])->name('products.destroy')->middleware('can:products.delete');
+
+        Route::get('customers/search', [\App\Http\Controllers\Admin\CustomerController::class, 'search'])->name('customers.search')->middleware('can:customers.view');
+        Route::post('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'store'])->name('customers.store')->middleware('can:customers.create');
+        Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show')->middleware('can:customers.view');
+        Route::put('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'update'])->name('customers.update')->middleware('can:customers.edit');
+        Route::delete('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('can:customers.delete');
+        Route::post('customers/{customer}/vehicles', [\App\Http\Controllers\Admin\CustomerController::class, 'storeVehicle'])->name('customers.vehicles.store')->middleware('can:customers.edit');
+        Route::put('customers/{customer}/vehicles/{vehicle}', [\App\Http\Controllers\Admin\CustomerController::class, 'updateVehicle'])->name('customers.vehicles.update')->middleware('can:customers.edit')->scopeBindings();
+        Route::delete('customers/{customer}/vehicles/{vehicle}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroyVehicle'])->name('customers.vehicles.destroy')->middleware('can:customers.edit')->scopeBindings();
+        // ─── END Phase 3 ─────────────────────────────────────────────────────────────────────
     });
 });
