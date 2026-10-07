@@ -1,213 +1,27 @@
-name: Deploy to Production
+name: Deploy to Hostinger
 
 on:
-  workflow_run:
-    workflows: ["CI Pipeline"]
-    branches: [ main, master ]
-    types:
-      - completed
-  workflow_dispatch:
-    inputs:
-      run_migrations:
-        description: 'Run database migrations (php artisan migrate --force)?'
-        required: true
-        type: boolean
-        default: true
-
-concurrency:
-  group: production-deployment
-  cancel-in-progress: false
+  push:
+    branches:
+      - main
+      - remediation/2026-10
 
 jobs:
   deploy:
-    name: Build & Deploy to Server
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success') }}
-
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP Environment
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, sqlite3, zip, bcmath, curl
-          coverage: none
-          tools: composer:v2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Production Composer Dependencies
-        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Install NPM Dependencies & Build Production Assets
-        run: |
-          npm ci
-          npm run build
-
-      - name: Package Clean Production Artifact
-        run: |
-          tar \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='node_modules' \
-            --exclude='tests' \
-            --exclude='.env' \
-            --exclude='.env.*' \
-            --exclude='database/*.sqlite*' \
-            --exclude='storage/logs/*' \
-            --exclude='storage/framework/cache/data/*' \
-            --exclude='storage/framework/sessions/*' \
-            --exclude='storage/framework/views/*' \
-            --exclude='public/uploads/*' \
-            --warning=no-file-changed \
-            -czf /tmp/release_${{ github.sha }}.tar.gz .
-          mv /tmp/release_${{ github.sha }}.tar.gz ./release_${{ github.sha }}.tar.gz
-
-      - name: Debug SSH Connection
-        uses: appleboy/ssh-action@v1.2.0
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 65002
-          debug: true
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            echo "✅ SSH connection successful!"
-            whoami
-            echo $HOME
-
-      - name: Ensure Remote Upload Directory Exists
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 65002
-          script: |
-            mkdir -p "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
-
-      - name: Transfer Artifact via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 65002
-          source: "release_${{ github.sha }}.tar.gz"
-          target: "${{ secrets.REMOTE_TARGET_PATH }}/.deploy_upload"
-
-      - name: Execute Atomic Deployment on Server
-        uses: appleboy/ssh-action@v1.2.0
-        env:
-          RELEASE_SHA: ${{ github.sha }}
-          TARGET_PATH: ${{ secrets.REMOTE_TARGET_PATH }}
-          RUN_MIGRATIONS: ${{ github.event.inputs.run_migrations != false }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: 65002
-          envs: RELEASE_SHA,TARGET_PATH,RUN_MIGRATIONS
-          script_stop: true
-          script: |
-            set -euo pipefail
-
-            TARGET_DIR="${TARGET_PATH}"
-            UPLOAD_DIR="${TARGET_DIR}/.deploy_upload"
-            ARCHIVE="${UPLOAD_DIR}/release_${RELEASE_SHA}.tar.gz"
-            TMP_DIR="${TARGET_DIR}/.deploy_tmp_${RELEASE_SHA}"
-
-            echo "=========================================================="
-            echo "🚀 Starting Deployment for Release: ${RELEASE_SHA}"
-            echo "📁 Target Directory: ${TARGET_DIR}"
-            echo "=========================================================="
-
-            cleanup() {
-              echo "🧹 Cleaning up temporary deployment files..."
-              rm -rf "${TMP_DIR}"
-              rm -f "${ARCHIVE}"
-            }
-            trap cleanup EXIT
-
-            PHP_BIN=$(command -v php8.2 2>/dev/null || command -v php82 2>/dev/null || command -v php 2>/dev/null || echo "php")
-            echo "Using PHP: $($PHP_BIN -r 'echo PHP_VERSION;' 2>/dev/null || echo 'unknown')"
-
-            echo "==> [1/9] Ensuring persistent storage directories..."
-            mkdir -p "${TMP_DIR}"
-            mkdir -p "${TARGET_DIR}/storage/app/public"
-            mkdir -p "${TARGET_DIR}/storage/framework/cache/data"
-            mkdir -p "${TARGET_DIR}/storage/framework/sessions"
-            mkdir -p "${TARGET_DIR}/storage/framework/views"
-            mkdir -p "${TARGET_DIR}/storage/logs"
-            mkdir -p "${TARGET_DIR}/public/uploads/avatars"
-            mkdir -p "${TARGET_DIR}/bootstrap/cache"
-
-            echo "==> [2/9] Extracting release package..."
-            tar -xzf "${ARCHIVE}" -C "${TMP_DIR}"
-
-            echo "==> [3/9] Maintenance mode..."
-            if [ -f "${TARGET_DIR}/artisan" ]; then
-              $PHP_BIN "${TARGET_DIR}/artisan" down --retry=60 || true
-            fi
-
-            echo "==> [4/9] Synchronizing release files..."
-            if command -v rsync &>/dev/null; then
-              rsync -a --delete \
-                --exclude='.env' \
-                --exclude='.deploy_upload/' \
-                --exclude='.deploy_tmp_*' \
-                --exclude='storage/' \
-                --exclude='public/uploads/' \
-                --exclude='database/*.sqlite*' \
-                "${TMP_DIR}/" "${TARGET_DIR}/"
-            else
-              echo "rsync not available — using cp fallback..."
-              find "${TARGET_DIR}" -maxdepth 1 \
-                ! -name '.' ! -name '.env' \
-                ! -name '.deploy_upload' \
-                ! -name ".deploy_tmp_${RELEASE_SHA}" \
-                ! -name 'storage' ! -name 'public' \
-                -exec rm -rf {} + 2>/dev/null || true
-              cp -rT "${TMP_DIR}" "${TARGET_DIR}"
-              mkdir -p "${TARGET_DIR}/public/uploads/avatars"
-            fi
-
-            echo "==> [5/9] Safety verifications..."
-            if [ ! -f "${TARGET_DIR}/.env" ]; then
-              echo "❌ CRITICAL: .env file is missing!"
-              exit 1
-            fi
-
-            echo "==> [6/9] Configuring permissions..."
-            chmod -R 775 "${TARGET_DIR}/storage" "${TARGET_DIR}/bootstrap/cache" "${TARGET_DIR}/public/uploads"
-            $PHP_BIN "${TARGET_DIR}/artisan" storage:link --force || true
-
-            if [ "${RUN_MIGRATIONS}" = "true" ]; then
-              echo "==> [7/9] Running database migrations..."
-              $PHP_BIN "${TARGET_DIR}/artisan" migrate --force
-            else
-              echo "==> [7/9] Migrations skipped."
-            fi
-
-            echo "==> [8/9] Rebuilding production caches..."
-            $PHP_BIN "${TARGET_DIR}/artisan" optimize:clear
-            $PHP_BIN "${TARGET_DIR}/artisan" config:cache
-            $PHP_BIN "${TARGET_DIR}/artisan" route:cache
-            $PHP_BIN "${TARGET_DIR}/artisan" view:cache
-
-            echo "==> [9/9] Bringing application online..."
-            $PHP_BIN "${TARGET_DIR}/artisan" up
-
-            sleep 3
-            HEALTH_CODE=$(curl -k -s -o /dev/null -w "%{http_code}" https://alhusseini.shop/up || echo "000")
-            echo "Health check → HTTP ${HEALTH_CODE}"
-
-            echo "=========================================================="
-            echo "✅ Deployment completed for ${RELEASE_SHA}!"
-            echo "=========================================================="
+            cd ${{ secrets.REMOTE_TARGET_PATH }}
+            php artisan down || true
+            git reset --hard HEAD && git pull origin main
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            php artisan migrate --force
+            php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache
+            php artisan up
