@@ -41,8 +41,11 @@ class AuthController extends Controller
             ], 403);
         }
 
-        // Security Enforcement: The Owner App is exclusively for executive management.
-        if (! $user->hasRole('super-admin') && ! $user->hasRole('admin')) {
+        // Security Enforcement: The Owner App is exclusively for the super-admin role.
+        // Do not widen this to any other role name — the Owner App bypasses the web-guard
+        // permission system entirely via the 'owner:monitor' ability, so this check is the
+        // only gate standing between a valid login and full executive read access.
+        if (! $user->hasRole('super-admin')) {
             return response()->json([
                 'status'  => 'error',
                 'code'    => 'OWNER_ROLE_REQUIRED',

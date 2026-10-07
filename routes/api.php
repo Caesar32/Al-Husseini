@@ -23,7 +23,7 @@ Route::prefix('v1/owner')->group(function () {
 
     // Public Guest Route (Rate-limited: 5 attempts per minute)
     Route::post('auth/login', [AuthController::class, 'login'])
-        ->middleware('throttle:5,1')
+        ->middleware('throttle:owner-login')
         ->name('api.v1.owner.login');
 
     // Protected Routes (Requires Bearer token with 'owner:monitor' ability)

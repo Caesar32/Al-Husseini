@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Contracts\Sales\PosOrderServiceInterface;
+use App\Jobs\DispatchOwnerPushNotification;
 use App\Models\CreditLedgerEntry;
 use App\Models\Customer;
 use App\Models\Invoice;
@@ -351,7 +352,18 @@ class PosOrderService implements PosOrderServiceInterface
 
                 // Decrement inventory safely
                 $product = $products->get($pItem['product_id']);
+                $stockBeforeDecrement = (int) $product->current_stock;
                 $product->decrement('current_stock', $pItem['quantity']);
+
+                // Owner alert: fires only on the 1 -> 0 edge, not on every sale of an
+                // already-depleted item.
+                if ($stockBeforeDecrement > 0 && $stockBeforeDecrement - $pItem['quantity'] <= 0) {
+                    DispatchOwnerPushNotification::dispatch(
+                        'نفاد مخزون صنف حيوي ⚠️',
+                        "نفد مخزون الصنف ({$product->name}) بالكامل بعد عملية بيع.",
+                        ['type' => 'critical_stock_zero', 'product_id' => $product->id, 'sku' => $product->sku]
+                    );
+                }
 
                 // Issue Warranty certificate if product is battery
                 if ($pItem['is_battery'] && !empty($pItem['battery_serial'])) {
@@ -408,6 +420,14 @@ class PosOrderService implements PosOrderServiceInterface
                 }
             }
 
+            // Owner alert: exceptionally large sale (threshold fixed per the approved spec).
+            if ($finalAmount > 15000.0) {
+                DispatchOwnerPushNotification::dispatch(
+                    'فاتورة مبيعات استثنائية 💰',
+                    "تم إصدار فاتورة رقم {$invoiceNumber} بقيمة " . number_format($finalAmount, 2) . ' ج.م',
+                    ['type' => 'high_value_sale', 'invoice_id' => $invoice->id, 'amount' => $finalAmount]
+                );
+            }
 
             return $invoice->fresh([
                 'items.product',
@@ -544,6 +564,13 @@ class PosOrderService implements PosOrderServiceInterface
                 'status' => $newStatus,
                 'notes'  => trim(($invoice->notes ?? '') . "\nمرتجع بقيمة {$refundTotal} ج.م{$capNote}. السبب: {$reason}"),
             ]);
+
+            // Owner alert: every sales return/refund is reported, regardless of size.
+            DispatchOwnerPushNotification::dispatch(
+                'تسجيل مرتجع مبيعات 🔄',
+                "تم تسجيل مرتجع على الفاتورة رقم {$invoice->invoice_number} بقيمة " . number_format($refundTotal, 2) . ' ج.م',
+                ['type' => 'sales_return', 'invoice_id' => $invoice->id, 'amount' => $refundTotal, 'status' => $newStatus]
+            );
 
             return $invoice->fresh(['items.product', 'customer', 'payments']);
         });

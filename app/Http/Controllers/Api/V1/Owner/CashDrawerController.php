@@ -23,10 +23,14 @@ class CashDrawerController extends Controller
         $branchId = $request->filled('branch_id') ? (int) $request->branch_id : null;
 
         // 1. Determine active shift and cashier
-        $activeAttendance = Attendance::query()
+        $activeAttendanceQuery = Attendance::query()
             ->where('work_date', $today)
             ->whereNotNull('check_in')
-            ->whereNull('check_out')
+            ->whereNull('check_out');
+        if ($branchId !== null) {
+            $activeAttendanceQuery->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
+        }
+        $activeAttendance = $activeAttendanceQuery
             ->with(['employee.jobTitle', 'employee.user'])
             ->latest('check_in')
             ->first();
@@ -46,7 +50,11 @@ class CashDrawerController extends Controller
             $mins = $diffMinutes % 60;
             $duration = $hours > 0 ? "{$hours} ساعة و {$mins} دقيقة" : "{$mins} دقيقة";
         } else {
-            $latestInvoice = Invoice::whereDate('created_at', $today)->with('cashier')->latest('id')->first();
+            $latestInvoiceQuery = Invoice::countable()->whereDate('created_at', $today);
+            if ($branchId !== null) {
+                $latestInvoiceQuery->where('branch_id', $branchId);
+            }
+            $latestInvoice = $latestInvoiceQuery->with('cashier')->latest('id')->first();
             if ($latestInvoice && $latestInvoice->cashier) {
                 $cashierName = $latestInvoice->cashier->name;
                 $openedAt = $latestInvoice->created_at->format('h:i') . ' ' . ($latestInvoice->created_at->format('A') === 'AM' ? 'ص' : 'م');
@@ -62,11 +70,14 @@ class CashDrawerController extends Controller
             $paymentsQuery->whereHas('invoice', fn($q) => $q->where('branch_id', $branchId));
         }
 
+        // Only real payment_method enum values written by PosOrderService/validation rules
+        // (cash, card, bank_transfer, credit) are queried here — 'visa'/'mastercard'/'pos'/
+        // 'instapay' never occur in invoice_payments and would silently always sum to zero.
         $cashSales = (float) (clone $paymentsQuery)->where('payment_method', 'cash')->sum('amount');
-        $cardSales = (float) (clone $paymentsQuery)->whereIn('payment_method', ['card', 'visa', 'mastercard', 'pos'])->sum('amount');
-        $instapaySales = (float) (clone $paymentsQuery)->where('payment_method', 'instapay')->sum('amount');
+        $cardSales = (float) (clone $paymentsQuery)->where('payment_method', 'card')->sum('amount');
+        $bankTransferSales = (float) (clone $paymentsQuery)->where('payment_method', 'bank_transfer')->sum('amount');
 
-        $creditQuery = CreditLedgerEntry::whereIn('entry_type', ['payment_collection', 'payment'])->whereDate('created_at', $today);
+        $creditQuery = CreditLedgerEntry::where('entry_type', 'payment_collection')->whereDate('created_at', $today);
         $creditCollectionsCash = (float) $creditQuery->sum('amount');
 
         $expensesPaid = 0.00;
@@ -83,15 +94,16 @@ class CashDrawerController extends Controller
                 'opening_balance'         => $openingBalance,
                 'cash_sales'              => $cashSales,
                 'card_sales'              => $cardSales,
-                'instapay_sales'          => $instapaySales,
+                'bank_transfer_sales'     => $bankTransferSales,
                 'credit_collections_cash' => $creditCollectionsCash,
                 'expenses_paid'           => $expensesPaid,
                 'expected_drawer_cash'    => $expectedDrawerCash,
+                'audit_notes'             => 'الرصيد الافتتاحي والمصروفات النثرية غير مسجلة بنظام الكاشير حالياً؛ الكاش المتوقع يمثل صافي المقبوضات النقدية والتحصيلات فقط.',
                 'formatted'               => [
                     'opening_balance'         => number_format($openingBalance, 2) . ' ج.م',
                     'cash_sales'              => number_format($cashSales, 2) . ' ج.م',
                     'card_sales'              => number_format($cardSales, 2) . ' ج.م',
-                    'instapay_sales'          => number_format($instapaySales, 2) . ' ج.م',
+                    'bank_transfer_sales'     => number_format($bankTransferSales, 2) . ' ج.م',
                     'credit_collections_cash' => number_format($creditCollectionsCash, 2) . ' ج.م',
                     'expenses_paid'           => number_format($expensesPaid, 2) . ' ج.م',
                     'expected_drawer_cash'    => number_format($expectedDrawerCash, 2) . ' ج.م',

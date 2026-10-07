@@ -27,7 +27,7 @@ class CreditController extends Controller
         $totalDebtFormatted = MoneyHelper::formatCompactCurrency($totalDebtRaw);
 
         // 2. Collections received today
-        $collectedTodayRaw = (float) CreditLedgerEntry::whereIn('entry_type', ['payment_collection', 'payment'])
+        $collectedTodayRaw = (float) CreditLedgerEntry::where('entry_type', 'payment_collection')
             ->whereDate('created_at', $today)
             ->sum('amount');
         $collectedTodayFormatted = MoneyHelper::formatCompactCurrency($collectedTodayRaw);

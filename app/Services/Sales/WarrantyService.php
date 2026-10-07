@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Contracts\Sales\WarrantyServiceInterface;
+use App\Jobs\DispatchOwnerPushNotification;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
@@ -166,7 +167,16 @@ class WarrantyService implements WarrantyServiceInterface
                 }
 
                 // Decrement 1 piece for instant customer replacement
+                $replacementStockBefore = (int) $replacementProduct->current_stock;
                 $replacementProduct->decrement('current_stock', 1);
+
+                if ($replacementStockBefore > 0 && $replacementStockBefore - 1 <= 0) {
+                    DispatchOwnerPushNotification::dispatch(
+                        'نفاد مخزون صنف حيوي ⚠️',
+                        "نفد مخزون الصنف ({$replacementProduct->name}) بعد صرفه كبطارية بديلة ضمن الضمان.",
+                        ['type' => 'critical_stock_zero', 'product_id' => $replacementProduct->id, 'sku' => $replacementProduct->sku]
+                    );
+                }
 
                 // Mark defective warranty as claimed
                 $warranty->update(['status' => 'claimed']);

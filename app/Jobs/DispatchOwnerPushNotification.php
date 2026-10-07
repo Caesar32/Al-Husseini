@@ -42,7 +42,7 @@ class DispatchOwnerPushNotification implements ShouldQueue
             ->pluck('id');
 
         if ($ownerIds->isEmpty()) {
-            Log::info('[Owner Push] No active super-admin or admin users found to receive push notification.');
+            Log::info('[Owner Push] No active super-admin users found to receive push notification.');
             return;
         }
 

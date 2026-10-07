@@ -37,7 +37,7 @@ class DashboardController extends Controller
             }
             $paymentsCash = (float) $cashQuery->sum('amount');
 
-            $creditCollectionsCash = (float) CreditLedgerEntry::whereIn('entry_type', ['payment_collection', 'payment'])
+            $creditCollectionsCash = (float) CreditLedgerEntry::where('entry_type', 'payment_collection')
                 ->whereDate('created_at', $today)
                 ->sum('amount');
 
@@ -70,10 +70,14 @@ class DashboardController extends Controller
             $salesTodayFormatted = MoneyHelper::formatCompactCurrency($salesTodayRaw);
 
             // 3. Active Shift Surveillance
-            $activeAttendance = Attendance::query()
+            $activeAttendanceQuery = Attendance::query()
                 ->where('work_date', $today)
                 ->whereNotNull('check_in')
-                ->whereNull('check_out')
+                ->whereNull('check_out');
+            if ($branchId !== null) {
+                $activeAttendanceQuery->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
+            }
+            $activeAttendance = $activeAttendanceQuery
                 ->with(['employee.user', 'employee.jobTitle'])
                 ->latest('check_in')
                 ->first();
@@ -102,7 +106,11 @@ class DashboardController extends Controller
                 ];
             } else {
                 // Check if any invoice was issued today to identify today's active cashier
-                $latestTodayInvoice = Invoice::whereDate('created_at', $today)
+                $latestInvoiceQuery = Invoice::countable()->whereDate('created_at', $today);
+                if ($branchId !== null) {
+                    $latestInvoiceQuery->where('branch_id', $branchId);
+                }
+                $latestTodayInvoice = $latestInvoiceQuery
                     ->with('cashier')
                     ->latest('id')
                     ->first();
@@ -203,7 +211,7 @@ class DashboardController extends Controller
 
         $data = OwnerPulseCache::periods($period, $branchId, function () use ($period, $periodLabels, $branchId) {
             $invoicesQuery = Invoice::countable();
-            $creditQuery = CreditLedgerEntry::whereIn('entry_type', ['payment_collection', 'payment']);
+            $creditQuery = CreditLedgerEntry::where('entry_type', 'payment_collection');
 
             if ($branchId !== null) {
                 $invoicesQuery->where('branch_id', $branchId);
