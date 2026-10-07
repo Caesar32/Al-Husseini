@@ -17,10 +17,11 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
           password: ${{ secrets.SSH_PASSWORD }}
+          script_stop: true
           script: |
             cd ${{ secrets.REMOTE_TARGET_PATH }}
             php artisan down || true
-            git reset --hard HEAD && git pull origin main
+            git reset --hard HEAD && git pull origin ${{ github.ref_name }}
             composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache
