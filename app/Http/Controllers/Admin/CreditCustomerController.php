@@ -114,7 +114,7 @@ class CreditCustomerController extends Controller
     {
         $validated = $request->validate([
             'customer_id'    => ['required', 'exists:customers,id'],
-            'amount'         => ['required', 'numeric', 'min:0.01'],
+            'amount'         => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
             'payment_method' => ['required', 'in:cash,card,bank_transfer'],
             'receipt_number' => ['nullable', 'string', 'max:50'],
             'notes'          => ['nullable', 'string', 'max:500'],
@@ -123,6 +123,8 @@ class CreditCustomerController extends Controller
             'customer_id.exists'      => 'العميل غير موجود في النظام.',
             'amount.required'         => 'مبلغ التحصيل مطلوب.',
             'amount.min'              => 'مبلغ التحصيل يجب أن يكون أكبر من الصفر.',
+            'amount.numeric'          => 'مبلغ التحصيل يجب أن يكون رقماً.',
+            'amount.decimal'          => 'مبلغ التحصيل يجب ألا يزيد عن خانتين عشريتين.',
             'payment_method.required' => 'طريقة الدفع مطلوبة.',
             'payment_method.in'       => 'طريقة الدفع غير مدعومة.',
         ]);

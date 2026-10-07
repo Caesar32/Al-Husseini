@@ -311,11 +311,69 @@
         font-weight: 800;
     }
 
-    .payment-method-card.active.pay-credit {
+    /* Payment mode selector (كامل الدفع / جزء من المبلغ / باقي المبلغ) */
+    .payment-mode-group {
+        display: flex;
+        gap: 4px;
+    }
+
+    .payment-mode-btn {
+        flex: 1 1 0;
+        cursor: pointer;
+        border: 2px solid var(--vz-border-color, #e9ebec);
+        border-radius: 8px;
+        padding: 5px 2px;
+        text-align: center;
+        line-height: 1.25;
+        background: var(--vz-card-bg, #ffffff);
+        color: var(--vz-body-color, #495057);
+        transition: all 0.15s ease;
+    }
+
+    .payment-mode-btn:hover {
+        border-color: var(--vz-border-color-translucent, #cbd5e1);
+    }
+
+    .payment-mode-btn:focus-visible {
+        outline: 2px solid var(--vz-primary);
+        outline-offset: 1px;
+    }
+
+    .payment-mode-btn.active.mode-full {
+        border-color: var(--vz-success);
+        background-color: var(--vz-success-bg-subtle, rgba(10, 179, 156, 0.1));
+        color: var(--vz-success);
+        font-weight: 800;
+    }
+
+    .payment-mode-btn.active.mode-partial {
+        border-color: var(--vz-primary);
+        background-color: var(--vz-primary-bg-subtle, rgba(64, 81, 137, 0.1));
+        color: var(--vz-primary);
+        font-weight: 800;
+    }
+
+    .payment-mode-btn.active.mode-remaining {
         border-color: var(--vz-warning);
         background-color: var(--vz-warning-bg-subtle, rgba(247, 184, 75, 0.12));
         color: var(--vz-warning-text-emphasis, #b45309);
         font-weight: 800;
+    }
+
+    [data-bs-theme="dark"] .payment-mode-btn {
+        background-color: #212529;
+        border-color: #32383e;
+        color: #ced4da;
+    }
+
+    [data-bs-theme="dark"] .payment-mode-btn.active {
+        color: #ffffff;
+    }
+
+    #paidNowInput[readonly],
+    #paidNowInput:disabled {
+        background-color: var(--vz-secondary-bg, #f3f6f9);
+        cursor: not-allowed;
     }
 
     /* Print styles */
@@ -456,12 +514,6 @@
         border-color: var(--vz-info) !important;
         color: var(--vz-info) !important;
     }
-    [data-bs-theme="dark"] .payment-method-card.active.pay-credit {
-        background-color: rgba(247, 184, 75, 0.2) !important;
-        border-color: var(--vz-warning) !important;
-        color: #f7b84b !important;
-    }
-
     /* Top Customer / Tech / Vehicle Header Bar */
     [data-bs-theme="dark"] .pos-catalog-panel .card-header,
     [data-bs-theme="dark"] .pos-cart-panel .card-header {
@@ -485,7 +537,7 @@
     [data-bs-theme="dark"] #scrapPriceInput,
     [data-bs-theme="dark"] #scrapCountInput,
     [data-bs-theme="dark"] #cashReceivedInput,
-    [data-bs-theme="dark"] #creditDepositInput {
+    [data-bs-theme="dark"] #paidNowInput {
         background-color: #1e2226 !important;
         color: #f8f9fa !important;
         border-color: #383f45 !important;
@@ -524,6 +576,7 @@
 
     /* Financials & Helpers in Checkout Panel */
     [data-bs-theme="dark"] #cashPresetsBox,
+    [data-bs-theme="dark"] #paymentAmountBox,
     [data-bs-theme="dark"] .pos-cart-panel .bg-light {
         background-color: #212529 !important;
         border-color: #32383e !important;
@@ -531,7 +584,7 @@
     [data-bs-theme="dark"] .text-dark {
         color: #f8f9fa !important;
     }
-    [data-bs-theme="dark"] #creditBalanceOutput {
+    [data-bs-theme="dark"] #paymentRemainingOutput {
         background-color: #1a1d21 !important;
         border-color: #32383e !important;
     }

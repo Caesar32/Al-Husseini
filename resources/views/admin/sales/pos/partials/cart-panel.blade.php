@@ -85,43 +85,73 @@
                 </div>
             </div>
 
-            <!-- Payment Method Selector -->
+            <!-- Payment mode: how much of the amount due is paid now -->
             <div class="mb-1">
+                <div class="payment-mode-group" role="radiogroup" aria-label="طريقة سداد الفاتورة">
+                    <button type="button" class="payment-mode-btn mode-full active" id="mode-full" role="radio" aria-checked="true" onclick="setPaymentMode('full')">
+                        <i class="ri-checkbox-circle-line fs-14 d-block"></i>
+                        <span class="fs-10">كامل الدفع</span>
+                    </button>
+                    <button type="button" class="payment-mode-btn mode-partial" id="mode-partial" role="radio" aria-checked="false" onclick="setPaymentMode('partial')">
+                        <i class="ri-pie-chart-2-line fs-14 d-block"></i>
+                        <span class="fs-10">جزء من المبلغ</span>
+                    </button>
+                    <button type="button" class="payment-mode-btn mode-remaining" id="mode-remaining" role="radio" aria-checked="false" onclick="setPaymentMode('remaining')">
+                        <i class="ri-hand-coin-line fs-14 d-block"></i>
+                        <span class="fs-10">باقي المبلغ</span>
+                    </button>
+                </div>
+                <div class="fs-9 text-muted mt-1" id="paymentModeHint"></div>
+            </div>
+
+            <!-- Payment method: how the amount paid now is paid (not needed when nothing is paid now) -->
+            <div class="mb-1" id="paymentMethodBox">
                 <div class="row g-1 text-center">
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="payment-method-card active pay-cash py-1" id="pay-cash" onclick="setPaymentMethod('cash')">
                             <i class="ri-money-dollar-circle-line fs-14 d-block mb-0 text-success"></i>
                             <span class="fs-10">كاش</span>
                         </div>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="payment-method-card pay-instapay py-1" id="pay-instapay" onclick="setPaymentMethod('instapay')">
                             <i class="ri-smartphone-line fs-14 d-block mb-0 text-primary"></i>
                             <span class="fs-10">إنستاباي</span>
                         </div>
                     </div>
-                    <div class="col-3">
+                    <div class="col-4">
                         <div class="payment-method-card pay-card py-1" id="pay-card" onclick="setPaymentMethod('card')">
                             <i class="ri-bank-card-line fs-14 d-block mb-0 text-info"></i>
                             <span class="fs-10">فيزا</span>
                         </div>
                     </div>
-                    <div class="col-3">
-                        <div class="payment-method-card pay-credit py-1" id="pay-credit" onclick="setPaymentMethod('credit')">
-                            <i class="ri-hand-coin-line fs-14 d-block mb-0 text-warning"></i>
-                            <span class="fs-10 fw-bold">الآجل</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            <!-- Quick Cash Calculation Helper (When Cash is chosen) -->
+            <!-- Amount paid now / remaining (computed live; the server re-validates everything) -->
+            <div class="p-1 px-2 bg-light rounded border mb-1" id="paymentAmountBox">
+                <div class="row g-1 align-items-end">
+                    <div class="col-6">
+                        <label for="paidNowInput" class="form-label fs-9 fw-bold text-dark mb-0">المبلغ المدفوع الآن:</label>
+                        <input type="number" inputmode="decimal" step="0.01" min="0.01" autocomplete="off"
+                               class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" id="paidNowInput" placeholder="0.00"
+                               aria-describedby="paidNowMessage" oninput="onPaidNowInput()" onkeydown="blockNonNumericKeys(event)">
+                    </div>
+                    <div class="col-6">
+                        <label for="paymentRemainingOutput" class="form-label fs-9 fw-bold mb-0" id="paymentRemainingLabel">المتبقي:</label>
+                        <input type="text" readonly class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" id="paymentRemainingOutput" value="0 ج.م">
+                    </div>
+                </div>
+                <div class="fs-9 mt-1 d-none" id="paidNowMessage" role="alert"></div>
+            </div>
+
+            <!-- Quick cash helper: change for the cash received (relative to the amount paid now) -->
             <div class="p-1 px-2 bg-light rounded border mb-1" id="cashPresetsBox">
                 <div class="row g-1 align-items-center">
                     <div class="col-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-body fs-9 py-0 px-1">المستلم:</span>
-                            <input type="number" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" oninput="calculateCashChange()">
+                            <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" oninput="calculateCashChange()" onkeydown="blockNonNumericKeys(event)">
                         </div>
                     </div>
                     <div class="col-6 text-end">
@@ -130,20 +160,6 @@
                     </div>
                 </div>
                 <div class="d-flex flex-wrap gap-1 mt-1" id="quickCashChips"></div>
-            </div>
-
-            <!-- Credit Fields (If payment is "الآجل") -->
-            <div class="p-1 px-2 bg-warning-subtle rounded border border-warning mb-1 d-none" id="creditFieldsBox">
-                <div class="row g-1">
-                    <div class="col-6">
-                        <label class="form-label fs-9 fw-bold text-dark mb-0">المقدم المدفوع الآن:</label>
-                        <input type="number" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="creditDepositInput" value="500" oninput="updateCreditBalance()">
-                    </div>
-                    <div class="col-6">
-                        <label class="form-label fs-9 fw-bold text-danger mb-0">المتبقي على الآجل:</label>
-                        <input type="text" class="form-control form-control-sm font-monospace text-danger fw-bold bg-light py-0 fs-11" id="creditBalanceOutput" readonly value="0 ج.م">
-                    </div>
-                </div>
             </div>
 
             <!-- Mandatory Technician in Checkout Box -->

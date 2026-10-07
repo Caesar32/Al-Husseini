@@ -47,7 +47,8 @@ class StorePosInvoiceRequest extends FormRequest
             // Split Payments
             'payments'              => ['required', 'array', 'min:1'],
             'payments.*.method'     => ['required', 'in:cash,card,bank_transfer,credit'],
-            'payments.*.amount'     => ['required', 'numeric', 'min:0.01'],
+            // Currency: strictly positive, at most 2 decimals (no fractions of a piaster)
+            'payments.*.amount'     => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
             'payments.*.reference'  => ['nullable', 'string', 'max:100'],
 
             // Manager Override Code for Credit Limit Exceed
@@ -234,11 +235,26 @@ class StorePosInvoiceRequest extends FormRequest
             }
 
             $eps = (float) config('finance.epsilon', 0.01);
-            if (abs($totalPayments - $finalAmount) > $eps) {
+            // Exact comparison in piasters: amounts are limited to 2 decimals above, so no tolerance
+            // is needed, and a tolerance would let a one-piaster overpayment through.
+            $paidCents = (int) round($totalPayments * 100);
+            $dueCents = (int) round($finalAmount * 100);
+
+            if ($paidCents > $dueCents) {
+                // Paying more than is due is never allowed (the excess has no meaning on the invoice).
                 $validator->errors()->add(
                     'payments',
                     sprintf(
-                        'إجمالي مبالغ الدفعات المجزأة (%s ج.م) لا يتطابق مع صافي الفاتورة الإجمالي بعد خصم الكهنة (%s ج.م).',
+                        'مبلغ الدفع (%s ج.م) يتجاوز المبلغ المستحق (%s ج.م). لا يمكن دفع أكثر من المستحق.',
+                        number_format($totalPayments, 2),
+                        number_format($finalAmount, 2)
+                    )
+                );
+            } elseif ($paidCents < $dueCents) {
+                $validator->errors()->add(
+                    'payments',
+                    sprintf(
+                        'إجمالي الدفعات (%s ج.م) أقل من المبلغ المستحق (%s ج.م). أكمل الدفع أو سجّل المتبقي على الآجل.',
                         number_format($totalPayments, 2),
                         number_format($finalAmount, 2)
                     )
@@ -298,6 +314,8 @@ class StorePosInvoiceRequest extends FormRequest
             'payments.*.method.required'        => 'طريقة الدفع مطلوبة.',
             'payments.*.amount.required'        => 'مبلغ الدفعة مطلوب.',
             'payments.*.amount.min'             => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر.',
+            'payments.*.amount.numeric'         => 'مبلغ الدفعة يجب أن يكون رقماً.',
+            'payments.*.amount.decimal'         => 'مبلغ الدفعة يجب ألا يزيد عن خانتين عشريتين.',
         ];
     }
 }

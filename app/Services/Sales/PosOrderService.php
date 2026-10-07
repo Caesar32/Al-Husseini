@@ -206,6 +206,11 @@ class PosOrderService implements PosOrderServiceInterface
             foreach ($paymentsData as $pay) {
                 $amt = (float) ($pay['amount'] ?? 0);
                 $m = $pay['method'] ?? 'cash';
+                // Defence in depth (the request validates too): never a negative payment, and no
+                // zero payment when something is due. A zero-due sale (full discount) may carry 0.
+                if ($amt < 0 || ($amt <= 0 && $finalAmount > $this->epsilon())) {
+                    throw new \DomainException('مبلغ الدفعة يجب أن يكون أكبر من الصفر.');
+                }
                 $totalPaid += $amt;
                 $paymentMethodsUsed[] = $m;
                 if ($m === 'credit') {
@@ -214,10 +219,24 @@ class PosOrderService implements PosOrderServiceInterface
             }
 
             $totalPaid = round($totalPaid, 2);
-            if (abs($totalPaid - $finalAmount) > $this->epsilon()) {
+            // Exact comparison in piasters (the amounts are 2-decimal currency values): a tolerance
+            // would let a one-piaster overpayment through.
+            $paidCents = (int) round($totalPaid * 100);
+            $dueCents = (int) round($finalAmount * 100);
+
+            if ($paidCents > $dueCents) {
                 throw new \DomainException(
                     sprintf(
-                        'إجمالي مبالغ الدفع (%s ج.م) لا يتطابق مع صافي الفاتورة (%s ج.م).',
+                        'مبلغ الدفع (%s ج.م) يتجاوز المبلغ المستحق (%s ج.م). لا يمكن دفع أكثر من المستحق.',
+                        number_format($totalPaid, 2),
+                        number_format($finalAmount, 2)
+                    )
+                );
+            }
+            if ($paidCents < $dueCents) {
+                throw new \DomainException(
+                    sprintf(
+                        'إجمالي الدفعات (%s ج.م) أقل من المبلغ المستحق (%s ج.م). أكمل الدفع أو سجّل المتبقي على الآجل.',
                         number_format($totalPaid, 2),
                         number_format($finalAmount, 2)
                     )

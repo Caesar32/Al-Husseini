@@ -21,7 +21,9 @@ let catalogViewMode = 'grid'; // 'grid' or 'list'
 // every battery carries its own serial number and warranty.
 let cart = [];
 let lineSeq = 0;
-let currentPaymentMethod = 'cash';
+let currentPaymentMethod = 'cash'; // how the amount paid now is paid: cash | instapay | card
+let paymentMode = 'full';          // full | partial | remaining
+let isSubmittingInvoice = false;   // blocks double clicks / double Enter while a checkout is in progress
 let checkoutKey = null; // idempotency key, kept across retries of the same checkout
 let audioCtx = null;
 
@@ -143,7 +145,7 @@ function onCustomerSelected() {
 
     if (custId === WALK_IN) {
         display.textContent = 'عميل نقدي فوري بالمركز';
-        updateCreditBalance();
+        renderPaymentSection();
         return;
     }
 
@@ -163,7 +165,7 @@ function onCustomerSelected() {
         vehicleSelect.classList.remove('d-none');
         display.classList.add('d-none');
     }
-    updateCreditBalance();
+    renderPaymentSection();
 }
 
 // ─── Catalog ─────────────────────────────────────────────────────────────────
@@ -663,19 +665,168 @@ function calculateCartTotal() {
     const mobileTotal = document.getElementById('mobileCartTotalAmount');
     if (mobileTotal) mobileTotal.textContent = fmt(t.total);
 
-    updateCreditBalance();
-    renderQuickCashChips(t.total);
-    calculateCashChange();
+    renderPaymentSection();
+}
+
+// ─── Payment: mode + method + amount paid now ────────────────────────────────
+// Modes: full (pay exactly the amount due), partial (pay > 0 and <= due now, the rest goes on
+// credit), remaining (pay nothing now, the whole amount goes on credit). Amounts are handled in
+// integer piasters so decimals never drift (0.1 + 0.2). The server validates everything again.
+const toCents = (value) => Math.round((Number(value) || 0) * 100);
+const fromCents = (cents) => Math.round(cents) / 100;
+const moneyText = (cents) => fmt(fromCents(cents));
+const PAYMENT_MODE_HINTS = {
+    full: 'سيتم دفع كامل المبلغ المستحق الآن.',
+    partial: 'ادفع جزءاً من المبلغ الآن (أكبر من صفر وحتى المستحق)، ويُسجَّل المتبقي على الآجل.',
+    remaining: 'لا يُدفع شيء الآن: يُسجَّل كامل المبلغ المستحق على الآجل.',
+};
+let paidNowNotice = null; // { type, text } shown under the amount (e.g. value clamped to the maximum)
+
+function blockNonNumericKeys(e) {
+    if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
+}
+
+function selectedCustomerId() {
+    const value = document.getElementById('posCustomerSelect')?.value;
+    return !value || value === WALK_IN ? null : Number(value);
+}
+
+function setPaymentMode(mode) {
+    if (!PAYMENT_MODE_HINTS[mode] || mode === paymentMode) return;
+    paymentMode = mode;
+    paidNowNotice = null;
+    const input = document.getElementById('paidNowInput');
+    if (input) input.value = '';
+    renderPaymentSection();
+    if (mode === 'partial' && input) input.focus();
 }
 
 function setPaymentMethod(m) {
+    if (!['cash', 'instapay', 'card'].includes(m)) return;
     currentPaymentMethod = m;
-    ['cash', 'instapay', 'card', 'credit'].forEach(id => {
-        document.getElementById(`pay-${id}`)?.classList.toggle('active', id === m);
+    renderPaymentSection();
+}
+
+// What is paid now / what remains. A pure function of the amount due, the mode and the typed amount.
+function paymentState() {
+    const due = toCents(cartTotals().total);
+    const raw = (document.getElementById('paidNowInput')?.value ?? '').trim();
+    let paid = 0;
+    let error = null;
+
+    if (paymentMode === 'full') {
+        paid = due;
+    } else if (paymentMode === 'partial') {
+        const entered = raw === '' ? null : toCents(raw);
+        if (entered === null) {
+            error = 'أدخل المبلغ المدفوع الآن (أكبر من صفر وحتى ' + moneyText(due) + ').';
+        } else if (entered <= 0) {
+            error = 'المبلغ المدفوع يجب أن يكون أكبر من الصفر.';
+        } else if (entered > due) {
+            error = 'لا يمكن أن يتجاوز المبلغ المدفوع المبلغ المستحق (' + moneyText(due) + ').';
+        } else {
+            paid = entered;
+        }
+    }
+    if (due <= 0 && cart.length > 0) {
+        error = 'المبلغ المستحق صفر؛ لا يمكن إصدار فاتورة بدون مبلغ مستحق. راجع الخصم.';
+    }
+
+    return { due, paid, remaining: Math.max(0, due - paid), error, typed: raw !== '' };
+}
+
+function onPaidNowInput() {
+    const input = document.getElementById('paidNowInput');
+    if (!input) return;
+    paidNowNotice = null;
+
+    // currency: at most two decimals
+    if (/\.\d{3,}/.test(input.value)) input.value = input.value.replace(/(\.\d{2})\d+/, '$1');
+
+    // never above the amount due: clamp and tell the cashier
+    const due = toCents(cartTotals().total);
+    if (input.value !== '' && toCents(input.value) > due) {
+        input.value = String(fromCents(due));
+        paidNowNotice = { type: 'warning', text: 'تم تعديل المبلغ إلى الحد الأقصى المسموح وهو المبلغ المستحق (' + moneyText(due) + ').' };
+    }
+    renderPaymentSection();
+}
+
+function renderPaymentSection() {
+    const input = document.getElementById('paidNowInput');
+    if (!input) return;
+    const st = paymentState();
+
+    ['full', 'partial', 'remaining'].forEach(m => {
+        const button = document.getElementById('mode-' + m);
+        button?.classList.toggle('active', m === paymentMode);
+        button?.setAttribute('aria-checked', String(m === paymentMode));
     });
-    document.getElementById('creditFieldsBox').classList.toggle('d-none', m !== 'credit');
-    document.getElementById('cashPresetsBox').classList.toggle('d-none', m !== 'cash');
-    updateCreditBalance();
+    document.getElementById('paymentModeHint').textContent = PAYMENT_MODE_HINTS[paymentMode];
+
+    ['cash', 'instapay', 'card'].forEach(id => {
+        document.getElementById('pay-' + id)?.classList.toggle('active', id === currentPaymentMethod);
+    });
+    const paysNow = paymentMode !== 'remaining';
+    document.getElementById('paymentMethodBox')?.classList.toggle('d-none', !paysNow);
+
+    // amount paid now: fixed in full mode, empty in remaining mode, free (0.01..due) in partial mode
+    input.max = String(fromCents(st.due));
+    if (paymentMode === 'full') {
+        input.value = st.due > 0 ? fromCents(st.due).toFixed(2) : '';
+        input.readOnly = true;
+        input.disabled = false;
+    } else if (paymentMode === 'remaining') {
+        input.value = '';
+        input.readOnly = false;
+        input.disabled = true;
+    } else {
+        input.readOnly = false;
+        input.disabled = st.due <= 0;
+    }
+
+    // remaining balance: always shown, never negative
+    const remainingOutput = document.getElementById('paymentRemainingOutput');
+    remainingOutput.value = moneyText(st.remaining);
+    remainingOutput.classList.toggle('text-danger', st.remaining > 0);
+    remainingOutput.classList.toggle('text-success', st.remaining === 0);
+    document.getElementById('paymentRemainingLabel').className =
+        'form-label fs-9 fw-bold mb-0 ' + (st.remaining > 0 ? 'text-danger' : 'text-success');
+
+    // inline message
+    let message = null;
+    let type = 'danger';
+    if (st.due <= 0 && cart.length > 0) {
+        message = st.error;
+    } else if (paymentMode === 'partial' && paidNowNotice) {
+        message = paidNowNotice.text;
+        type = paidNowNotice.type;
+    } else if (paymentMode === 'partial' && st.typed && st.error) {
+        message = st.error;
+    } else if (st.remaining > 0 && cart.length > 0 && selectedCustomerId() === null) {
+        message = 'المتبقي على الآجل يتطلب اختيار عميل مسجل (أو اختر كامل الدفع).';
+        type = 'warning';
+    }
+    const messageEl = document.getElementById('paidNowMessage');
+    messageEl.textContent = message ?? '';
+    messageEl.classList.toggle('d-none', !message);
+    messageEl.classList.toggle('text-danger', type === 'danger');
+    messageEl.classList.toggle('text-warning', type === 'warning');
+    input.classList.toggle('is-invalid', !!message && type === 'danger' && paymentMode === 'partial');
+
+    // cash helper (change for the cash received) only when cash is paid now
+    document.getElementById('cashPresetsBox')?.classList.toggle('d-none', !(paysNow && currentPaymentMethod === 'cash' && st.paid > 0));
+    renderQuickCashChips(fromCents(st.paid));
+    calculateCashChange();
+}
+
+function resetPaymentSection() {
+    paymentMode = 'full';
+    currentPaymentMethod = 'cash';
+    paidNowNotice = null;
+    const input = document.getElementById('paidNowInput');
+    if (input) input.value = '';
+    renderPaymentSection();
 }
 
 function renderQuickCashChips(total) {
@@ -706,19 +857,7 @@ function setReceivedCash(amount) {
 function calculateCashChange() {
     const received = Number(document.getElementById('cashReceivedInput')?.value) || 0;
     const out = document.getElementById('cashChangeOutput');
-    if (out) out.textContent = fmt(Math.max(0, received - cartTotals().total));
-}
-
-function updateCreditBalance() {
-    if (currentPaymentMethod !== 'credit') return;
-    const total = cartTotals().total;
-    const depositInput = document.getElementById('creditDepositInput');
-    let deposit = Math.max(0, Number(depositInput.value) || 0);
-    if (deposit > total) {
-        deposit = total;
-        depositInput.value = total;
-    }
-    document.getElementById('creditBalanceOutput').value = fmt(Math.max(0, total - deposit));
+    if (out) out.textContent = fmt(Math.max(0, received - fromCents(paymentState().paid)));
 }
 
 // ─── Quick customer registration (server) ────────────────────────────────────
@@ -819,18 +958,20 @@ function buildPayload() {
         return { error: 'يرجى إدخال سعة البطارية الكهنة (أمبير).', focus: document.getElementById('scrapCapacityInput') };
     }
 
+    const pay = paymentState();
+    if (pay.error) {
+        return { error: pay.error, focus: document.getElementById('paidNowInput') };
+    }
+
     const payments = [];
-    if (currentPaymentMethod === 'credit') {
+    if (pay.paid > 0) {
+        payments.push({ method: currentPaymentMethod === 'instapay' ? 'bank_transfer' : currentPaymentMethod, amount: fromCents(pay.paid) });
+    }
+    if (pay.remaining > 0) {
         if (customerId === null) {
-            return { error: 'لا يمكن البيع بالآجل لعميل نقدي مجهول! سجّل العميل أولاً.', newCustomer: true };
+            return { error: 'لا يمكن ترك مبلغ متبقٍ على الآجل لعميل نقدي مجهول! سجّل العميل أولاً أو اختر كامل الدفع.', newCustomer: true };
         }
-        const deposit = Math.min(t.total, Math.max(0, Number(document.getElementById('creditDepositInput').value) || 0));
-        const remaining = Math.max(0, t.total - deposit);
-        if (deposit > 0) payments.push({ method: 'cash', amount: deposit });
-        if (remaining > 0) payments.push({ method: 'credit', amount: remaining });
-        if (payments.length === 0) payments.push({ method: 'credit', amount: t.total });
-    } else {
-        payments.push({ method: currentPaymentMethod === 'instapay' ? 'bank_transfer' : currentPaymentMethod, amount: t.total });
+        payments.push({ method: 'credit', amount: fromCents(pay.remaining) });
     }
 
     if (!checkoutKey) checkoutKey = newCheckoutKey();
@@ -845,7 +986,7 @@ function buildPayload() {
         discount_amount: t.discount,
         tax_amount: 0,
         payments,
-        notes: currentPaymentMethod === 'credit' ? 'مبيعات بالآجل من شاشة الكاشير' : 'مبيعات فورية بالمركز',
+        notes: pay.remaining > 0 ? 'مبيعات بالآجل من شاشة الكاشير' : 'مبيعات فورية بالمركز',
     };
     if (t.scrap.active) {
         payload.scrap_capacity_ah = t.scrap.ah;
@@ -874,6 +1015,16 @@ function errorText(data, fallback) {
 }
 
 async function submitFullInvoice() {
+    if (isSubmittingInvoice) return; // double click / double Enter
+    isSubmittingInvoice = true;
+    try {
+        await processInvoiceSubmission();
+    } finally {
+        isSubmittingInvoice = false;
+    }
+}
+
+async function processInvoiceSubmission() {
     if (cart.length === 0) {
         Swal.fire({ icon: 'warning', title: 'السلة فارغة', text: 'يرجى اختيار صنف واحد على الأقل لإصدار الفاتورة.', confirmButtonText: 'حسناً' });
         return;
@@ -989,6 +1140,7 @@ function onInvoiceCreated(data) {
     document.getElementById('scrapPriceInput').value = '';
     document.getElementById('cartDiscountInput').value = '';
     document.getElementById('cashReceivedInput').value = '';
+    resetPaymentSection();
     renderCart();
     renderCatalog();
     loadQuickAddDropdown();
