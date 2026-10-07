@@ -88,7 +88,7 @@
                             <div class="p-3 bg-light rounded">
                                 <span class="text-muted fs-12 d-block mb-1">الرصيد المدين الحالي (المستحق):</span>
                                 <h3 class="fw-extrabold mb-0 font-monospace {{ $customer->current_credit_balance > 0 ? 'text-danger' : 'text-success' }}">
-                                    {{ number_format($customer->current_credit_balance, 2) }} ج.م
+                                    <x-compact-money :amount="$customer->current_credit_balance" />
                                 </h3>
                             </div>
                         </div>
@@ -96,7 +96,7 @@
                             <div class="p-3 bg-light rounded">
                                 <span class="text-muted fs-12 d-block mb-1">الحد الائتماني المسموح به:</span>
                                 <h3 class="fw-bold mb-0 font-monospace text-secondary">
-                                    {{ number_format($customer->credit_limit, 2) }} ج.م
+                                    <x-compact-money :amount="$customer->credit_limit" />
                                 </h3>
                             </div>
                         </div>

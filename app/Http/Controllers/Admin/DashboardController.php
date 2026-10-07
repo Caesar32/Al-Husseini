@@ -13,11 +13,20 @@ use App\Models\Product;
 use App\Models\InvoiceItem;
 use App\Models\Employee;
 use App\Models\Attendance;
+use App\Support\MoneyHelper;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    /**
+     * @return array{compact: string, exact: string}
+     */
+    private function formatCompactCurrency(float $amount): array
+    {
+        return MoneyHelper::formatCompactCurrency($amount);
+    }
+
     /**
      * Display live management dashboard with real metrics from database.
      */
@@ -83,74 +92,89 @@ class DashboardController extends Controller
 
         $salesPeriods = [
             'today' => [
-                'key'                    => 'today',
-                'label'                  => 'اليوم',
-                'badge'                  => 'مبيعات اليوم',
-                'sublabel'               => 'اليوم',
-                'total'                  => round($salesToday, 2),
-                'total_formatted'        => number_format(round($salesToday, 2), 2) . ' ج.م',
-                'count'                  => $invoicesCountToday,
-                'invoices_url'           => route('admin.sales.invoices', ['date_from' => $todayStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                => $revenueToday,
-                'revenue_formatted'      => number_format($revenueToday, 2) . ' ج.م',
-                'credit_collected'       => round($creditCollectedToday, 2),
-                'credit_collected_fmt'   => number_format(round($creditCollectedToday, 2), 2) . ' ج.م',
+                'key'                      => 'today',
+                'label'                    => 'اليوم',
+                'badge'                    => 'مبيعات اليوم',
+                'sublabel'                 => 'اليوم',
+                'total'                    => round($salesToday, 2),
+                'total_formatted'          => number_format(round($salesToday, 2), 2) . ' ج.م',
+                'total_compact'            => $this->formatCompactCurrency(round($salesToday, 2))['compact'],
+                'count'                    => $invoicesCountToday,
+                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $todayStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+                'revenue'                  => $revenueToday,
+                'revenue_formatted'        => number_format($revenueToday, 2) . ' ج.م',
+                'revenue_compact'          => $this->formatCompactCurrency($revenueToday)['compact'],
+                'credit_collected'         => round($creditCollectedToday, 2),
+                'credit_collected_fmt'     => number_format(round($creditCollectedToday, 2), 2) . ' ج.م',
+                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedToday, 2))['compact'],
             ],
             'week' => [
-                'key'                    => 'week',
-                'label'                  => 'أسبوع',
-                'badge'                  => 'آخر 7 أيام',
-                'sublabel'               => 'هذا الأسبوع',
-                'total'                  => round($salesWeek, 2),
-                'total_formatted'        => number_format(round($salesWeek, 2), 2) . ' ج.م',
-                'count'                  => $invoicesCountWeek,
-                'invoices_url'           => route('admin.sales.invoices', ['date_from' => $weekStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                => $revenueWeek,
-                'revenue_formatted'      => number_format($revenueWeek, 2) . ' ج.م',
-                'credit_collected'       => round($creditCollectedWeek, 2),
-                'credit_collected_fmt'   => number_format(round($creditCollectedWeek, 2), 2) . ' ج.م',
+                'key'                      => 'week',
+                'label'                    => 'أسبوع',
+                'badge'                    => 'آخر 7 أيام',
+                'sublabel'                 => 'هذا الأسبوع',
+                'total'                    => round($salesWeek, 2),
+                'total_formatted'          => number_format(round($salesWeek, 2), 2) . ' ج.م',
+                'total_compact'            => $this->formatCompactCurrency(round($salesWeek, 2))['compact'],
+                'count'                    => $invoicesCountWeek,
+                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $weekStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+                'revenue'                  => $revenueWeek,
+                'revenue_formatted'        => number_format($revenueWeek, 2) . ' ج.م',
+                'revenue_compact'          => $this->formatCompactCurrency($revenueWeek)['compact'],
+                'credit_collected'         => round($creditCollectedWeek, 2),
+                'credit_collected_fmt'     => number_format(round($creditCollectedWeek, 2), 2) . ' ج.م',
+                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedWeek, 2))['compact'],
             ],
             'month' => [
-                'key'                    => 'month',
-                'label'                  => 'شهر',
-                'badge'                  => 'الشهر الحالي',
-                'sublabel'               => 'هذا الشهر',
-                'total'                  => round($salesMonth, 2),
-                'total_formatted'        => number_format(round($salesMonth, 2), 2) . ' ج.م',
-                'count'                  => $invoicesCountMonth,
-                'invoices_url'           => route('admin.sales.invoices', ['date_from' => $monthStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                => $revenueMonth,
-                'revenue_formatted'      => number_format($revenueMonth, 2) . ' ج.م',
-                'credit_collected'       => round($creditCollectedMonth, 2),
-                'credit_collected_fmt'   => number_format(round($creditCollectedMonth, 2), 2) . ' ج.م',
+                'key'                      => 'month',
+                'label'                    => 'شهر',
+                'badge'                    => 'الشهر الحالي',
+                'sublabel'                 => 'هذا الشهر',
+                'total'                    => round($salesMonth, 2),
+                'total_formatted'          => number_format(round($salesMonth, 2), 2) . ' ج.م',
+                'total_compact'            => $this->formatCompactCurrency(round($salesMonth, 2))['compact'],
+                'count'                    => $invoicesCountMonth,
+                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $monthStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+                'revenue'                  => $revenueMonth,
+                'revenue_formatted'        => number_format($revenueMonth, 2) . ' ج.م',
+                'revenue_compact'          => $this->formatCompactCurrency($revenueMonth)['compact'],
+                'credit_collected'         => round($creditCollectedMonth, 2),
+                'credit_collected_fmt'     => number_format(round($creditCollectedMonth, 2), 2) . ' ج.م',
+                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedMonth, 2))['compact'],
             ],
             'year' => [
-                'key'                    => 'year',
-                'label'                  => 'سنة',
-                'badge'                  => 'السنة الحالية',
-                'sublabel'               => 'هذا العام',
-                'total'                  => round($salesYear, 2),
-                'total_formatted'        => number_format(round($salesYear, 2), 2) . ' ج.م',
-                'count'                  => $invoicesCountYear,
-                'invoices_url'           => route('admin.sales.invoices', ['date_from' => $yearStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                => $revenueYear,
-                'revenue_formatted'      => number_format($revenueYear, 2) . ' ج.م',
-                'credit_collected'       => round($creditCollectedYear, 2),
-                'credit_collected_fmt'   => number_format(round($creditCollectedYear, 2), 2) . ' ج.م',
+                'key'                      => 'year',
+                'label'                    => 'سنة',
+                'badge'                    => 'السنة الحالية',
+                'sublabel'                 => 'هذا العام',
+                'total'                    => round($salesYear, 2),
+                'total_formatted'          => number_format(round($salesYear, 2), 2) . ' ج.م',
+                'total_compact'            => $this->formatCompactCurrency(round($salesYear, 2))['compact'],
+                'count'                    => $invoicesCountYear,
+                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $yearStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
+                'revenue'                  => $revenueYear,
+                'revenue_formatted'        => number_format($revenueYear, 2) . ' ج.م',
+                'revenue_compact'          => $this->formatCompactCurrency($revenueYear)['compact'],
+                'credit_collected'         => round($creditCollectedYear, 2),
+                'credit_collected_fmt'     => number_format(round($creditCollectedYear, 2), 2) . ' ج.م',
+                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedYear, 2))['compact'],
             ],
             'all' => [
-                'key'                    => 'all',
-                'label'                  => 'الكل',
-                'badge'                  => 'الإجمالي العام',
-                'sublabel'               => 'منذ البداية',
-                'total'                  => round($salesAll, 2),
-                'total_formatted'        => number_format(round($salesAll, 2), 2) . ' ج.م',
-                'count'                  => $invoicesCountAll,
-                'invoices_url'           => route('admin.sales.invoices'),
-                'revenue'                => $revenueAll,
-                'revenue_formatted'      => number_format($revenueAll, 2) . ' ج.م',
-                'credit_collected'       => round($creditCollectedAll, 2),
-                'credit_collected_fmt'   => number_format(round($creditCollectedAll, 2), 2) . ' ج.م',
+                'key'                      => 'all',
+                'label'                    => 'الكل',
+                'badge'                    => 'الإجمالي العام',
+                'sublabel'                 => 'منذ البداية',
+                'total'                    => round($salesAll, 2),
+                'total_formatted'          => number_format(round($salesAll, 2), 2) . ' ج.م',
+                'total_compact'            => $this->formatCompactCurrency(round($salesAll, 2))['compact'],
+                'count'                    => $invoicesCountAll,
+                'invoices_url'             => route('admin.sales.invoices'),
+                'revenue'                  => $revenueAll,
+                'revenue_formatted'        => number_format($revenueAll, 2) . ' ج.م',
+                'revenue_compact'          => $this->formatCompactCurrency($revenueAll)['compact'],
+                'credit_collected'         => round($creditCollectedAll, 2),
+                'credit_collected_fmt'     => number_format(round($creditCollectedAll, 2), 2) . ' ج.م',
+                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedAll, 2))['compact'],
             ],
         ];
 
@@ -174,6 +198,9 @@ class DashboardController extends Controller
 
 
         $totalCredit = (float) Customer::sum('current_credit_balance');
+        $totalCreditFormatted = $this->formatCompactCurrency($totalCredit);
+        $totalCreditCompact = $totalCreditFormatted['compact'];
+        $totalCreditExact = $totalCreditFormatted['exact'];
         $creditCustomersCount = (int) Customer::where('current_credit_balance', '>', 0)->count();
 
         $customersCount = (int) Customer::count();
@@ -286,6 +313,8 @@ class DashboardController extends Controller
             'totalSales',
             'invoicesCount',
             'totalCredit',
+            'totalCreditCompact',
+            'totalCreditExact',
             'creditCustomersCount',
             'customersCount',
             'vehiclesCount',

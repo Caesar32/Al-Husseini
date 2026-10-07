@@ -28,12 +28,12 @@
                 </div>
                 <div class="card-body">
                     <div class="row g-3 text-center">
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الأساسي</span><strong>{{ number_format($consistency['basic'], 2) }} ج.م</strong></div>
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي البدلات</span><strong class="text-info">{{ number_format($consistency['allowances'], 2) }} ج.م</strong></div>
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الإضافي</span><strong class="text-info">{{ number_format($consistency['overtime'], 2) }} ج.م</strong></div>
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الخصومات</span><strong class="text-danger">-{{ number_format($consistency['deductions'], 2) }} ج.م</strong></div>
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">أرصدة مرحّلة</span><strong class="text-warning">{{ number_format($consistency['carried_debt'], 2) }} ج.م</strong></div>
-                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">صافي المسجل</span><strong class="{{ $consistency['consistent'] ? 'text-success' : 'text-warning' }}">{{ number_format($consistency['stored_net'], 2) }} ج.م</strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الأساسي</span><strong><x-compact-money :amount="$consistency['basic']" /></strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي البدلات</span><strong class="text-info"><x-compact-money :amount="$consistency['allowances']" /></strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الإضافي</span><strong class="text-info"><x-compact-money :amount="$consistency['overtime']" /></strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">إجمالي الخصومات</span><strong class="text-danger">-<x-compact-money :amount="$consistency['deductions']" /></strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">أرصدة مرحّلة</span><strong class="text-warning"><x-compact-money :amount="$consistency['carried_debt']" /></strong></div>
+                        <div class="col-md-2 col-6"><span class="text-muted fs-12 d-block">صافي المسجل</span><strong class="{{ $consistency['consistent'] ? 'text-success' : 'text-warning' }}"><x-compact-money :amount="$consistency['stored_net']" /></strong></div>
                     </div>
 
                     <div class="mt-3 text-muted fs-12">

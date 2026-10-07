@@ -184,6 +184,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // نقطة البيع ومبيعات الكاشير
         Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware('can:pos.access');
+        Route::get('pos/products/search', [PosController::class, 'searchProducts'])->name('pos.products.search')->middleware('can:pos.access');
         Route::post('pos', [PosController::class, 'store'])->name('pos.store')->middleware('can:pos.access');
         Route::get('pos/{invoice}/receipt', [PosController::class, 'receipt'])->name('pos.receipt')->middleware('can:invoices.print');
         Route::get('pos/{invoice}/warranty', [PosController::class, 'warrantyCert'])->name('pos.warranty_cert')->middleware('can:warranties.view');

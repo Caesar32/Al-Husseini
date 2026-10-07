@@ -139,7 +139,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">إجمالي مبالغ الآجل المستحقة</p>
-                            <h3 class="fs-24 fw-extrabold text-danger mb-1 font-monospace" id="kpiTotalOutstanding">0 ج.م</h3>
+                            <h3 class="fs-24 fw-extrabold text-danger mb-1 font-monospace" id="kpiTotalOutstanding" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="0.00 ج.م">0 ج.م</h3>
                             <small class="text-muted fs-11">مستحقات على عملاء وورش المركز</small>
                         </div>
                         <div class="avatar-sm">
@@ -179,7 +179,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">المحصل من الآجل هذا الشهر</p>
-                            <h3 class="fs-24 fw-extrabold text-success mb-1 font-monospace" id="kpiCollectedThisMonth">0 ج.م</h3>
+                            <h3 class="fs-24 fw-extrabold text-success mb-1 font-monospace" id="kpiCollectedThisMonth" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="0.00 ج.م">0 ج.م</h3>
                             <small class="text-muted fs-11">تم توريدها لحساب المركز</small>
                         </div>
                         <div class="avatar-sm">
@@ -444,6 +444,35 @@ function fmt(amount) {
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(amount) || 0) + ' ج.م';
 }
 
+/** Compact form for page-header KPI totals only (e.g. 26781945.84 -> "26.78 مليون ج.م");
+ *  mirrors App\Support\MoneyHelper::formatCompactCurrency(). Table/row amounts keep using fmt(). */
+function fmtCompact(amount) {
+    const n = Number(amount) || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + ' مليون ج.م';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + ' ألف ج.م';
+    return Math.round(n).toLocaleString('ar-EG') + ' ج.م';
+}
+
+/** Initializes (once) or live-updates a Bootstrap tooltip's text without losing its instance. */
+function initOrUpdateTooltip(el, title) {
+    if (!el || typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+    el.setAttribute('title', title);
+    el.setAttribute('data-bs-original-title', title);
+    const existing = bootstrap.Tooltip.getInstance(el);
+    if (existing) {
+        existing.setContent({ '.tooltip-inner': title });
+    } else {
+        new bootstrap.Tooltip(el);
+    }
+}
+
+function setKpiCompact(elId, amount) {
+    const el = document.getElementById(elId);
+    if (!el) return;
+    el.textContent = fmtCompact(amount);
+    initOrUpdateTooltip(el, fmt(amount));
+}
+
 function csrf() {
     return typeof window.getCsrfToken === 'function'
         ? window.getCsrfToken()
@@ -467,9 +496,9 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function renderCreditDashboard() {
-    document.getElementById('kpiTotalOutstanding').textContent = fmt(CREDIT_DATA.totalOutstanding);
+    setKpiCompact('kpiTotalOutstanding', CREDIT_DATA.totalOutstanding);
     document.getElementById('kpiCreditCustomersCount').textContent = `${CREDIT_DATA.customersCount} عميل`;
-    document.getElementById('kpiCollectedThisMonth').textContent = fmt(CREDIT_DATA.collectedThisMonth);
+    setKpiCompact('kpiCollectedThisMonth', CREDIT_DATA.collectedThisMonth);
 
     const ratio = CREDIT_DATA.totalCustomers > 0
         ? Math.round((CREDIT_DATA.customersCount / CREDIT_DATA.totalCustomers) * 100)
@@ -540,7 +569,7 @@ async function loadPayments(page) {
 
         CREDIT_DATA.collectedThisMonth = data.collected_this_month;
         CREDIT_DATA.collectionsCount = data.meta.total;
-        document.getElementById('kpiCollectedThisMonth').textContent = fmt(data.collected_this_month);
+        setKpiCompact('kpiCollectedThisMonth', data.collected_this_month);
         document.getElementById('badgeCreditPayCount').textContent = data.meta.total;
 
         if (data.data.length === 0) {

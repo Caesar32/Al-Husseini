@@ -9,6 +9,38 @@ let categoryDonutChart = null;
 
 const salesPeriodsData = @json($salesPeriods ?? []);
 
+/** Clean compact form for a raw number, e.g. 26781945.84 -> "26.78 مليون ج.م". Mirrors the
+ *  backend's DashboardController::formatCompactCurrency() for values the server didn't already
+ *  format (defensive fallback only — every period from the server carries its own *_compact). */
+function formatCompactCurrency(val) {
+    const n = Number(val) || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + ' مليون ج.م';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + ' ألف ج.م';
+    return Math.round(n).toLocaleString('ar-EG') + ' ج.م';
+}
+
+/** Initializes (once) or live-updates a Bootstrap tooltip's text without losing its instance. */
+function initOrUpdateTooltip(el, title) {
+    if (!el || typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+    el.setAttribute('title', title);
+    el.setAttribute('data-bs-original-title', title);
+    const existing = bootstrap.Tooltip.getInstance(el);
+    if (existing) {
+        existing.setContent({ '.tooltip-inner': title });
+    } else {
+        new bootstrap.Tooltip(el);
+    }
+}
+
+function initDashboardTooltips() {
+    if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+        if (!bootstrap.Tooltip.getInstance(el)) {
+            new bootstrap.Tooltip(el);
+        }
+    });
+}
+
 function changeSalesPeriod(periodKey, triggerEl) {
     if (!salesPeriodsData || !salesPeriodsData[periodKey]) return;
     const period = salesPeriodsData[periodKey];
@@ -23,29 +55,32 @@ function changeSalesPeriod(periodKey, triggerEl) {
     const creditCollectedEl   = document.getElementById('dashCreditCollected');
     const creditCollectedWrap = document.getElementById('dashCreditCollectedWrap');
 
-    // الإيراد النقدي الفعلي (paid + تحصيلات الآجل)
+    // الإيراد النقدي الفعلي (paid + تحصيلات الآجل): نص مختصر + التلميح يحمل القيمة الدقيقة
     if (revenueEl) {
         revenueEl.style.opacity = '0.3';
         setTimeout(() => {
-            revenueEl.textContent = period.revenue_formatted || period.total_formatted;
+            revenueEl.textContent = period.revenue_compact || formatCompactCurrency(period.revenue);
+            initOrUpdateTooltip(revenueEl, period.revenue_formatted || (Number(period.revenue || 0).toFixed(2) + ' ج.م'));
             revenueEl.style.opacity = '1';
         }, 120);
     }
 
-    // قيمة الفواتير الصادرة (دفترية)
+    // قيمة الفواتير الصادرة (دفترية): نص مختصر + التلميح يحمل القيمة الدقيقة
     if (salesEl) {
         salesEl.style.opacity = '0.3';
         setTimeout(() => {
-            salesEl.textContent = period.total_formatted;
+            salesEl.textContent = period.total_compact || formatCompactCurrency(period.total);
+            initOrUpdateTooltip(salesEl, period.total_formatted || (Number(period.total || 0).toFixed(2) + ' ج.م'));
             salesEl.style.opacity = '1';
         }, 120);
     }
 
-    // تحصيلات الآجل للفترة
+    // تحصيلات الآجل للفترة: نص مختصر + التلميح يحمل القيمة الدقيقة
     if (creditCollectedEl && creditCollectedWrap) {
         const creditAmt = period.credit_collected || 0;
         if (creditAmt > 0) {
-            creditCollectedEl.textContent = period.credit_collected_fmt || (creditAmt.toLocaleString('ar-EG') + ' ج.م');
+            creditCollectedEl.textContent = period.credit_collected_compact || formatCompactCurrency(creditAmt);
+            initOrUpdateTooltip(creditCollectedEl, period.credit_collected_fmt || (creditAmt.toFixed(2) + ' ج.م'));
             creditCollectedWrap.style.display = '';
         } else {
             creditCollectedWrap.style.display = 'none';
@@ -93,6 +128,7 @@ function changeSalesPeriod(periodKey, triggerEl) {
 
 document.addEventListener('DOMContentLoaded', function () {
     renderDashboardCharts();
+    initDashboardTooltips();
 
     // Check if period was specified in URL or saved in localStorage
     const urlParams = new URLSearchParams(window.location.search);

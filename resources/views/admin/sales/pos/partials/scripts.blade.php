@@ -2,6 +2,8 @@
 'use strict';
 
 // ─── Server data (single source of truth; real database ids) ─────────────────
+// Only an initial ~36-product "fast movers" shortlist is embedded for instant paint — the full
+// catalog (7,340+ items) is never sent to the browser; it loads on demand from the search API.
 const POS_DATA = {
     products: @json($products),
     customers: @json($customers),
@@ -11,8 +13,8 @@ const POS_ROUTES = {
     store: @json(route('admin.pos.store')),
     customerStore: @json(route('admin.customers.store')),
     invoiceShow: @json(route('admin.invoices.show', ['invoice' => '__ID__'])),
+    productsSearch: @json(route('admin.pos.products.search')),
 };
-const CATEGORY_LABELS = { batteries: 'بطاريات', oils: 'زيوت وفلاتر', greases: 'شحوم وسوائل', services: 'صيانة الورشة' };
 const WALK_IN = 'WALK_IN';
 
 let currentCategory = 'all';
@@ -26,6 +28,21 @@ let paymentMode = 'full';          // full | partial | remaining
 let isSubmittingInvoice = false;   // blocks double clicks / double Enter while a checkout is in progress
 let checkoutKey = null; // idempotency key, kept across retries of the same checkout
 let audioCtx = null;
+
+// ─── Catalog data layer: server-paginated search, client-side result caching ──
+const productCache = new Map();       // id -> product object; shared by rendered cards AND cart lines
+const searchResultsCache = new Map(); // "category|query|page" -> API response; repeat queries resolve from memory
+let currentResults = [];              // the product set currently painted in the grid (accumulates across pages)
+let currentQuery = '';
+let currentPage = 1;
+let currentLastPage = 1;
+let isFetchingCatalog = false;
+let isShowingFeatured = true;   // true until the user searches, picks a category, or scrolls past the shortlist
+let catalogSearchDebounceTimer = null;
+let scannerSettleTimer = null;
+let lastKeystrokeAt = 0;
+let keystrokeIntervals = [];    // recent inter-keystroke gaps (ms), used to tell a scanner from typing
+let catalogLoadMoreObserver = null;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function esc(value) {
@@ -46,8 +63,14 @@ function newCheckoutKey() {
     return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
 }
 
+function cacheProduct(p) {
+    p.id = Number(p.id);
+    productCache.set(p.id, p);
+    return p;
+}
+
 function findProduct(id) {
-    return POS_DATA.products.find(p => p.id === Number(id)) || null;
+    return productCache.get(Number(id)) || null;
 }
 
 function findCustomer(id) {
@@ -83,9 +106,11 @@ function playBeep(freq = 880, duration = 0.08) {
 
 document.addEventListener('DOMContentLoaded', function () {
     loadCustomersDropdown();
-    loadQuickAddDropdown();
-    updateCategoryCounts();
+
+    POS_DATA.products.forEach(cacheProduct);
+    currentResults = POS_DATA.products.slice();
     renderCatalog();
+    setupInfiniteScroll();
     renderCart();
 
     document.addEventListener('keydown', function (e) {
@@ -102,17 +127,90 @@ document.addEventListener('DOMContentLoaded', function () {
             clearCart();
         }
     });
+
+    setupCategoryRibbonScroll();
 });
 
+// ─── Category ribbon: wheel, drag-to-scroll, and nav arrows ───────────────────
+function setupCategoryRibbonScroll() {
+    const ribbon = document.getElementById('categoryTabsContainer');
+    if (!ribbon) return;
+
+    // Mouse wheel -> horizontal scroll (deltaY is normally vertical-only on a horizontal strip).
+    // If this feels reversed in testing, flip the two signs below — RTL scrollLeft direction is
+    // a genuine per-browser judgment call, not something that can be verified without a browser.
+    ribbon.addEventListener('wheel', (e) => {
+        if (e.deltaY === 0) return;
+        e.preventDefault();
+        ribbon.scrollLeft += (e.deltaY > 0 ? 120 : -120);
+    }, { passive: false });
+
+    // Click-and-drag panning (desktop): content follows the cursor, like a touch drag.
+    let isDragging = false;
+    let dragMoved = false;
+    let dragStartX = 0;
+    let dragStartScrollLeft = 0;
+
+    ribbon.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragMoved = false;
+        dragStartX = e.pageX;
+        dragStartScrollLeft = ribbon.scrollLeft;
+        ribbon.classList.add('is-dragging');
+    });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const delta = e.pageX - dragStartX;
+        if (Math.abs(delta) > 3) dragMoved = true;
+        ribbon.scrollLeft = dragStartScrollLeft - delta;
+    });
+
+    function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        ribbon.classList.remove('is-dragging');
+        if (dragMoved) {
+            // A real drag just happened: swallow the click it would otherwise trigger on
+            // whichever category pill is under the cursor (mousedown -> drag -> mouseup
+            // normally fires a click too, which would wrongly switch category).
+            const suppressClick = (evt) => { evt.preventDefault(); evt.stopPropagation(); };
+            ribbon.addEventListener('click', suppressClick, { capture: true, once: true });
+        }
+    }
+    window.addEventListener('mouseup', endDrag);
+    ribbon.addEventListener('mouseleave', () => { if (isDragging && !dragMoved) endDrag(); });
+
+    ribbon.addEventListener('scroll', () => updateCategoryNavArrows(ribbon));
+    window.addEventListener('resize', () => updateCategoryNavArrows(ribbon));
+    updateCategoryNavArrows(ribbon);
+}
+
+/** Nav arrow buttons: ‹ always pans physically left, › always pans physically right. */
+function scrollCategoryRibbon(direction) {
+    const ribbon = document.getElementById('categoryTabsContainer');
+    if (!ribbon) return;
+    ribbon.scrollBy({ left: direction * 160, behavior: 'smooth' });
+}
+
+/** Arrows are only shown when the ribbon actually overflows its container. */
+function updateCategoryNavArrows(ribbon) {
+    const leftBtn = document.getElementById('catScrollLeftBtn');
+    const rightBtn = document.getElementById('catScrollRightBtn');
+    if (!leftBtn || !rightBtn) return;
+
+    const hasOverflow = ribbon.scrollWidth > ribbon.clientWidth + 1;
+    leftBtn.classList.toggle('d-none', !hasOverflow);
+    rightBtn.classList.toggle('d-none', !hasOverflow);
+}
+
 // ─── Customers & vehicles ────────────────────────────────────────────────────
-function updateCategoryCounts() {
-    const products = POS_DATA.products;
-    const count = slug => products.filter(p => p.category === slug).length;
-    document.getElementById('pillCountAll').textContent = products.length;
-    document.getElementById('pillCountBatteries').textContent = count('batteries');
-    document.getElementById('pillCountOils').textContent = count('oils');
-    document.getElementById('pillCountGreases').textContent = count('greases');
-    document.getElementById('pillCountServices').textContent = count('services');
+function applyCategoryCounts(counts) {
+    if (!counts) return;
+    Object.keys(counts).forEach(slug => {
+        const el = document.getElementById('pillCount-' + slug);
+        if (el) el.textContent = counts[slug];
+    });
 }
 
 function loadCustomersDropdown(selectedId = null) {
@@ -168,34 +266,130 @@ function onCustomerSelected() {
     renderPaymentSection();
 }
 
-// ─── Catalog ─────────────────────────────────────────────────────────────────
-function loadQuickAddDropdown() {
-    const select = document.getElementById('quickAddProductSelect');
-    if (!select) return;
+// ─── Catalog: server search + pagination ───────────────────────────────────────
+/**
+ * Fetches one page of the catalog from the server. Non-barcode queries are cached in memory
+ * (Map) so repeat searches/category switches within the session resolve instantly with no
+ * network round-trip. Every response also carries fresh cached category counts for the pills.
+ */
+async function fetchCatalogPage({ query = '', category = 'all', page = 1, perPage = 36, exactBarcode = false } = {}) {
+    const cacheKey = exactBarcode ? null : `${category}|${query.toLowerCase()}|${page}|${perPage}`;
+    if (cacheKey && searchResultsCache.has(cacheKey)) {
+        return searchResultsCache.get(cacheKey);
+    }
 
-    let html = '<option value="">-- اضغط هنا للبحث السريع أو اختيار أي صنف لإضافته للسلة مباشرة --</option>';
-    const groups = {};
-    POS_DATA.products.forEach(p => {
-        const label = CATEGORY_LABELS[p.category] || p.category_name || 'أخرى';
-        (groups[label] = groups[label] || []).push(p);
+    const params = new URLSearchParams();
+    if (query) params.set('q', query);
+    if (category && category !== 'all') params.set('category', category);
+    params.set('page', String(page));
+    params.set('per_page', String(perPage));
+    if (exactBarcode) params.set('exact_barcode', '1');
+
+    const res = await fetch(`${POS_ROUTES.productsSearch}?${params.toString()}`, {
+        headers: { 'Accept': 'application/json' }
     });
+    if (!res.ok) throw new Error('تعذر الاتصال بالخادم لجلب الأصناف.');
+    const json = await res.json();
 
-    Object.keys(groups).forEach(label => {
-        html += `<optgroup label="=== ${esc(label)} ===">`;
-        groups[label].forEach(p => {
-            html += `<option value="${p.id}">${esc(p.name)} [${esc(p.brand || '')}] — ${esc(fmt(p.price))} (مخزن: ${p.stock})</option>`;
-        });
-        html += '</optgroup>';
-    });
-
-    select.innerHTML = html;
+    json.data.forEach(cacheProduct);
+    applyCategoryCounts(json.category_counts);
+    if (cacheKey) searchResultsCache.set(cacheKey, json);
+    return json;
 }
 
-function onQuickSelectProduct(selectEl) {
-    const prodId = selectEl.value;
-    if (!prodId) return;
-    addToCart(Number(prodId));
-    selectEl.value = '';
+function renderSkeletonCards(count = 8) {
+    const grid = document.getElementById('posCatalogGrid');
+    if (!grid) return;
+    let html = '';
+    for (let i = 0; i < count; i++) {
+        html += `
+            <div class="col-6 col-sm-6 col-md-6 col-xl-4 col-xxl-3">
+                <div class="pos-product-card pos-skeleton-card">
+                    <div class="pos-skeleton-line w-50 mb-2"></div>
+                    <div class="pos-skeleton-line w-100 mb-2" style="height:14px;"></div>
+                    <div class="pos-skeleton-line w-75 mb-3"></div>
+                    <div class="pos-skeleton-line w-25" style="height:16px;"></div>
+                </div>
+            </div>
+        `;
+    }
+    grid.innerHTML = html;
+}
+
+function toggleLoadMore(hasMore) {
+    document.getElementById('catalogLoadMoreSentinel')?.classList.toggle('d-none', !hasMore);
+}
+
+function setLoadMoreLoading(loading) {
+    const btn = document.getElementById('catalogLoadMoreBtn');
+    if (!btn) return;
+    btn.disabled = loading;
+    btn.innerHTML = loading
+        ? '<span class="spinner-border spinner-border-sm me-1"></span> جاري التحميل...'
+        : '<i class="ri-add-line me-1"></i> تحميل المزيد';
+}
+
+/**
+ * Loads a catalog page. reset=true starts a fresh search/category/page-1 and replaces the grid;
+ * reset=false appends the next page onto what's already shown (infinite scroll / "تحميل المزيد").
+ */
+async function loadCatalogPage({ reset = false } = {}) {
+    if (isFetchingCatalog) return;
+    isFetchingCatalog = true;
+
+    if (reset) {
+        currentQuery = (document.getElementById('catalogSearchInput')?.value || '').trim();
+        currentPage = 1;
+        isShowingFeatured = false;
+        renderSkeletonCards(8);
+        toggleLoadMore(false);
+    } else {
+        currentPage += 1;
+        setLoadMoreLoading(true);
+    }
+
+    try {
+        const json = await fetchCatalogPage({ query: currentQuery, category: currentCategory, page: currentPage, perPage: 36 });
+        currentLastPage = json.meta.last_page;
+        currentResults = reset ? json.data : currentResults.concat(json.data);
+        renderCatalog();
+        toggleLoadMore(json.meta.has_more);
+    } catch (e) {
+        console.error('POS catalog fetch error:', e);
+        if (reset) {
+            document.getElementById('posCatalogGrid').innerHTML = `
+                <div class="col-12 text-center py-5 text-danger fs-13">
+                    <i class="ri-error-warning-line fs-24 d-block mb-1"></i>
+                    تعذر تحميل الأصناف من الخادم. تحقق من الاتصال وحاول مرة أخرى.
+                </div>
+            `;
+        }
+    } finally {
+        isFetchingCatalog = false;
+        setLoadMoreLoading(false);
+    }
+}
+
+function loadNextCatalogPage() {
+    if (isShowingFeatured) {
+        // The initial screen is a curated "fast movers" shortlist ordered by popularity, not
+        // page 1 of the real catalog — scrolling past it switches to the real, consistently
+        // ordered, paginated catalog instead of appending onto an unrelated set.
+        loadCatalogPage({ reset: true });
+        return;
+    }
+    if (isFetchingCatalog || currentPage >= currentLastPage) return;
+    loadCatalogPage({ reset: false });
+}
+
+function setupInfiniteScroll() {
+    const sentinel = document.getElementById('catalogLoadMoreSentinel');
+    const root = document.getElementById('posCatalogScrollContainer');
+    if (!sentinel || !root || !('IntersectionObserver' in window)) return;
+    catalogLoadMoreObserver = new IntersectionObserver((entries) => {
+        if (entries[0]?.isIntersecting) loadNextCatalogPage();
+    }, { root, rootMargin: '200px' });
+    catalogLoadMoreObserver.observe(sentinel);
 }
 
 function setViewMode(mode) {
@@ -212,13 +406,11 @@ function setViewMode(mode) {
 
 function filterByCategory(slug) {
     currentCategory = slug;
-    ['all', 'batteries', 'oils', 'greases', 'services'].forEach(t => {
-        const el = document.getElementById(`cat-tab-${t}`);
-        if (el) {
-            el.className = (t === slug ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-soft-secondary') + ' pos-category-pill text-nowrap';
-        }
+    document.querySelectorAll('.pos-category-pill').forEach(el => {
+        const isActive = el.dataset.slug === slug;
+        el.className = (isActive ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-soft-secondary') + ' pos-category-pill text-nowrap';
     });
-    renderCatalog();
+    loadCatalogPage({ reset: true });
 }
 
 function clearCatalogSearch() {
@@ -226,41 +418,103 @@ function clearCatalogSearch() {
     if (input) {
         input.value = '';
         input.focus();
-        renderCatalog();
+        keystrokeIntervals = [];
+        loadCatalogPage({ reset: true });
     }
 }
 
-function handleBarcodeEnter(e) {
+/**
+ * Live search input: debounces normal typing (250ms), but detects hardware-scanner-speed input
+ * (consecutive keystrokes averaging under 50ms apart, the signature of a barcode gun rather than
+ * a human) and resolves it as a barcode almost immediately instead of waiting for the debounce.
+ */
+function onCatalogSearchInput() {
+    const input = document.getElementById('catalogSearchInput');
+    const now = performance.now();
+    if (lastKeystrokeAt) {
+        keystrokeIntervals.push(now - lastKeystrokeAt);
+        if (keystrokeIntervals.length > 10) keystrokeIntervals.shift();
+    }
+    lastKeystrokeAt = now;
+
+    clearTimeout(catalogSearchDebounceTimer);
+    clearTimeout(scannerSettleTimer);
+
+    const value = input.value.trim();
+    if (!value) {
+        loadCatalogPage({ reset: true });
+        return;
+    }
+
+    const avgInterval = keystrokeIntervals.length
+        ? keystrokeIntervals.reduce((a, b) => a + b, 0) / keystrokeIntervals.length
+        : Infinity;
+    const looksLikeScanner = value.length >= 6 && keystrokeIntervals.length >= 4 && avgInterval < 50;
+
+    if (looksLikeScanner) {
+        scannerSettleTimer = setTimeout(() => tryAutoAddByBarcode(value), 60);
+        return;
+    }
+
+    catalogSearchDebounceTimer = setTimeout(() => loadCatalogPage({ reset: true }), 250);
+}
+
+/** Scanner-speed auto-detect path: silently tries an exact barcode match; falls back to a normal search. */
+async function tryAutoAddByBarcode(code) {
+    try {
+        const json = await fetchCatalogPage({ query: code, exactBarcode: true, perPage: 5 });
+        if (json.data.length === 1) {
+            const prod = json.data[0];
+            if (addToCart(prod.id)) {
+                playBeep(1050, 0.1);
+                showBarcodeNotification(prod);
+                const input = document.getElementById('catalogSearchInput');
+                if (input) input.value = '';
+                keystrokeIntervals = [];
+            }
+            return;
+        }
+    } catch (e) {
+        console.error('Barcode auto-detect error:', e);
+    }
+    loadCatalogPage({ reset: true });
+}
+
+/** Enter key: the reliable, primary barcode path (virtually every scanner sends a trailing Enter). */
+async function handleBarcodeEnter(e) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const input = document.getElementById('catalogSearchInput');
-    const query = (input?.value || '').trim().toLowerCase();
+    const query = (input?.value || '').trim();
     if (!query) return;
 
-    // Exact match on barcode, SKU, supplier carton code, or full name.
-    const matches = POS_DATA.products.filter(p =>
-        (p.barcode && String(p.barcode).toLowerCase() === query) ||
-        (p.sku && String(p.sku).toLowerCase() === query) ||
-        (p.supplier_skus || []).some(s => String(s).toLowerCase() === query) ||
-        p.name.toLowerCase() === query
-    );
+    clearTimeout(catalogSearchDebounceTimer);
+    clearTimeout(scannerSettleTimer);
 
-    if (matches.length === 1) {
-        const prod = matches[0];
+    let json;
+    try {
+        json = await fetchCatalogPage({ query, exactBarcode: true, perPage: 5 });
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'خطأ في الاتصال', text: 'تعذر الاتصال بالخادم. حاول مرة أخرى.', confirmButtonText: 'حسناً' });
+        return;
+    }
+
+    if (json.data.length === 1) {
+        const prod = json.data[0];
         if (addToCart(prod.id)) {
             playBeep(1050, 0.1);
             showBarcodeNotification(prod);
         }
         input.value = '';
-        renderCatalog();
+        keystrokeIntervals = [];
         return;
     }
 
     playBeep(350, 0.15);
     Swal.fire({
         icon: 'warning',
-        title: matches.length > 1 ? 'الكود يطابق أكثر من صنف' : 'صنف غير مسجل بالباركود',
-        text: matches.length > 1 ? 'يرجى اختيار الصنف من القائمة.' : `الكود "${query}" غير موجود بالمخزون.`,
+        title: json.data.length > 1 ? 'الكود يطابق أكثر من صنف' : 'صنف غير مسجل بالباركود',
+        text: json.data.length > 1 ? 'يرجى البحث بالاسم لاختيار الصنف المطلوب.' : `الكود "${query}" غير موجود بالمخزون.`,
         confirmButtonText: 'حسناً',
         customClass: { confirmButton: 'btn btn-warning fw-bold' }
     });
@@ -285,6 +539,96 @@ function showBarcodeNotification(prod) {
     setTimeout(() => toast.remove(), 1800);
 }
 
+// ─── Quick-add bar: lightweight async autocomplete (replaces the old 7,340-option <select>) ───
+let quickAddDebounceTimer = null;
+let quickAddResults = [];
+let quickAddActiveIndex = -1;
+
+function onQuickAddInput() {
+    clearTimeout(quickAddDebounceTimer);
+    const value = (document.getElementById('quickAddSearchInput')?.value || '').trim();
+    if (!value) {
+        hideQuickAddResults();
+        return;
+    }
+    quickAddDebounceTimer = setTimeout(() => runQuickAddSearch(value), 250);
+}
+
+async function runQuickAddSearch(value) {
+    try {
+        const json = await fetchCatalogPage({ query: value, perPage: 8 });
+        quickAddResults = json.data;
+        quickAddActiveIndex = -1;
+        renderQuickAddResults();
+    } catch (e) {
+        hideQuickAddResults();
+    }
+}
+
+function renderQuickAddResults() {
+    const dropdown = document.getElementById('quickAddResultsDropdown');
+    if (!dropdown) return;
+
+    if (quickAddResults.length === 0) {
+        dropdown.innerHTML = `<div class="quick-add-result-empty">لا توجد نتائج مطابقة</div>`;
+        dropdown.classList.remove('d-none');
+        return;
+    }
+
+    dropdown.innerHTML = quickAddResults.map((p, i) => `
+        <div class="quick-add-result-item ${i === quickAddActiveIndex ? 'active' : ''}" onmousedown="selectQuickAddResult(${p.id})">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+                <span class="fw-bold fs-12 text-dark text-truncate">${esc(p.name)}</span>
+                <span class="fs-11 text-success fw-bold font-monospace text-nowrap">${esc(fmt(p.price))}</span>
+            </div>
+            <div class="fs-10 text-muted">${esc(p.brand || '')} ${p.stock <= 0 ? '— نفذ من المخزن' : '— مخزون: ' + p.stock}</div>
+        </div>
+    `).join('');
+    dropdown.classList.remove('d-none');
+}
+
+function selectQuickAddResult(productId) {
+    addToCart(productId);
+    const input = document.getElementById('quickAddSearchInput');
+    if (input) input.value = '';
+    hideQuickAddResults();
+    input?.focus();
+}
+
+function hideQuickAddResults() {
+    const dropdown = document.getElementById('quickAddResultsDropdown');
+    if (dropdown) {
+        dropdown.classList.add('d-none');
+        dropdown.innerHTML = '';
+    }
+    quickAddResults = [];
+    quickAddActiveIndex = -1;
+}
+
+function onQuickAddBlur() {
+    // Delayed so a click on a result (onmousedown fires before blur) still registers.
+    setTimeout(hideQuickAddResults, 150);
+}
+
+function onQuickAddKeydown(e) {
+    if (quickAddResults.length === 0) return;
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        quickAddActiveIndex = Math.min(quickAddResults.length - 1, quickAddActiveIndex + 1);
+        renderQuickAddResults();
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        quickAddActiveIndex = Math.max(0, quickAddActiveIndex - 1);
+        renderQuickAddResults();
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const target = quickAddActiveIndex >= 0 ? quickAddResults[quickAddActiveIndex] : quickAddResults[0];
+        if (target) selectQuickAddResult(target.id);
+    } else if (e.key === 'Escape') {
+        hideQuickAddResults();
+    }
+}
+
 function stockBadgeHtml(p, compact) {
     const cls = compact ? 'fs-11 fw-bold px-2 py-1' : 'pos-stock-badge';
     if (p.stock <= 0) {
@@ -296,17 +640,12 @@ function stockBadgeHtml(p, compact) {
     return `<span class="badge bg-success-subtle text-success border border-success-subtle ${cls}">المخزون: <strong>${p.stock}</strong></span>`;
 }
 
+/** Renders whatever is currently loaded in `currentResults` (the active search/category/page set). */
 function renderCatalog() {
-    const searchVal = (document.getElementById('catalogSearchInput')?.value || '').trim().toLowerCase();
     const grid = document.getElementById('posCatalogGrid');
     if (!grid) return;
 
-    const filtered = POS_DATA.products.filter(p => {
-        if (currentCategory !== 'all' && p.category !== currentCategory) return false;
-        if (!searchVal) return true;
-        return [p.name, p.brand, p.category_name, p.barcode, p.sku, p.capacity_ah]
-            .some(v => v && String(v).toLowerCase().includes(searchVal));
-    });
+    const filtered = currentResults;
 
     if (filtered.length === 0) {
         grid.innerHTML = `
@@ -323,7 +662,15 @@ function renderCatalog() {
         batteries: 'bg-success-subtle text-success',
         oils: 'bg-warning-subtle text-warning',
         greases: 'bg-info-subtle text-info',
-        services: 'bg-primary-subtle text-primary'
+        services: 'bg-primary-subtle text-primary',
+        filters: 'bg-info-subtle text-info',
+        brakes: 'bg-danger-subtle text-danger',
+        suspension: 'bg-secondary-subtle text-secondary',
+        belts: 'bg-dark-subtle text-dark',
+        electrical: 'bg-warning-subtle text-warning',
+        engine: 'bg-primary-subtle text-primary',
+        'cooling-ac': 'bg-info-subtle text-info',
+        general: 'bg-light text-dark',
     };
 
     if (catalogViewMode === 'list') {
@@ -1108,6 +1455,8 @@ function onInvoiceCreated(data) {
     playBeep(1200, 0.2);
 
     // Mirror the stock the server just consumed so the catalog stays accurate until reload.
+    // line.product is the same object reference held in productCache, so this also keeps the
+    // cache (and therefore every cached search page referencing this product) in sync.
     cart.forEach(line => {
         line.product.stock = Math.max(0, line.product.stock - line.qty);
     });
@@ -1143,6 +1492,7 @@ function onInvoiceCreated(data) {
     resetPaymentSection();
     renderCart();
     renderCatalog();
-    loadQuickAddDropdown();
+    document.getElementById('quickAddSearchInput').value = '';
+    hideQuickAddResults();
 }
 </script>

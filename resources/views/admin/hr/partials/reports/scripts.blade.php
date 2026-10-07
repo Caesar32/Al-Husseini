@@ -22,6 +22,35 @@
     const formatCurrency = (amount) => `${Number(amount || 0).toLocaleString('ar-EG')} ج.م`;
     const DEFAULT_AVATAR = @json(asset('assets/images/users/avatar-1.jpg'));
 
+    /** Compact form for page-header KPI totals only; mirrors App\Support\MoneyHelper. Row/table
+     *  amounts keep using formatCurrency(). */
+    function formatCompactCurrency(amount) {
+        const n = Number(amount) || 0;
+        if (n >= 1e6) return (n / 1e6).toFixed(2) + ' مليون ج.م';
+        if (n >= 1e3) return (n / 1e3).toFixed(1) + ' ألف ج.م';
+        return Math.round(n).toLocaleString('ar-EG') + ' ج.م';
+    }
+
+    /** Initializes (once) or live-updates a Bootstrap tooltip's text without losing its instance. */
+    function initOrUpdateTooltip(el, title) {
+        if (!el || typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+        el.setAttribute('title', title);
+        el.setAttribute('data-bs-original-title', title);
+        const existing = bootstrap.Tooltip.getInstance(el);
+        if (existing) {
+            existing.setContent({ '.tooltip-inner': title });
+        } else {
+            new bootstrap.Tooltip(el);
+        }
+    }
+
+    function setKpiCompact(elId, amount) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        el.textContent = formatCompactCurrency(amount);
+        initOrUpdateTooltip(el, formatCurrency(amount));
+    }
+
     function localDateString(date) {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
@@ -203,7 +232,7 @@
             document.getElementById('kpi-unexcused-count').textContent = summary.totalAbsents;
             document.getElementById('kpi-leave-count').textContent = summary.totalLeaveDays;
         }
-        document.getElementById('kpi-deductions-amount').textContent = formatCurrency(summary.totalDeductionsAmount);
+        setKpiCompact('kpi-deductions-amount', summary.totalDeductionsAmount);
         document.getElementById('kpi-deductions-count').textContent = summary.deductionsCount;
     }
 

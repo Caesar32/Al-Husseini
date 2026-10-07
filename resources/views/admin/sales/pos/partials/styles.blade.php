@@ -130,15 +130,51 @@
     .pos-category-scroll-container {
         display: flex;
         gap: 6px;
-        overflow-x: auto;
+        overflow-x: auto !important;
+        overflow-y: hidden;
         white-space: nowrap;
         -webkit-overflow-scrolling: touch;
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE/Edge */
-        padding: 2px 1px 4px 1px;
+        scrollbar-width: thin; /* Firefox: slim, visible scrollbar instead of hidden */
+        scrollbar-color: rgba(64, 81, 137, 0.35) transparent;
+        scroll-behavior: smooth;
+        cursor: grab;
+        padding: 2px 1px 6px 1px;
+    }
+    .pos-category-scroll-container:active,
+    .pos-category-scroll-container.is-dragging {
+        cursor: grabbing;
+        scroll-behavior: auto; /* smooth-scroll fights an active drag; disable it mid-drag */
     }
     .pos-category-scroll-container::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
+        height: 4px;
+        display: block; /* Chrome, Safari, Opera: slim visible scrollbar instead of hidden */
+    }
+    .pos-category-scroll-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .pos-category-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(64, 81, 137, 0.35);
+        border-radius: 4px;
+    }
+    .pos-category-nav-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .pos-category-nav-arrow {
+        flex-shrink: 0;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 15px;
+        line-height: 1;
+    }
+    .pos-category-nav-arrow:disabled {
+        opacity: 0.35;
     }
     .pos-category-pill {
         flex-shrink: 0;
@@ -224,6 +260,56 @@
         align-items: center;
         gap: 4px;
         z-index: 3;
+    }
+
+    /* Quick-add autocomplete dropdown (replaces the old 7,340-option <select>) */
+    #quickAddResultsDropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        left: 0;
+        z-index: 1050;
+        max-height: 320px;
+        overflow-y: auto;
+        background: var(--vz-card-bg, #ffffff);
+        border: 1px solid var(--vz-border-color, #e2e8f0);
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    }
+    .quick-add-result-item {
+        padding: 7px 10px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--vz-border-color, #eef0f2);
+    }
+    .quick-add-result-item:last-child {
+        border-bottom: none;
+    }
+    .quick-add-result-item:hover,
+    .quick-add-result-item.active {
+        background-color: var(--vz-light, #f3f6f9);
+    }
+    .quick-add-result-empty {
+        padding: 10px;
+        text-align: center;
+        font-size: 11.5px;
+        color: var(--vz-secondary-color, #878a99);
+    }
+
+    /* Skeleton loading state for catalog cards while a search/category fetch is in flight */
+    .pos-skeleton-card {
+        cursor: default;
+        pointer-events: none;
+    }
+    .pos-skeleton-line {
+        height: 10px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #eef0f2 25%, #e2e5e9 37%, #eef0f2 63%);
+        background-size: 400% 100%;
+        animation: pos-skeleton-shimmer 1.4s ease infinite;
+    }
+    @keyframes pos-skeleton-shimmer {
+        0% { background-position: 100% 50%; }
+        100% { background-position: 0 50%; }
     }
 
     /* Mobile product card optimizations */
@@ -532,7 +618,7 @@
     [data-bs-theme="dark"] #posCustomerSelect,
     [data-bs-theme="dark"] #posTechnicianSelect,
     [data-bs-theme="dark"] #posTechnicianSelectCart,
-    [data-bs-theme="dark"] #quickAddProductSelect,
+    [data-bs-theme="dark"] #quickAddSearchInput,
     [data-bs-theme="dark"] #scrapCapacityInput,
     [data-bs-theme="dark"] #scrapPriceInput,
     [data-bs-theme="dark"] #scrapCountInput,
@@ -548,11 +634,38 @@
     [data-bs-theme="dark"] #catalogSearchInput:focus,
     [data-bs-theme="dark"] #posCustomerSelect:focus,
     [data-bs-theme="dark"] #posTechnicianSelect:focus,
-    [data-bs-theme="dark"] #quickAddProductSelect:focus {
+    [data-bs-theme="dark"] #quickAddSearchInput:focus {
         background-color: #212529 !important;
         color: #ffffff !important;
         border-color: var(--vz-primary) !important;
         box-shadow: 0 0 0 0.15rem rgba(64, 81, 137, 0.25) !important;
+    }
+    [data-bs-theme="dark"] #quickAddResultsDropdown {
+        background-color: #1e2226 !important;
+        border-color: #383f45 !important;
+    }
+    [data-bs-theme="dark"] .quick-add-result-item {
+        border-color: #32383e !important;
+        color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .quick-add-result-item:hover,
+    [data-bs-theme="dark"] .quick-add-result-item.active {
+        background-color: #262a2e !important;
+    }
+    [data-bs-theme="dark"] .pos-skeleton-card .pos-skeleton-line {
+        background: linear-gradient(90deg, #262a2e 25%, #32383e 37%, #262a2e 63%) !important;
+        background-size: 400% 100% !important;
+    }
+    [data-bs-theme="dark"] .pos-category-scroll-container {
+        scrollbar-color: rgba(141, 162, 251, 0.35) transparent;
+    }
+    [data-bs-theme="dark"] .pos-category-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(141, 162, 251, 0.35);
+    }
+    [data-bs-theme="dark"] .pos-category-nav-arrow {
+        background-color: #262a2e !important;
+        border-color: #383f45 !important;
+        color: #ced4da !important;
     }
     [data-bs-theme="dark"] .input-group-text {
         background-color: #262a2e !important;

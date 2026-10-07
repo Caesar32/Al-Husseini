@@ -22,8 +22,11 @@
                     <div class="d-flex align-items-end justify-content-between mt-2">
                         <div>
                             {{-- الرقم الرئيسي: الإيراد النقدي الفعلي (paid + تحصيلات الآجل) --}}
-                            <h3 class="fs-22 fw-extrabold text-success mb-0 font-monospace" id="dashTotalRevenue" style="transition: opacity 0.15s ease;">
-                                {{ $selectedPeriod['revenue_formatted'] ?? number_format(round($selectedPeriod['revenue'] ?? $totalSales), 0) . ' ج.م' }}
+                            <h3 class="fs-22 fw-extrabold text-success mb-0 font-monospace" id="dashTotalRevenue"
+                                style="transition: opacity 0.15s ease; cursor: help;"
+                                data-bs-toggle="tooltip" data-bs-placement="top"
+                                title="{{ $selectedPeriod['revenue_formatted'] ?? number_format($selectedPeriod['revenue'] ?? $totalSales, 2) . ' ج.م' }}">
+                                {{ $selectedPeriod['revenue_compact'] ?? $selectedPeriod['revenue_formatted'] ?? number_format(round($selectedPeriod['revenue'] ?? $totalSales), 0) . ' ج.م' }}
                             </h3>
                             <div class="fs-11 text-muted mb-1">
                                 <i class="ri-checkbox-circle-fill text-success align-middle"></i>
@@ -33,11 +36,15 @@
                             <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                                 <span class="fs-11 text-muted">
                                     <i class="ri-file-list-3-line align-middle"></i>
-                                    فواتير: <span id="dashTotalSales" class="fw-bold text-dark" style="transition: opacity 0.15s ease;">{{ $selectedPeriod['total_formatted'] ?? number_format(round($totalSales), 0) . ' ج.م' }}</span>
+                                    فواتير: <span id="dashTotalSales" class="fw-bold text-dark" style="transition: opacity 0.15s ease; cursor: help;"
+                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="{{ $selectedPeriod['total_formatted'] ?? number_format($totalSales, 2) . ' ج.م' }}">{{ $selectedPeriod['total_compact'] ?? $selectedPeriod['total_formatted'] ?? number_format(round($totalSales), 0) . ' ج.م' }}</span>
                                 </span>
                                 <span class="fs-11 text-warning fw-bold" id="dashCreditCollectedWrap" style="{{ ($selectedPeriod['credit_collected'] ?? 0) > 0 ? '' : 'display:none' }}">
                                     <i class="ri-hand-coin-line align-middle"></i>
-                                    تحصيل آجل: <span id="dashCreditCollected">{{ $selectedPeriod['credit_collected_fmt'] ?? '0 ج.م' }}</span>
+                                    تحصيل آجل: <span id="dashCreditCollected" style="cursor: help;"
+                                        data-bs-toggle="tooltip" data-bs-placement="top"
+                                        title="{{ $selectedPeriod['credit_collected_fmt'] ?? '0.00 ج.م' }}">{{ $selectedPeriod['credit_collected_compact'] ?? $selectedPeriod['credit_collected_fmt'] ?? '0 ج.م' }}</span>
                                 </span>
                             </div>
                             @can('invoices.view')
@@ -97,7 +104,8 @@
                     </div>
                     <div class="d-flex align-items-end justify-content-between mt-2">
                         <div>
-                            <h3 class="fs-22 fw-extrabold text-warning mb-1 font-monospace" id="dashTotalCredit">{{ number_format(round($totalCredit), 0) }} ج.م</h3>
+                            <h3 class="fs-22 fw-extrabold text-warning mb-1 font-monospace" id="dashTotalCredit" style="cursor: help;"
+                                data-bs-toggle="tooltip" data-bs-placement="top" title="{{ $totalCreditExact }}">{{ $totalCreditCompact }}</h3>
                             @can('credit.view')
                             <a href="{{ route('admin.sales.credit') }}" class="text-decoration-underline text-muted fs-11">
                                 <span id="dashCreditCustomersCount" class="fw-bold">{{ $creditCustomersCount }}</span> عملاء عليهم آجل
