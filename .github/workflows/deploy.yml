@@ -36,6 +36,7 @@ jobs:
               -p "$PORT" \
               "$USER_NAME@$HOST" << EOF
             set -e
+            trap 'php artisan up' ERR
             cd "$TARGET"
             php artisan down || true
             git reset --hard HEAD
