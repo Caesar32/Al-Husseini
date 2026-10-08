@@ -14,7 +14,18 @@ jobs:
       - name: Deploy to Hostinger
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          REMOTE_TARGET_PATH: ${{ secrets.REMOTE_TARGET_PATH }}
+          BRANCH: ${{ github.ref_name }}
         run: |
+          # Secrets pasted with a trailing newline/space break the ssh command line.
+          HOST=$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')
+          PORT=$(printf '%s' "$SSH_PORT" | tr -d '[:space:]')
+          USER_NAME=$(printf '%s' "$SSH_USER" | tr -d '[:space:]')
+          TARGET=$(printf '%s' "$REMOTE_TARGET_PATH" | tr -d '\r\n')
+
           mkdir -p ~/.ssh
           echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
@@ -22,13 +33,13 @@ jobs:
           ssh -o StrictHostKeyChecking=no \
               -o PubkeyAcceptedKeyTypes=+ssh-rsa \
               -o HostKeyAlgorithms=+ssh-rsa \
-              -p ${{ secrets.SSH_PORT }} \
-              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+              -p "$PORT" \
+              "$USER_NAME@$HOST" << EOF
             set -e
-            cd ${{ secrets.REMOTE_TARGET_PATH }}
+            cd "$TARGET"
             php artisan down || true
             git reset --hard HEAD
-            git pull origin ${{ github.ref_name }}
+            git pull origin $BRANCH
             composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan optimize:clear
