@@ -6,6 +6,9 @@ on:
       - main
       - remediation/2026-10
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy via Native SSH
@@ -19,6 +22,8 @@ jobs:
           SSH_USER: ${{ secrets.SSH_USER }}
           REMOTE_TARGET_PATH: ${{ secrets.REMOTE_TARGET_PATH }}
           BRANCH: ${{ github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           # Secrets pasted with a trailing newline/space break the ssh command line.
           HOST=$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')
@@ -39,8 +44,8 @@ jobs:
             trap 'php artisan up' ERR
             cd "$TARGET"
             php artisan down || true
-            git reset --hard HEAD
-            git pull origin $BRANCH
+            git fetch "https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git" "$BRANCH"
+            git reset --hard FETCH_HEAD
             composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan optimize:clear
