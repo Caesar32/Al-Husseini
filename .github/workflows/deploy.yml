@@ -16,7 +16,7 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
           script: |
             cd ${{ secrets.REMOTE_TARGET_PATH }}
