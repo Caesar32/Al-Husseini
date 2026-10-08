@@ -46,7 +46,8 @@ jobs:
             php artisan down || true
             git fetch "https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git" "$BRANCH"
             git reset --hard FETCH_HEAD
-            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+            php artisan package:discover --ansi
             php artisan migrate --force
             php artisan optimize:clear
             php artisan config:cache
