@@ -8,21 +8,33 @@ on:
 
 jobs:
   deploy:
+    name: Deploy via Native SSH
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          port: ${{ secrets.SSH_PORT }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script_stop: true
-          script: |
+      - name: Deploy to Hostinger
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          ssh -o StrictHostKeyChecking=no \
+              -o PubkeyAcceptedKeyTypes=+ssh-rsa \
+              -o HostKeyAlgorithms=+ssh-rsa \
+              -p ${{ secrets.SSH_PORT }} \
+              ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            set -e
             cd ${{ secrets.REMOTE_TARGET_PATH }}
             php artisan down || true
-            git reset --hard HEAD && git pull origin ${{ github.ref_name }}
+            git reset --hard HEAD
+            git pull origin ${{ github.ref_name }}
             composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
-            php artisan optimize:clear && php artisan config:cache && php artisan route:cache && php artisan view:cache
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
             php artisan up
+            echo "✅ Deployment successful!"
+          EOF
