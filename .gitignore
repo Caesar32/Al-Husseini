@@ -26,3 +26,7 @@ Thumbs.db
 
 id_rsa_deploy
 id_rsa_deploy.pub
+
+/public/almadina/
+/.dart_tool/
+/build/
