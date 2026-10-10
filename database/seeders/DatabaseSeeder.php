@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             SettingsSeeder::class,
             ScrapPricingTiersSeeder::class,
             SupplierProductsSeeder::class,
+            ProductCategoriesSeeder::class,
         ]);
 
         if (!app()->environment('testing')) {

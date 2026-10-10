@@ -1,19 +1,9 @@
-import 'package:flutter/foundation.dart';
-
 class ApiConstants {
   ApiConstants._();
 
   // Base URL (Can be overridden dynamically or via environment)
-  static String get defaultBaseUrl {
-    if (kIsWeb) {
-      return 'http://127.0.0.1:8000/api';
-    }
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api';
-    }
-    return 'http://127.0.0.1:8000/api';
-  }
-  static const String liveProductionUrl = 'https://alhusseini-auto.com/api';
+  static String get defaultBaseUrl => liveProductionUrl;
+  static const String liveProductionUrl = 'https://alhusseini.shop/api';
 
   // API Version Prefix
   static const String v1OwnerPrefix = '/v1/owner';
