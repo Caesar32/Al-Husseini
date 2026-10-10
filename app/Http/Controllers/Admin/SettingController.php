@@ -9,6 +9,19 @@ use Illuminate\Http\Request;
 class SettingController extends Controller
 {
     /**
+     * Keys the settings form manages (identical to SettingsSeeder). Any other request field
+     * is ignored instead of being persisted as a new setting (SEC-09).
+     */
+    private const ALLOWED_KEYS = [
+        'company_name', 'company_short_name', 'company_tax_id', 'company_cr_id', 'company_phone',
+        'company_mobile', 'company_email', 'company_address', 'currency',
+        'default_grace_period', 'default_shift_start', 'default_shift_end', 'monthly_working_days',
+        'daily_working_hours', 'overtime_rate_multiplier',
+        'vat_percentage', 'invoice_prefix', 'scrap_prefix', 'warranty_months_default', 'allow_negative_stock',
+        'lateness_alert_enabled', 'session_timeout_minutes', 'email_notifications_enabled',
+    ];
+
+    /**
      * عرض شاشة الإعدادات مصنفة بالتبويبات
      */
     public function index()
@@ -31,13 +44,16 @@ class SettingController extends Controller
             'default_grace_period' => ['nullable', 'integer', 'min:0', 'max:120'],
             'monthly_working_days' => ['nullable', 'integer', 'min:1', 'max:31'],
             'daily_working_hours' => ['nullable', 'integer', 'min:1', 'max:24'],
+            'overtime_rate_multiplier' => ['nullable', 'numeric', 'min:1', 'max:10'],
+            'warranty_months_default' => ['nullable', 'integer', 'min:0', 'max:120'],
+            'invoice_prefix' => ['nullable', 'regex:/^[A-Za-z0-9-]{1,10}$/'],
         ], [
             'company_name.required' => 'يرجى إدخال اسم المنشأة / الشركة.',
             'company_phone.required' => 'يرجى إدخال رقم الهاتف الرئيسي.',
             'currency.required' => 'يرجى إدخال رمز العملة المستخدمة.',
         ]);
 
-        $settingsData = $request->except(['_token', '_method']);
+        $settingsData = $request->only(self::ALLOWED_KEYS);
 
         // معالجة مربعات الاختيار (Checkboxes) غير المحددة
         $checkboxes = ['allow_negative_stock', 'lateness_alert_enabled', 'email_notifications_enabled'];

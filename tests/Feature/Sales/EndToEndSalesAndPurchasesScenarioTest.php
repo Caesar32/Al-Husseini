@@ -79,6 +79,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         // سداد 5,000 ج.م كاش، والمتبقي 15,000 ج.م آجل
         $invoice1 = $purchaseService->createDirectPurchase([
             'supplier_id'     => $supplierA->id,
+            'branch_id'       => $this->branch->id,
             'invoice_number'  => 'PUR-SEC1-01',
             'invoice_date'    => '2026-09-23',
             'items'           => [
@@ -106,6 +107,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         // ( (10 * 2000) + (10 * 2200) ) / (10 + 10) = (20,000 + 22,000) / 20 = 42,000 / 20 = 2,100.00 ج.م
         $invoice2 = $purchaseService->createDirectPurchase([
             'supplier_id'     => $supplierB->id,
+            'branch_id'       => $this->branch->id,
             'invoice_number'  => 'PUR-SEC1-02',
             'invoice_date'    => '2026-09-23',
             'items'           => [
@@ -141,7 +143,8 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
 
         // اختبار سداد دفعة للمورد (أ) بمبلغ 5,000 ج.م وتحديث دفتر الأستاذ
         $paymentEntry = $purchaseService->recordSupplierPayment($supplierA->id, 5000.00, 'cash', [
-            'notes' => 'سداد جزء من فاتورة PUR-SEC1-01',
+            'notes'   => 'سداد جزء من فاتورة PUR-SEC1-01',
+            'paid_by' => $this->cashier->id,
         ]);
 
         $supplierA->refresh();
@@ -290,7 +293,8 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
         $product = Product::first();
         $product->update(['current_stock' => 10, 'retail_price' => 2500.00]);
 
-        // البيع مع كود موافقة المدير الصحيح mgr_override_99
+        // البيع مع كود موافقة المدير الصحيح (سر مُعدّ صراحة في الإعدادات، لا يوجد كود افتراضي)
+        config(['finance.manager_override_hash' => \Illuminate\Support\Facades\Hash::make('supervisor-secret')]);
         $validPayload = [
             'branch_id'             => $this->branch->id,
             'customer_id'           => $customer->id,
@@ -307,7 +311,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
             'payments'              => [
                 ['method' => 'credit', 'amount' => 2500.00],
             ],
-            'manager_override_code' => 'mgr_override_99',
+            'manager_override_code' => 'supervisor-secret',
         ];
 
         $invoice = $posService->processPosSale($validPayload, $this->cashier->id);
@@ -349,7 +353,7 @@ class EndToEndSalesAndPurchasesScenarioTest extends TestCase
                 'final_amount'   => 3000,
                 'paid_amount'    => 3000,
                 'payment_method' => 'cash',
-                'payment_status' => 'paid',
+                'status' => 'paid',
             ]);
         });
 

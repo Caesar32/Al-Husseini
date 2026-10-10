@@ -4,9 +4,11 @@
             <i class="ri-file-list-3-line text-primary me-1"></i> أحدث فواتير المبيعات وصيانة السيارات بالمركز
         </h5>
         <div class="d-flex gap-1">
+            @can('invoices.view')
             <a href="{{ route('admin.sales.invoices') }}" class="btn btn-sm btn-soft-primary rounded-pill px-3 py-1 fs-12">
                 عرض جميع الفواتير <i class="ri-arrow-left-s-line align-middle"></i>
             </a>
+            @endcan
         </div>
     </div>
 
@@ -31,9 +33,15 @@
                         @endphp
                         <tr>
                             <td class="text-center">
+                                @can('invoices.view')
                                 <a href="{{ route('admin.invoices.show', $inv->id) }}" class="fw-bold font-monospace link-primary fs-12 d-block">
                                     #{{ $inv->invoice_number }}
                                 </a>
+                                @else
+                                <span class="fw-bold font-monospace fs-12 d-block">
+                                    #{{ $inv->invoice_number }}
+                                </span>
+                                @endcan
                                 <small class="text-muted fs-10 font-monospace">{{ $inv->created_at->format('Y-m-d') }}</small>
                             </td>
                             <td>
@@ -69,9 +77,11 @@
                                 @endif
                             </td>
                             <td class="text-center">
+                                @can('invoices.view')
                                 <a href="{{ route('admin.invoices.show', $inv->id) }}" class="btn btn-sm btn-soft-primary rounded-pill px-2.5 py-1 fs-11 shadow-none" title="معاينة وطباعة">
                                     <i class="ri-eye-line me-0.5"></i> عرض
                                 </a>
+                                @endcan
                             </td>
                         </tr>
                     @empty

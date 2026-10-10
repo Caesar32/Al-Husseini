@@ -46,18 +46,26 @@
                                 </div>
                             </div>
 
+                            @can('pos.access')
                             <a href="{{ route('admin.sales.pos') }}" class="btn btn-primary btn-sm quick-action-btn shadow-sm fs-12 px-3 py-2">
                                 <i class="ri-barcode-box-line align-middle me-1"></i> نقطة البيع (POS)
                             </a>
+                            @endcan
+                            @can('credit.view')
                             <a href="{{ route('admin.sales.credit') }}" class="btn btn-soft-warning btn-sm quick-action-btn fs-12 px-3 py-2">
                                 <i class="ri-hand-coin-line align-middle me-1"></i> تحصيل الآجل
                             </a>
+                            @endcan
+                            @can('products.view')
                             <a href="{{ route('admin.sales.products') }}" class="btn btn-soft-info btn-sm quick-action-btn fs-12 px-3 py-2">
                                 <i class="ri-box-3-line align-middle me-1"></i> المخزون والباركود
                             </a>
+                            @endcan
+                            @can('attendance.view')
                             <a href="{{ route('admin.hr.attendance') }}" class="btn btn-soft-success btn-sm quick-action-btn fs-12 px-3 py-2">
                                 <i class="ri-user-follow-line align-middle me-1"></i> حضور الورشة
                             </a>
+                            @endcan
                         </div>
                     </div>
                 </div>

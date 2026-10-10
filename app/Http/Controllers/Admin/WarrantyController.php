@@ -92,7 +92,7 @@ class WarrantyController extends Controller
     public function storeClaim(ProcessWarrantyClaimRequest $request): RedirectResponse|JsonResponse
     {
         try {
-            $claim = $this->warrantyService->processInstantClaim($request->validated(), auth()->id() ?? 1);
+            $claim = $this->warrantyService->processInstantClaim($request->validated(), (int) auth()->id());
 
             if ($request->wantsJson()) {
                 return response()->json([
@@ -104,8 +104,12 @@ class WarrantyController extends Controller
 
             return redirect()->route('admin.warranties.index')
                 ->with('status', "تم تسجيل مطالبة الضمان بنجاح برقم ({$claim->claim_number}) وصرف البديل للعميل.");
-        } catch (\DomainException $e) {
-            return redirect()->back()->withErrors(['claim_error' => $e->getMessage()]);
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return redirect()->back()->withErrors(['claim_error' => $e->getMessage()])->withInput();
         }
     }
 
@@ -119,12 +123,20 @@ class WarrantyController extends Controller
             'action.required' => 'يرجى تحديد نوع إجراء التسوية مع المورد.',
         ]);
 
-        $settledClaim = $this->warrantyService->settleClaimWithSupplier(
-            $claim->id,
-            $validated['action'],
-            $validated,
-            auth()->id() ?? 1
-        );
+        try {
+            $settledClaim = $this->warrantyService->settleClaimWithSupplier(
+                $claim->id,
+                $validated['action'],
+                $validated,
+                (int) auth()->id()
+            );
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return redirect()->back()->withErrors(['settle_error' => $e->getMessage()]);
+        }
 
         if ($request->wantsJson()) {
             return response()->json([

@@ -10,6 +10,14 @@ class AttendanceObserver
 {
     public function saving(Attendance $attendance): void
     {
+        // يوم إجازة معتمدة (holiday) أو غياب بعذر (excused): الحالة يحددها AttendanceService ولا تُستبدل بـ late،
+        // وساعات العمل في يوم الإجازة تُحتسب بالكامل كعمل إضافي، لذا لا يُحتسب تأخير عن الشفت (ولا جزاء تأخير تلقائي).
+        if (in_array($attendance->status, ['holiday', 'excused'], true)) {
+            $attendance->late_minutes = 0;
+
+            return;
+        }
+
         // حساب دقائق التأخير بناءً على بداية الشفت وسماحية الموظف
         if ($attendance->check_in) {
             $employee = $attendance->employee;

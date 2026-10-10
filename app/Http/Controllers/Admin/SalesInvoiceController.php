@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Contracts\Sales\PosOrderServiceInterface;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Sales\ProcessSalesReturnRequest;
 use App\Models\Branch;
 use App\Models\Invoice;
 use Illuminate\Http\JsonResponse;
@@ -20,44 +21,25 @@ class SalesInvoiceController extends Controller
     public function index(Request $request): View|JsonResponse
     {
         $filters = $request->only(['search', 'status', 'branch_id', 'date_from', 'date_to']);
-        $invoices = $this->posOrderService->getPaginatedInvoices($filters);
+
+        // Unified filtering via InvoiceFilter (FIN-C02, FIN-M02, FIN-M03, FIN-M05, FIN-H02)
+        try {
+            $invoices = $this->posOrderService->getPaginatedInvoices($filters);
+            $stats = $this->posOrderService->getInvoiceStats($filters);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'فلتر التواريخ غير صحيح.',
+                    'errors' => $e->errors(),
+                ], 422);
+            }
+            return redirect()->back()->withErrors($e->errors())->withInput();
+        }
 
         if ($request->wantsJson()) {
             return response()->json($invoices);
         }
-
-        // Stats matching active date/branch/search filters
-        $statsQuery = Invoice::query();
-        if (!empty($filters['search'])) {
-            $search = trim($filters['search']);
-            $statsQuery->where(function ($q) use ($search) {
-                $q->where('invoice_number', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function ($cq) use ($search) {
-                      $cq->where('name', 'like', "%{$search}%")
-                        ->orWhere('phone', 'like', "%{$search}%");
-                  });
-            });
-        }
-        if (!empty($filters['status'])) {
-            $statsQuery->where('status', $filters['status']);
-        }
-        if (!empty($filters['branch_id'])) {
-            $statsQuery->where('branch_id', $filters['branch_id']);
-        }
-        if (!empty($filters['date_from'])) {
-            $statsQuery->whereDate('created_at', '>=', $filters['date_from']);
-        }
-        if (!empty($filters['date_to'])) {
-            $statsQuery->whereDate('created_at', '<=', $filters['date_to']);
-        }
-
-        $stats = [
-            'total_sales'            => (float) (clone $statsQuery)->sum('final_amount'),
-            'invoices_count'         => (int) (clone $statsQuery)->count(),
-            'credit_invoices_count'  => (int) (clone $statsQuery)->where('remaining_amount', '>', 0)->count(),
-            'total_remaining_credit' => (float) (clone $statsQuery)->sum('remaining_amount'),
-            'scrap_count'            => (int) (clone $statsQuery)->where('scrap_deduction_amount', '>', 0)->count(),
-        ];
 
         $branches = Branch::where('is_active', true)->get();
         $viewName = view()->exists('admin.invoices.index') ? 'admin.invoices.index' : 'admin.sales.invoices';
@@ -82,24 +64,16 @@ class SalesInvoiceController extends Controller
         return view('admin.invoices.show', compact('invoice'));
     }
 
-    public function processReturn(Request $request, Invoice $invoice): RedirectResponse|JsonResponse
+    public function processReturn(ProcessSalesReturnRequest $request, Invoice $invoice): RedirectResponse|JsonResponse
     {
-        $validated = $request->validate([
-            'reason'             => ['required', 'string', 'max:500'],
-            'items'              => ['required', 'array', 'min:1'],
-            'items.*.product_id' => ['required', 'exists:products,id'],
-            'items.*.quantity'   => ['required', 'integer', 'min:1'],
-        ], [
-            'reason.required'    => 'سبب المرتجع مطلوب.',
-            'items.required'     => 'يرجى تحديد الأصناف المراد إرجاعها.',
-        ]);
+        $validated = $request->validated();
 
         try {
             $updatedInvoice = $this->posOrderService->processSalesReturn(
                 $invoice->id,
                 $validated['items'],
                 $validated['reason'],
-                auth()->id() ?? 1
+                $request->user()->id
             );
 
             if ($request->wantsJson()) {
@@ -113,6 +87,14 @@ class SalesInvoiceController extends Controller
             return redirect()->route('admin.invoices.show', $invoice)
                 ->with('status', 'تم تسجيل مرتجع الفاتورة بنجاح.');
         } catch (\DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                    'errors'  => ['return_error' => [$e->getMessage()]],
+                ], 422);
+            }
+
             return redirect()->back()->withErrors(['return_error' => $e->getMessage()]);
         }
     }

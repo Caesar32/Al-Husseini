@@ -5,7 +5,20 @@
 @section('content')
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'المخزون والورشة', 'title' => 'كتالوج المنتجات والزيوت والشحوم وخدمات الصيانة'])
 
-    <!-- Top Stats -->
+    @if(session('status'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('status') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    <!-- Top Stats (live from the products table) -->
     <div class="row mb-3">
         <div class="col-xl-3 col-md-6 mb-3">
             <div class="card card-animate border-start border-success border-4 shadow-sm h-100 mb-0">
@@ -13,8 +26,8 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">بطاريات السيارات بالمخزن</p>
-                            <h3 class="fs-22 fw-extrabold text-success mb-1 font-monospace" id="statBatteriesStock">0 بطارية</h3>
-                            <small class="text-muted fs-11" id="statBatteriesCount">0 موديل معتمد</small>
+                            <h3 class="fs-22 fw-extrabold text-success mb-1 font-monospace">{{ number_format($stats['batteries_stock']) }} بطارية</h3>
+                            <small class="text-muted fs-11">{{ number_format($stats['batteries_count']) }} موديل مفعّل</small>
                         </div>
                         <div class="avatar-sm">
                             <span class="avatar-title bg-success-subtle text-success rounded-circle fs-20">
@@ -31,9 +44,9 @@
                 <div class="card-body">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
-                            <p class="text-uppercase fw-bold text-muted fs-12 mb-1">زيوت المحركات والفتيس</p>
-                            <h3 class="fs-22 fw-extrabold text-warning mb-1 font-monospace" id="statOilsStock">0 عبوة/جالون</h3>
-                            <small class="text-muted fs-11">موبيل، شل، كاسترول، فلاتر</small>
+                            <p class="text-uppercase fw-bold text-muted fs-12 mb-1">زيوت المحركات والفلاتر</p>
+                            <h3 class="fs-22 fw-extrabold text-warning mb-1 font-monospace">{{ number_format($stats['oils_stock']) }} عبوة</h3>
+                            <small class="text-muted fs-11">رصيد الأصناف المفعّلة</small>
                         </div>
                         <div class="avatar-sm">
                             <span class="avatar-title bg-warning-subtle text-warning rounded-circle fs-20">
@@ -51,8 +64,8 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">الشحوم وسوائل التبريد</p>
-                            <h3 class="fs-22 fw-extrabold text-info mb-1 font-monospace" id="statGreaseStock">0 قطعة</h3>
-                            <small class="text-muted fs-11">مياه ردياتير، باكم، مياه نار، WD-40</small>
+                            <h3 class="fs-22 fw-extrabold text-info mb-1 font-monospace">{{ number_format($stats['greases_stock']) }} قطعة</h3>
+                            <small class="text-muted fs-11">رصيد الأصناف المفعّلة</small>
                         </div>
                         <div class="avatar-sm">
                             <span class="avatar-title bg-info-subtle text-info rounded-circle fs-20">
@@ -70,8 +83,8 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">خدمات الصيانة والورشة</p>
-                            <h3 class="fs-22 fw-extrabold text-primary mb-1 font-monospace" id="statServicesCount">5 خدمات</h3>
-                            <small class="text-muted fs-11">دينامو، كمبيوتر، شحن، طوارئ طريق</small>
+                            <h3 class="fs-22 fw-extrabold text-primary mb-1 font-monospace">{{ number_format($stats['services_count']) }} خدمة</h3>
+                            <small class="text-muted fs-11">أصناف تحت الحد الأدنى: {{ number_format($stats['low_stock_count']) }}</small>
                         </div>
                         <div class="avatar-sm">
                             <span class="avatar-title bg-primary-subtle text-primary rounded-circle fs-20">
@@ -89,31 +102,37 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-transparent border-bottom p-3">
-                    <div class="row g-2 align-items-center justify-content-between">
-                        <!-- Category Filter Tabs -->
+                    <form method="GET" action="{{ route('admin.sales.products') }}" class="row g-2 align-items-center justify-content-between">
                         <div class="col-lg-6 col-12">
                             <div class="d-flex flex-wrap gap-1">
-                                <button type="button" class="btn btn-sm btn-primary fw-bold px-3" id="tab-prod-all" onclick="filterProductTab('all')">الكل</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="tab-prod-batteries" onclick="filterProductTab('بطاريات')">🔋 بطاريات</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="tab-prod-oils" onclick="filterProductTab('زيوت')">🛢️ زيوت وفلاتر</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="tab-prod-greases" onclick="filterProductTab('شحوم وسوائل')">🧪 شحوم وسوائل</button>
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="tab-prod-services" onclick="filterProductTab('خدمات وصيانة')">🔧 خدمات الورشة</button>
+                                @php($activeCategory = $filters['category'] ?? '')
+                                <a href="{{ route('admin.sales.products', array_filter(['search' => $filters['search'] ?? null])) }}"
+                                   class="btn btn-sm {{ $activeCategory === '' ? 'btn-primary fw-bold px-3' : 'btn-outline-secondary' }}">الكل</a>
+                                @foreach($categories as $category)
+                                    <a href="{{ route('admin.sales.products', array_filter(['category' => $category->slug, 'search' => $filters['search'] ?? null])) }}"
+                                       class="btn btn-sm {{ $activeCategory === $category->slug ? 'btn-primary fw-bold px-3' : 'btn-outline-secondary' }}">{{ $category->name }}</a>
+                                @endforeach
                             </div>
                         </div>
 
-                        <!-- Search & Add Button -->
                         <div class="col-lg-6 col-12 text-lg-end">
                             <div class="d-flex gap-2 justify-content-lg-end">
+                                @if($activeCategory !== '')
+                                    <input type="hidden" name="category" value="{{ $activeCategory }}">
+                                @endif
                                 <div class="input-group input-group-sm" style="max-width: 270px;">
                                     <span class="input-group-text bg-light text-primary"><i class="ri-barcode-box-line me-1"></i> <i class="ri-search-line"></i></span>
-                                    <input type="text" class="form-control" id="searchProductInput" placeholder="بحث بالاسم، الماركة، أو الباركود..." oninput="renderProductsTable()">
+                                    <input type="text" class="form-control" name="search" value="{{ $filters['search'] ?? '' }}" placeholder="بحث بالاسم، الماركة، الكود أو الباركود...">
+                                    <button type="submit" class="btn btn-light border">بحث</button>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#productModal" onclick="openNewProductModal()">
-                                    <i class="ri-add-line me-1"></i> إضافة صنف / خدمة جديدة
-                                </button>
+                                @can('products.create')
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="openProductModal(null)">
+                                        <i class="ri-add-line me-1"></i> إضافة صنف / خدمة جديدة
+                                    </button>
+                                @endcan
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
 
                 <div class="card-body p-0">
@@ -122,27 +141,93 @@
                             <thead class="table-light">
                                 <tr class="text-muted fs-12 text-uppercase">
                                     <th>البيان والاسم التجاري</th>
-                                    <th>الباركود</th>
+                                    <th>الكود / الباركود</th>
                                     <th>القسم</th>
-                                    <th>المواصفة / الحجم</th>
-                                    <th>النوع / التقنية</th>
-                                    <th>السعر (ج.م)</th>
-                                    <th>استبدال قديمة (كهنة)</th>
+                                    <th>المواصفة</th>
+                                    <th>سعر البيع (ج.م)</th>
                                     <th>الضمان</th>
                                     <th>الرصيد بالمخزن</th>
-                                    <th class="text-center">تعديل</th>
+                                    <th>الحالة</th>
+                                    <th class="text-center">إجراءات</th>
                                 </tr>
                             </thead>
-                            <tbody id="tbodyProducts">
-                                <!-- Populated dynamically -->
+                            <tbody>
+                                @forelse($products as $product)
+                                    @php($isService = $product->category?->slug === 'services')
+                                    <tr>
+                                        <td>
+                                            <strong class="text-dark fs-13 d-block">{{ $product->name }}</strong>
+                                            <span class="badge bg-light text-secondary border font-monospace fs-11">{{ $product->brand }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border font-monospace fs-11 d-block mb-1">{{ $product->sku }}</span>
+                                            <span class="badge bg-light text-dark border font-monospace fs-11">
+                                                <i class="ri-barcode-line text-primary me-1"></i>{{ $product->barcode ?: 'بدون باركود' }}
+                                            </span>
+                                        </td>
+                                        <td><span class="badge bg-primary-subtle text-primary fs-11">{{ $product->category?->name ?? '-' }}</span></td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border font-monospace fs-11">
+                                                {{ $product->is_battery ? trim(($product->capacity_ah ?? '') . ' ' . ($product->voltage ?? '')) ?: '-' : ($product->capacity_ah ?: '-') }}
+                                            </span>
+                                        </td>
+                                        <td><strong class="text-success font-monospace fs-13">{{ number_format((float) $product->retail_price, 2) }}</strong></td>
+                                        <td>
+                                            @if($product->warranty_months > 0)
+                                                <span class="badge bg-info-subtle text-info fs-11">{{ $product->warranty_months }} شهر</span>
+                                            @else
+                                                <span class="text-muted fs-11">-</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($isService)
+                                                <span class="badge bg-light text-muted border fs-11">خدمة ورشة</span>
+                                            @else
+                                                <span class="badge {{ $product->current_stock > $product->reorder_threshold ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' }} font-monospace fs-12">{{ number_format($product->current_stock) }}</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($product->is_active)
+                                                <span class="badge bg-success-subtle text-success fs-11">مفعّل</span>
+                                            @else
+                                                <span class="badge bg-secondary-subtle text-secondary fs-11">موقوف</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="d-inline-flex gap-1">
+                                                @can('products.edit')
+                                                    <button type="button" class="btn btn-sm btn-soft-secondary js-edit-product"
+                                                            data-product="{{ json_encode($product->only(['id', 'category_id', 'sku', 'barcode', 'name', 'brand', 'capacity_ah', 'voltage', 'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price', 'reorder_threshold', 'is_battery', 'is_active'])) }}">
+                                                        <i class="ri-edit-line"></i> تعديل
+                                                    </button>
+                                                @endcan
+                                                @can('products.delete')
+                                                    <form method="POST" action="{{ route('admin.products.destroy', $product) }}" onsubmit="return confirm('حذف هذا الصنف نهائياً من الكتالوج؟');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <button type="submit" class="btn btn-sm btn-soft-danger"><i class="ri-delete-bin-line"></i></button>
+                                                    </form>
+                                                @endcan
+                                            </div>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="9" class="text-center py-5 text-muted fs-13">لا توجد أصناف أو خدمات مطابقة للبحث.</td></tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>
                 </div>
+                @if($products->hasPages())
+                    <div class="card-footer bg-transparent border-top py-2 d-flex justify-content-center">
+                        {{ $products->links() }}
+                    </div>
+                @endif
             </div>
         </div>
     </div>
 
+    @canany(['products.create', 'products.edit'])
     <!-- Modal: Add / Edit Product or Service -->
     <div class="modal fade" id="productModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -152,338 +237,189 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
 
-                <form id="productForm" onsubmit="saveProductData(event)">
+                <form id="productForm" novalidate>
                     <input type="hidden" id="prodFormId">
                     <div class="modal-body p-4">
+                        <div class="alert alert-danger d-none" id="productFormErrors"></div>
                         <div class="row g-3">
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">قسم الصنف / الخدمة <span class="text-danger">*</span></label>
-                                <select class="form-select fw-bold" id="prodFormCategory" onchange="onFormCategoryChange()" required>
-                                    <option value="بطاريات">🔋 بطاريات سيارات</option>
-                                    <option value="زيوت">🛢️ زيوت محركات وفتيس</option>
-                                    <option value="شحوم وسوائل">🧪 شحوم وسوائل تبريد</option>
-                                    <option value="خدمات وصيانة">🔧 خدمات وصيانة ورشة</option>
+                                <label class="form-label fw-bold text-dark fs-13">القسم <span class="text-danger">*</span></label>
+                                <select class="form-select fw-bold" name="category_id" required>
+                                    @foreach($categories as $category)
+                                        <option value="{{ $category->id }}" data-slug="{{ $category->slug }}">{{ $category->name }}</option>
+                                    @endforeach
                                 </select>
                             </div>
-
                             <div class="col-md-4">
                                 <label class="form-label fw-bold text-dark fs-13">الماركة / الشركة <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="prodFormBrand" required placeholder="مثلاً: فارتا، موبيل، شل، بوش، ورشة">
+                                <input type="text" class="form-control" name="brand" required maxlength="100">
                             </div>
-
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">كود الباركود (Barcode) <span class="text-danger">*</span></label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-light"><i class="ri-barcode-line text-primary"></i></span>
-                                    <input type="text" class="form-control font-monospace fw-bold" id="prodFormBarcode" required placeholder="6221001010018">
-                                    <button class="btn btn-outline-secondary" type="button" onclick="generateRandomBarcode()" title="توليد باركود تلقائي"><i class="ri-magic-line"></i></button>
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">الوحدة</label>
-                                <input type="text" class="form-control" id="prodFormUnit" value="قطعة" placeholder="جالون، عبوة، خدمة، بطارية">
+                                <label class="form-label fw-bold text-dark fs-13">كود الصنف (SKU) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control font-monospace" name="sku" required maxlength="50">
                             </div>
 
                             <div class="col-md-8">
                                 <label class="form-label fw-bold text-dark fs-13">الاسم التجاري الكامل <span class="text-danger">*</span></label>
-                                <input type="text" class="form-control" id="prodFormName" required placeholder="مثلاً: زيت موبيل 1 تخليقي 5W-40 (4L)">
+                                <input type="text" class="form-control" name="name" required maxlength="200">
                             </div>
-
                             <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">المواصفة / الأمبير / اللزوجة</label>
-                                <input type="text" class="form-control font-monospace" id="prodFormAmp" placeholder="70A أو 5W-40 أو DOT 4">
+                                <label class="form-label fw-bold text-dark fs-13">الباركود</label>
+                                <input type="text" class="form-control font-monospace" name="barcode" maxlength="100">
                             </div>
 
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-13">نوع التقنية / التفاصيل</label>
-                                <input type="text" class="form-control" id="prodFormType" placeholder="جافة كالسيوم، تخليقي بالكامل، إلخ">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">بطارية؟</label>
+                                <select class="form-select" name="is_battery">
+                                    <option value="1">نعم (يتطلب سيريال وضمان)</option>
+                                    <option value="0">لا</option>
+                                </select>
                             </div>
-
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold text-dark fs-13">مدة الضمان المعتمد (بالشهور)</label>
-                                <select class="form-select" id="prodFormWarranty">
-                                    <option value="0">بدون ضمان (زيوت وشحوم)</option>
-                                    <option value="1">شهر واحد (صيانة)</option>
-                                    <option value="3">3 شهور (إصلاح دينامو)</option>
-                                    <option value="12">12 شهر (سنة)</option>
-                                    <option value="18">18 شهر (سنة ونصف)</option>
-                                    <option value="24">24 شهر (سنتين)</option>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">السعة / المواصفة</label>
+                                <input type="text" class="form-control font-monospace" name="capacity_ah" maxlength="20" placeholder="70Ah أو 5W-40">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">الجهد</label>
+                                <input type="text" class="form-control font-monospace" name="voltage" maxlength="20" placeholder="12V">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">نوع الأقطاب</label>
+                                <select class="form-select" name="terminal_type">
+                                    <option value="regular">عادي</option>
+                                    <option value="reverse">معكوس</option>
+                                    <option value="side">جانبي</option>
                                 </select>
                             </div>
 
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">سعر البيع الأساسي (ج.م) <span class="text-danger">*</span></label>
-                                <input type="number" class="form-control font-monospace fw-bold" id="prodFormPriceNew" required min="10" step="10">
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">مدة الضمان (شهور) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control font-monospace" name="warranty_months" required min="0" max="120" value="0">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">سعر البيع (ج.م) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control font-monospace fw-bold" name="retail_price" required min="0" step="0.01">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">سعر الجملة (ج.م)</label>
+                                <input type="number" class="form-control font-monospace" name="wholesale_price" min="0" step="0.01">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">حد إعادة الطلب</label>
+                                <input type="number" class="form-control font-monospace" name="reorder_threshold" min="0" value="5">
                             </div>
 
-                            <div class="col-md-4" id="scrapGroup">
-                                <label class="form-label fw-bold text-warning-emphasis fs-13">قيمة استرجاع القديمة (للبطاريات فقط)</label>
-                                <input type="number" class="form-control font-monospace text-danger fw-bold" id="prodFormScrap" value="0" min="0" step="50">
+                            <div class="col-md-4" id="prodCostGroup">
+                                <label class="form-label fw-bold text-dark fs-13">التكلفة المبدئية (ج.م)</label>
+                                <input type="number" class="form-control font-monospace" name="cost_price" min="0" step="0.01" value="0">
+                                <small class="text-muted fs-11">تُحدَّث تلقائياً بالمتوسط المرجح من فواتير الشراء.</small>
                             </div>
-
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold text-dark fs-13">الرصيد المتاح بالمخزن</label>
-                                <input type="number" class="form-control font-monospace" id="prodFormStock" value="20" min="0">
+                            <div class="col-md-4 d-none" id="prodActiveGroup">
+                                <label class="form-label fw-bold text-dark fs-13">الحالة</label>
+                                <select class="form-select" name="is_active">
+                                    <option value="1">مفعّل</option>
+                                    <option value="0">موقوف</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 d-flex align-items-end">
+                                <small class="text-muted fs-11"><i class="ri-information-line"></i> رصيد المخزون لا يُعدَّل من هنا؛ يتغير فقط عبر فواتير الشراء والبيع والمرتجعات.</small>
                             </div>
                         </div>
                     </div>
 
                     <div class="modal-footer bg-light p-3">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
-                        <button type="submit" class="btn btn-primary fw-bold px-4">
-                            <i class="ri-save-line me-1"></i> حفظ وتحديث الكتالوج
+                        <button type="submit" class="btn btn-primary fw-bold px-4" id="productFormSubmit">
+                            <i class="ri-save-line me-1"></i> حفظ
                         </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
+    @endcanany
 @endsection
 
 @section('script')
 <script>
 'use strict';
 
-let currentTab = 'all';
+(function () {
+    const form = document.getElementById('productForm');
+    if (!form) return;
 
-document.addEventListener('DOMContentLoaded', function () {
-    renderProductsDashboard();
+    const storeUrl = @json(route('admin.products.store'));
+    const updateUrlTemplate = @json(route('admin.products.update', ['product' => '__ID__']));
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const modalEl = document.getElementById('productModal');
+    const errorsEl = document.getElementById('productFormErrors');
 
-    window.addEventListener('alhusseini-sales-updated', function () {
-        renderProductsDashboard();
-    });
-});
+    window.openProductModal = function (product) {
+        form.reset();
+        errorsEl.classList.add('d-none');
+        errorsEl.textContent = '';
+        document.getElementById('prodFormId').value = product ? product.id : '';
+        document.getElementById('productModalTitle').textContent = product ? 'تعديل بيانات الصنف / الخدمة' : 'إضافة صنف أو خدمة جديدة';
+        document.getElementById('prodCostGroup').classList.toggle('d-none', !!product);
+        document.getElementById('prodActiveGroup').classList.toggle('d-none', !product);
 
-function renderProductsDashboard() {
-    if (!window.AlHusseiniSales) return;
-
-    const products = window.AlHusseiniSales.getProducts();
-
-    const batteries = products.filter(p => p.category === 'بطاريات');
-    const oils = products.filter(p => p.category === 'زيوت');
-    const greases = products.filter(p => p.category === 'شحوم وسوائل');
-    const services = products.filter(p => p.category === 'خدمات وصيانة');
-
-    const batStock = batteries.reduce((s, p) => s + Number(p.stock || 0), 0);
-    const oilStock = oils.reduce((s, p) => s + Number(p.stock || 0), 0);
-    const greaseStock = greases.reduce((s, p) => s + Number(p.stock || 0), 0);
-
-    document.getElementById('statBatteriesStock').textContent = `${batStock} بطارية`;
-    document.getElementById('statBatteriesCount').textContent = `${batteries.length} موديل معتمد`;
-
-    document.getElementById('statOilsStock').textContent = `${oilStock} جالون/عبوة`;
-    document.getElementById('statGreaseStock').textContent = `${greaseStock} قطعة`;
-    document.getElementById('statServicesCount').textContent = `${services.length} خدمات بالورشة`;
-
-    renderProductsTable();
-}
-
-function filterProductTab(cat) {
-    currentTab = cat;
-
-    const tabs = ['all', 'batteries', 'oils', 'greases', 'services'];
-    const catMap = { 'all': 'all', 'بطاريات': 'batteries', 'زيوت': 'oils', 'شحوم وسوائل': 'greases', 'خدمات وصيانة': 'services' };
-
-    tabs.forEach(t => {
-        const btn = document.getElementById(`tab-prod-${t}`);
-        if (btn) {
-            if (catMap[cat] === t) btn.className = 'btn btn-sm btn-primary fw-bold px-3';
-            else btn.className = 'btn btn-sm btn-outline-secondary';
+        if (product) {
+            Object.keys(product).forEach(function (key) {
+                const field = form.elements[key];
+                if (!field) return;
+                let value = product[key];
+                if (typeof value === 'boolean') value = value ? '1' : '0';
+                field.value = value === null || value === undefined ? '' : value;
+            });
         }
-    });
 
-    renderProductsTable();
-}
-
-function renderProductsTable() {
-    if (!window.AlHusseiniSales) return;
-
-    const products = window.AlHusseiniSales.getProducts();
-    const searchVal = (document.getElementById('searchProductInput')?.value || '').trim().toLowerCase();
-    const tbody = document.getElementById('tbodyProducts');
-    if (!tbody) return;
-
-    const filtered = products.filter(p => {
-        if (currentTab !== 'all' && p.category !== currentTab) return false;
-        if (searchVal) {
-            const matchName = p.name.toLowerCase().includes(searchVal);
-            const matchBrand = p.brand.toLowerCase().includes(searchVal);
-            const matchCat = p.category.toLowerCase().includes(searchVal);
-            const matchBarcode = p.barcode ? p.barcode.toString().toLowerCase().includes(searchVal) : false;
-            if (!matchName && !matchBrand && !matchCat && !matchBarcode) return false;
-        }
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="10" class="text-center py-5 text-muted fs-13">لا توجد أصناف أو خدمات مطابقة للبحث أو الباركود</td></tr>`;
-        return;
-    }
-
-    const catBadges = {
-        'بطاريات': 'bg-success-subtle text-success',
-        'زيوت': 'bg-warning-subtle text-warning',
-        'شحوم وسوائل': 'bg-info-subtle text-info',
-        'خدمات وصيانة': 'bg-primary-subtle text-primary'
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
     };
 
-    let html = '';
-    filtered.forEach(p => {
-        const isBattery = p.category === 'بطاريات';
-        const isService = p.category === 'خدمات وصيانة';
-
-        const scrapDisplay = isBattery && p.scrapValue > 0 ? 
-            `<span class="badge bg-danger-subtle text-danger font-monospace fs-11">- ${p.scrapValue} ج.م</span>` : 
-            '<span class="text-muted fs-11">-</span>';
-
-        const warrantyDisplay = p.warrantyMonths > 0 ? 
-            `<span class="badge bg-info-subtle text-info fs-11">${p.warrantyMonths} شهر</span>` : 
-            '<span class="text-muted fs-11">-</span>';
-
-        const stockDisplay = isService ? 
-            '<span class="badge bg-light text-muted border fs-11">خدمة ورشة</span>' : 
-            `<span class="badge ${p.stock > 10 ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'} font-monospace fs-12">${p.stock} ${p.unit || 'قطعة'}</span>`;
-
-        html += `
-            <tr>
-                <td>
-                    <strong class="text-dark fs-13 d-block">${p.name}</strong>
-                    <span class="badge bg-light text-secondary border font-monospace fs-11">${p.brand}</span>
-                </td>
-                <td>
-                    <span class="badge bg-light text-dark border font-monospace fs-11" title="كود الباركود">
-                        <i class="ri-barcode-line text-primary me-1"></i>${p.barcode || 'بدون باركود'}
-                    </span>
-                </td>
-                <td><span class="badge ${catBadges[p.category] || 'bg-light text-dark'} fs-11">${p.category}</span></td>
-                <td><span class="badge bg-light text-dark border font-monospace fs-11">${p.amp || p.unit || '-'}</span></td>
-                <td><span class="text-muted fs-12">${p.type || '-'}</span></td>
-                <td><strong class="text-success font-monospace fs-13">${window.AlHusseiniSales.formatCurrency(p.priceNew)}</strong></td>
-                <td>${scrapDisplay}</td>
-                <td>${warrantyDisplay}</td>
-                <td>${stockDisplay}</td>
-                <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-soft-secondary" onclick="editProduct('${p.id}')">
-                        <i class="ri-edit-line"></i> تعديل
-                    </button>
-                </td>
-            </tr>
-        `;
+    document.querySelectorAll('.js-edit-product').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            window.openProductModal(JSON.parse(btn.dataset.product));
+        });
     });
 
-    tbody.innerHTML = html;
-}
+    form.addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const id = document.getElementById('prodFormId').value;
+        const payload = {};
+        new FormData(form).forEach(function (value, key) {
+            payload[key] = value === '' ? null : value;
+        });
+        if (id) {
+            delete payload.cost_price;
+        } else {
+            delete payload.is_active;
+        }
 
-function onFormCategoryChange() {
-    const cat = document.getElementById('prodFormCategory').value;
-    const scrapGrp = document.getElementById('scrapGroup');
-    const warrantySel = document.getElementById('prodFormWarranty');
+        const submitBtn = document.getElementById('productFormSubmit');
+        submitBtn.disabled = true;
+        try {
+            const res = await fetch(id ? updateUrlTemplate.replace('__ID__', encodeURIComponent(id)) : storeUrl, {
+                method: id ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json().catch(function () { return {}; });
 
-    if (cat === 'بطاريات') {
-        scrapGrp.classList.remove('d-none');
-        warrantySel.value = "18";
-    } else if (cat === 'خدمات وصيانة') {
-        scrapGrp.classList.add('d-none');
-        document.getElementById('prodFormStock').value = 999;
-        warrantySel.value = "0";
-    } else {
-        scrapGrp.classList.add('d-none');
-        warrantySel.value = "0";
-    }
-}
+            if (!res.ok) {
+                const messages = data.errors ? Object.values(data.errors).flat() : [data.message || 'تعذر حفظ الصنف.'];
+                errorsEl.textContent = messages.join(' | ');
+                errorsEl.classList.remove('d-none');
+                return;
+            }
 
-function generateRandomBarcode() {
-    const cat = document.getElementById('prodFormCategory').value;
-    if (window.AlHusseiniSales && window.AlHusseiniSales.generateBarcode) {
-        document.getElementById('prodFormBarcode').value = window.AlHusseiniSales.generateBarcode(cat);
-    }
-}
-
-function openNewProductModal() {
-    document.getElementById('productModalTitle').textContent = 'إضافة صنف أو خدمة جديدة';
-    document.getElementById('prodFormId').value = '';
-    document.getElementById('prodFormCategory').value = 'زيوت';
-    document.getElementById('prodFormBrand').value = 'موبيل (Mobil)';
-    document.getElementById('prodFormName').value = '';
-    document.getElementById('prodFormAmp').value = '5W-40';
-    document.getElementById('prodFormType').value = 'زيت محرك تخليقي';
-    document.getElementById('prodFormUnit').value = 'جالون 4L';
-    document.getElementById('prodFormWarranty').value = '0';
-    document.getElementById('prodFormPriceNew').value = 1850;
-    document.getElementById('prodFormScrap').value = 0;
-    document.getElementById('prodFormStock').value = 30;
-    generateRandomBarcode();
-    onFormCategoryChange();
-}
-
-function editProduct(id) {
-    const p = window.AlHusseiniSales.getProductById(id);
-    if (!p) return;
-
-    document.getElementById('productModalTitle').textContent = 'تعديل بيانات الصنف / الخدمة';
-    document.getElementById('prodFormId').value = p.id;
-    document.getElementById('prodFormCategory').value = p.category || 'بطاريات';
-    document.getElementById('prodFormBrand').value = p.brand;
-    document.getElementById('prodFormBarcode').value = p.barcode || (window.AlHusseiniSales ? window.AlHusseiniSales.generateBarcode(p.category) : '');
-    document.getElementById('prodFormName').value = p.name;
-    document.getElementById('prodFormAmp').value = p.amp || '';
-    document.getElementById('prodFormType').value = p.type || '';
-    document.getElementById('prodFormUnit').value = p.unit || 'قطعة';
-    document.getElementById('prodFormWarranty').value = p.warrantyMonths || 0;
-    document.getElementById('prodFormPriceNew').value = p.priceNew;
-    document.getElementById('prodFormScrap').value = p.scrapValue || 0;
-    document.getElementById('prodFormStock').value = p.stock;
-    onFormCategoryChange();
-
-    const modal = new bootstrap.Modal(document.getElementById('productModal'));
-    modal.show();
-}
-
-function saveProductData(e) {
-    e.preventDefault();
-    const id = document.getElementById('prodFormId').value;
-    const cat = document.getElementById('prodFormCategory').value;
-    const brand = document.getElementById('prodFormBrand').value.trim();
-    const barcode = document.getElementById('prodFormBarcode').value.trim();
-    const name = document.getElementById('prodFormName').value.trim();
-    const amp = document.getElementById('prodFormAmp').value.trim();
-    const type = document.getElementById('prodFormType').value.trim();
-    const unit = document.getElementById('prodFormUnit').value.trim();
-    const warranty = Number(document.getElementById('prodFormWarranty').value);
-    const priceNew = Number(document.getElementById('prodFormPriceNew').value);
-    const scrap = Number(document.getElementById('prodFormScrap').value) || 0;
-    const stock = Number(document.getElementById('prodFormStock').value) || 0;
-
-    window.AlHusseiniSales.saveProduct({
-        id: id || null,
-        category: cat,
-        brand: brand,
-        barcode: barcode,
-        name: name,
-        amp: amp,
-        type: type,
-        unit: unit,
-        warrantyMonths: warranty,
-        priceNew: priceNew,
-        priceWithOld: Math.max(0, priceNew - scrap),
-        scrapValue: scrap,
-        stock: stock
+            window.location.reload();
+        } catch (err) {
+            errorsEl.textContent = 'تعذر الاتصال بالخادم. حاول مرة أخرى.';
+            errorsEl.classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
+        }
     });
-
-    const modalEl = document.getElementById('productModal');
-    const modal = bootstrap.Modal.getInstance(modalEl);
-    if (modal) modal.hide();
-
-    Swal.fire({
-        icon: 'success',
-        title: 'تم حفظ الصنف وتحديث الباركود بنجاح!',
-        timer: 1500,
-        showConfirmButton: false
-    });
-
-    renderProductsDashboard();
-}
+})();
 </script>
 @endsection

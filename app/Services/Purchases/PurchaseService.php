@@ -14,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 
 class PurchaseService implements PurchaseServiceInterface
 {
+    private const EPSILON = 0.01;
+
     public function getPaginatedInvoices(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = PurchaseInvoice::query()
@@ -104,19 +106,19 @@ class PurchaseService implements PurchaseServiceInterface
             $paidAmount = round((float) ($data['paid_amount'] ?? 0), 2);
             $remainingAmount = round(max(0, $finalAmount - $paidAmount), 2);
 
-            $paymentStatus = 'unpaid';
-            if ($remainingAmount <= 0.001) {
-                $paymentStatus = 'paid';
-            } elseif ($paidAmount > 0) {
-                $paymentStatus = 'partially_paid';
+            $paymentStatus = $this->paymentStatusFor($finalAmount, $paidAmount, $remainingAmount);
+
+            $branchId = $data['branch_id'] ?? auth()->user()?->branch_id;
+            if (empty($branchId)) {
+                throw new \InvalidArgumentException('الفرع مطلوب لتسجيل فاتورة المشتريات.');
             }
 
             // 2. Create Purchase Invoice without triggering double observer execution
-            $invoice = PurchaseInvoice::withoutEvents(function () use ($data, $receivedByUserId, $subtotal, $taxAmount, $discountAmount, $finalAmount, $paidAmount, $remainingAmount, $paymentStatus) {
+            $invoice = PurchaseInvoice::withoutEvents(function () use ($data, $branchId, $receivedByUserId, $subtotal, $taxAmount, $discountAmount, $finalAmount, $paidAmount, $remainingAmount, $paymentStatus) {
                 return PurchaseInvoice::create([
                     'invoice_number'   => $data['invoice_number'],
                     'supplier_id'      => $data['supplier_id'],
-                    'branch_id'        => $data['branch_id'] ?? auth()->user()?->branch_id ?? 1,
+                    'branch_id'        => $branchId,
                     'received_by'      => $receivedByUserId,
                     'invoice_date'     => $data['invoice_date'] ?? now()->toDateString(),
                     'subtotal'         => $subtotal,
@@ -158,62 +160,58 @@ class PurchaseService implements PurchaseServiceInterface
                     'cost_price'    => round($newWac, 2),
                 ]);
 
-                // Sync catalog entry in supplier_products
+                // Sync catalog entry in supplier_products. The supplier of the latest purchase
+                // becomes the (single) primary supplier; an empty line SKU keeps the known SKU.
+                $catalogValues = [
+                    'last_purchase_price' => $newCost,
+                    'is_primary_supplier' => true,
+                ];
+                if (!empty($pItem['supplier_sku'])) {
+                    $catalogValues['supplier_sku'] = $pItem['supplier_sku'];
+                }
+
                 SupplierProduct::updateOrCreate(
                     [
                         'supplier_id' => $supplier->id,
                         'product_id'  => $product->id,
                     ],
-                    [
-                        'supplier_sku'        => $pItem['supplier_sku'] ?? null,
-                        'last_purchase_price' => $newCost,
-                        'is_primary_supplier' => true,
-                    ]
+                    $catalogValues
                 );
+
+                SupplierProduct::where('product_id', $product->id)
+                    ->where('supplier_id', '!=', $supplier->id)
+                    ->where('is_primary_supplier', true)
+                    ->update(['is_primary_supplier' => false]);
             }
 
-            // 4. Update Supplier ledger and current balance
-            $balanceBefore = (float) $supplier->current_balance;
-            $balanceAfter = $balanceBefore + $remainingAmount;
+            // 4. Supplier ledger: the invoice is owed in full, then any amount paid on
+            // reception is a payment. The running balance of the ledger therefore always
+            // equals Supplier.current_balance (before + final - paid = before + remaining).
+            $balance = (float) $supplier->current_balance;
 
-            $supplier->update([
-                'current_balance' => $balanceAfter,
-            ]);
-
-            if ($remainingAmount > 0) {
-                SupplierLedgerEntry::create([
-                    'supplier_id'         => $supplier->id,
+            if ($finalAmount > 0) {
+                $balance = (float) $this->postLedgerEntry($supplier, [
                     'purchase_invoice_id' => $invoice->id,
                     'entry_type'          => 'purchase_invoice',
-                    'amount'              => $remainingAmount,
-                    'balance_before'      => $balanceBefore,
-                    'balance_after'       => $balanceAfter,
+                    'amount'              => $finalAmount,
                     'payment_method'      => $data['payment_method'] ?? 'cash',
                     'paid_by'             => $receivedByUserId,
-                    'notes'               => "استحقاق آجل لفاتورة توريد رقم {$invoice->invoice_number}",
-                ]);
+                    'notes'               => "استحقاق فاتورة توريد رقم {$invoice->invoice_number}",
+                ], $balance, +1)->balance_after;
             }
 
-            // If there's an immediate payment made on invoice reception
             if ($paidAmount > 0) {
-                // balance_before للدفعة الفورية = الرصيد بعد إضافة الآجل ($balanceAfter)
-                // لأن الرصيد تحرك من $balanceBefore -> $balanceAfter (بإضافة الآجل فقط)
-                // ثم الدفعة الفورية تخفضه: $balanceAfter -> ($balanceAfter - $paidAmount)
-                $paymentBalanceBefore = $balanceAfter; // = $balanceBefore + $remainingAmount
-                $paymentBalanceAfter  = round($paymentBalanceBefore - $paidAmount, 2);
-
-                SupplierLedgerEntry::create([
-                    'supplier_id'         => $supplier->id,
+                $balance = (float) $this->postLedgerEntry($supplier, [
                     'purchase_invoice_id' => $invoice->id,
                     'entry_type'          => 'supplier_payment',
                     'amount'              => $paidAmount,
-                    'balance_before'      => $paymentBalanceBefore,
-                    'balance_after'       => $paymentBalanceAfter,
                     'payment_method'      => $data['payment_method'] ?? 'cash',
                     'paid_by'             => $receivedByUserId,
-                    'notes'               => "دفعة نقدية مسددة فور استلام فاتورة توريد رقم {$invoice->invoice_number}",
-                ]);
+                    'notes'               => "دفعة مسددة فور استلام فاتورة توريد رقم {$invoice->invoice_number}",
+                ], $balance, -1)->balance_after;
             }
+
+            $supplier->update(['current_balance' => $balance]);
 
             return $invoice->fresh(['items.product', 'supplier', 'receivedByUser']);
         });
@@ -239,23 +237,62 @@ class PurchaseService implements PurchaseServiceInterface
                 );
             }
 
-            $balanceAfter = round($balanceBefore - $amount, 2);
+            $paidBy = $extra['paid_by'] ?? auth()->id();
+            if (empty($paidBy)) {
+                throw new \InvalidArgumentException('يجب تحديد المستخدم المسؤول عن صرف الدفعة.');
+            }
 
-            $supplier->update(['current_balance' => $balanceAfter]);
+            $targetInvoiceId = $extra['purchase_invoice_id'] ?? null;
 
-            return SupplierLedgerEntry::create([
-                'supplier_id'         => $supplier->id,
-                'purchase_invoice_id' => $extra['purchase_invoice_id'] ?? null,
+            // Allocate the payment to open purchase invoices so their paid/remaining/status stay
+            // truthful: to the given invoice only, otherwise FIFO (oldest invoice first).
+            // Any amount beyond the open invoices stays unallocated (advance), as before.
+            $openInvoices = PurchaseInvoice::where('supplier_id', $supplier->id)
+                ->where('remaining_amount', '>', self::EPSILON)
+                ->when($targetInvoiceId, fn ($q) => $q->where('id', $targetInvoiceId))
+                ->orderBy('invoice_date')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+
+            if ($targetInvoiceId && $openInvoices->isEmpty()
+                && !PurchaseInvoice::where('supplier_id', $supplier->id)->where('id', $targetInvoiceId)->exists()) {
+                throw new \DomainException('فاتورة المشتريات المحددة لا تخص هذا المورد.');
+            }
+
+            $toAllocate = round($amount, 2);
+            foreach ($openInvoices as $invoice) {
+                if ($toAllocate <= self::EPSILON) {
+                    break;
+                }
+
+                $applied = round(min($toAllocate, (float) $invoice->remaining_amount), 2);
+                $newPaid = round((float) $invoice->paid_amount + $applied, 2);
+                $newRemaining = round(max(0, (float) $invoice->remaining_amount - $applied), 2);
+
+                $invoice->update([
+                    'paid_amount'      => $newPaid,
+                    'remaining_amount' => $newRemaining,
+                    'payment_status'   => $this->paymentStatusFor((float) $invoice->final_amount, $newPaid, $newRemaining),
+                ]);
+
+                $toAllocate = round($toAllocate - $applied, 2);
+            }
+
+            $entry = $this->postLedgerEntry($supplier, [
+                'purchase_invoice_id' => $targetInvoiceId,
                 'entry_type'          => 'supplier_payment',
                 'amount'              => $amount,
-                'balance_before'      => $balanceBefore,
-                'balance_after'       => $balanceAfter,
                 'payment_method'      => $method,
                 'cheque_number'       => $extra['cheque_number'] ?? null,
-                'paid_by'             => $extra['paid_by'] ?? auth()->id() ?? 1,
+                'paid_by'             => $paidBy,
                 'receipt_number'      => $extra['receipt_number'] ?? null,
                 'notes'               => $extra['notes'] ?? 'سند صرف وسداد دفعة للمورد',
-            ]);
+            ], $balanceBefore, -1);
+
+            $supplier->update(['current_balance' => (float) $entry->balance_after]);
+
+            return $entry;
         });
     }
 
@@ -266,15 +303,24 @@ class PurchaseService implements PurchaseServiceInterface
             $supplier = Supplier::where('id', $invoice->supplier_id)->lockForUpdate()->firstOrFail();
 
             $returnTotal = 0.0;
-            $invoiceItems = $invoice->items->keyBy('product_id');
+            $invoiceItems = PurchaseInvoiceItem::where('purchase_invoice_id', $invoice->id)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
 
             foreach ($items as $item) {
-                $productId = $item['product_id'];
+                $productId = (int) $item['product_id'];
                 $qty = (int) $item['quantity'];
 
-                $invItem = $invoiceItems->get($productId);
-                if (!$invItem || $qty > $invItem->quantity) {
-                    throw new \DomainException("كمية المرتجع للصنف تتجاوز الكمية المسجلة بالفاتورة الأصلية.");
+                if ($qty < 1) {
+                    throw new \InvalidArgumentException('كمية المرتجع يجب أن تكون 1 على الأقل.');
+                }
+
+                // Quantities already returned are excluded, so the same goods cannot be returned twice.
+                $lines = $invoiceItems->where('product_id', $productId);
+                $available = $lines->sum(fn ($line) => (int) $line->quantity - (int) $line->returned_quantity);
+                if ($lines->isEmpty() || $qty > $available) {
+                    throw new \DomainException("كمية المرتجع للصنف تتجاوز الكمية المتبقية القابلة للإرجاع بالفاتورة الأصلية.");
                 }
 
                 $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
@@ -282,27 +328,56 @@ class PurchaseService implements PurchaseServiceInterface
                     throw new \DomainException("المخزون الحالي للصنف ({$product->name}) أقل من كمية المرتجع المطلوبة.");
                 }
 
-                $itemTotal = round($qty * (float) $invItem->unit_cost_price, 2);
-                $returnTotal += $itemTotal;
+                $remainingQty = $qty;
+                foreach ($lines as $line) {
+                    $lineAvailable = (int) $line->quantity - (int) $line->returned_quantity;
+                    if ($remainingQty <= 0 || $lineAvailable <= 0) {
+                        continue;
+                    }
+                    $take = min($remainingQty, $lineAvailable);
+                    $returnTotal += round($take * (float) $line->unit_cost_price, 2);
+                    $line->update(['returned_quantity' => (int) $line->returned_quantity + $take]);
 
-                $product->decrement('current_stock', $qty);
+                    // Reverse the weighted average cost for the goods leaving stock.
+                    $stock = (int) $product->current_stock;
+                    $newStock = $stock - $take;
+                    $cost = (float) $product->cost_price;
+                    if ($newStock > 0) {
+                        $reversed = (($stock * $cost) - ($take * (float) $line->unit_cost_price)) / $newStock;
+                        if ($reversed >= 0) {
+                            $cost = round($reversed, 2);
+                        }
+                    }
+                    $product->update(['current_stock' => $newStock, 'cost_price' => $cost]);
+
+                    $remainingQty -= $take;
+                }
             }
 
-            $balanceBefore = (float) $supplier->current_balance;
-            $balanceAfter = round(max(0, $balanceBefore - $returnTotal), 2);
-            $supplier->update(['current_balance' => $balanceAfter]);
+            $returnTotal = round($returnTotal, 2);
 
-            SupplierLedgerEntry::create([
-                'supplier_id'         => $supplier->id,
+            // The return first reduces what is still owed on this invoice. Anything beyond
+            // that (invoice already paid) becomes a credit with the supplier: the balance may
+            // go below zero instead of being clamped, so the ledger keeps matching the balance.
+            $fromRemaining = round(min($returnTotal, (float) $invoice->remaining_amount), 2);
+            if ($fromRemaining > 0) {
+                $newRemaining = round((float) $invoice->remaining_amount - $fromRemaining, 2);
+                $invoice->update([
+                    'remaining_amount' => $newRemaining,
+                    'payment_status'   => $this->paymentStatusFor((float) $invoice->final_amount, (float) $invoice->paid_amount, $newRemaining),
+                ]);
+            }
+
+            $entry = $this->postLedgerEntry($supplier, [
                 'purchase_invoice_id' => $invoice->id,
                 'entry_type'          => 'purchase_return',
                 'amount'              => $returnTotal,
-                'balance_before'      => $balanceBefore,
-                'balance_after'       => $balanceAfter,
                 'payment_method'      => 'cash',
                 'paid_by'             => $userId,
                 'notes'               => "مرتجع بضاعة لفاتورة مشتريات رقم {$invoice->invoice_number}. السبب: {$reason}",
-            ]);
+            ], (float) $supplier->current_balance, -1);
+
+            $supplier->update(['current_balance' => (float) $entry->balance_after]);
 
             return $invoice->fresh(['items.product', 'supplier']);
         });
@@ -332,14 +407,42 @@ class PurchaseService implements PurchaseServiceInterface
         $totalPurchases = $entries->where('entry_type', 'purchase_invoice')->sum('amount');
         $totalPayments = $entries->where('entry_type', 'supplier_payment')->sum('amount');
         $totalReturns = $entries->where('entry_type', 'purchase_return')->sum('amount');
+        // Adjustments (e.g. warranty credit notes) reduce the balance like payments and returns.
+        $totalAdjustments = $entries->where('entry_type', 'adjustment')->sum('amount');
 
         return [
-            'supplier'        => $supplier,
-            'entries'         => $entries,
-            'total_purchases' => (float) $totalPurchases,
-            'total_payments'  => (float) $totalPayments,
-            'total_returns'   => (float) $totalReturns,
-            'current_balance' => (float) $supplier->current_balance,
+            'supplier'          => $supplier,
+            'entries'           => $entries,
+            'total_purchases'   => (float) $totalPurchases,
+            'total_payments'    => (float) $totalPayments,
+            'total_returns'     => (float) $totalReturns,
+            'total_adjustments' => (float) $totalAdjustments,
+            'current_balance'   => (float) $supplier->current_balance,
         ];
+    }
+
+    private function paymentStatusFor(float $finalAmount, float $paidAmount, float $remainingAmount): string
+    {
+        if ($remainingAmount <= self::EPSILON) {
+            return 'paid';
+        }
+
+        return $paidAmount > 0 ? 'partially_paid' : 'unpaid';
+    }
+
+    /**
+     * Writes one supplier ledger entry whose balance_before/after continue the running balance.
+     * $sign is +1 for amounts owed to the supplier and -1 for payments, returns and credits.
+     */
+    private function postLedgerEntry(Supplier $supplier, array $attributes, float $balanceBefore, int $sign): SupplierLedgerEntry
+    {
+        $amount = round((float) $attributes['amount'], 2);
+
+        return SupplierLedgerEntry::create(array_merge($attributes, [
+            'supplier_id'    => $supplier->id,
+            'amount'         => $amount,
+            'balance_before' => round($balanceBefore, 2),
+            'balance_after'  => round($balanceBefore + ($sign * $amount), 2),
+        ]));
     }
 }

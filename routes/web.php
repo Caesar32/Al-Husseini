@@ -36,10 +36,7 @@ Route::get('/', function () {
     }
     /** @var \App\Models\User $user */
     $user = \Illuminate\Support\Facades\Auth::user();
-    if ($user->hasRole('cashier') || (!$user->can('dashboard.view') && $user->can('pos.access'))) {
-        return redirect()->route('admin.pos.index');
-    }
-    return redirect()->route('admin.dashboard');
+    return redirect()->route($user->homeRouteName());
 });
 
 // تبديل اللغة (Language Switcher)
@@ -90,6 +87,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::put('/profile/info', [ProfileController::class, 'updateInfo'])->name('profile.info');
         Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
         Route::post('/profile/avatar', [ProfileController::class, 'updateAvatar'])->name('profile.avatar');
+        Route::get('/profile/avatar/{user}', [ProfileController::class, 'showAvatar'])->name('profile.avatar.show');
 
         // إعدادات النظام والمنشأة (System Settings)
         Route::get('/settings', [SettingController::class, 'index'])->name('settings')->middleware('can:settings.manage');
@@ -101,7 +99,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('/system-diagnostics/simulate', [SystemDiagnosticController::class, 'runSimulation'])->name('diagnostics.run_simulation')->middleware('can:settings.manage');
 
         // إدارة الأدوار وتحديد الصلاحيات (Roles & Permissions)
-        Route::resource('roles', RoleController::class)->middleware('can:roles.manage');
+        Route::resource('roles', RoleController::class)->except(['show'])->middleware('can:roles.manage');
 
         // إدارة المستخدمين وحسابات الموظفين (User Accounts & Role Assignments)
         Route::get('/users', [UserController::class, 'index'])->name('users.index')->middleware('can:users.manage');
@@ -150,10 +148,15 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::post('/payroll/{payroll}/approve', [PayrollController::class, 'approve'])->name('payroll.approve')->middleware('can:payroll.approve');
             Route::post('/payroll/{payroll}/disburse', [PayrollController::class, 'disburse'])->name('payroll.disburse')->middleware('can:payroll.disburse');
 
-            // تقارير الموارد البشرية
-            Route::get('/reports', function () {
-                return view('admin.hr.reports');
-            })->name('reports')->middleware('can:reports.hr');
+            // ── تقارير الموارد البشرية (Phase 8 / FE-03: بيانات حقيقية من قاعدة البيانات) ──
+            Route::middleware('can:reports.hr')->group(function () {
+                Route::get('/reports', [\App\Http\Controllers\Hr\HrReportController::class, 'index'])->name('reports');
+                Route::get('/reports/daily', [\App\Http\Controllers\Hr\HrReportController::class, 'daily'])->name('reports.daily');
+                Route::get('/reports/monthly', [\App\Http\Controllers\Hr\HrReportController::class, 'monthly'])->name('reports.monthly');
+                Route::get('/reports/range', [\App\Http\Controllers\Hr\HrReportController::class, 'range'])->name('reports.range');
+                Route::get('/reports/employees/{employee}', [\App\Http\Controllers\Hr\HrReportController::class, 'employee'])->name('reports.employee');
+            });
+            // ── نهاية تقارير الموارد البشرية ──
 
             // إشعارات الإدارة
             Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index')->middleware('can:notifications.view');
@@ -162,16 +165,26 @@ Route::prefix('admin')->name('admin.')->group(function () {
         });
 
         // قطاع الموردين والتوريدات
-        Route::resource('suppliers', SupplierController::class);
+        // Supplier creation happens through the modal on the index page (there is no create view).
+        Route::resource('suppliers', SupplierController::class)
+            ->except(['create'])
+            ->middlewareFor(['index', 'show'], 'can:suppliers.view')
+            ->middlewareFor('store', 'can:suppliers.create')
+            ->middlewareFor(['edit', 'update'], 'can:suppliers.edit')
+            ->middlewareFor('destroy', 'can:suppliers.delete');
         Route::get('suppliers/{supplier}/ledger', [SupplierController::class, 'ledger'])->name('suppliers.ledger')->middleware('can:suppliers.view');
         Route::post('suppliers/{supplier}/payments', [SupplierController::class, 'recordPayment'])->name('suppliers.payments')->middleware('can:purchases.settle_payment');
 
         // فواتير المشتريات والتوريد
-        Route::resource('purchases', PurchaseInvoiceController::class)->except(['edit', 'update', 'destroy']);
+        Route::resource('purchases', PurchaseInvoiceController::class)
+            ->except(['edit', 'update', 'destroy'])
+            ->middlewareFor(['index', 'show'], 'can:purchases.view')
+            ->middlewareFor(['create', 'store'], 'can:purchases.create');
         Route::get('purchases/{purchase}/print', [PurchaseInvoiceController::class, 'print'])->name('purchases.print')->middleware('can:purchases.view');
 
         // نقطة البيع ومبيعات الكاشير
         Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware('can:pos.access');
+        Route::get('pos/products/search', [PosController::class, 'searchProducts'])->name('pos.products.search')->middleware('can:pos.access');
         Route::post('pos', [PosController::class, 'store'])->name('pos.store')->middleware('can:pos.access');
         Route::get('pos/{invoice}/receipt', [PosController::class, 'receipt'])->name('pos.receipt')->middleware('can:invoices.print');
         Route::get('pos/{invoice}/warranty', [PosController::class, 'warrantyCert'])->name('pos.warranty_cert')->middleware('can:warranties.view');
@@ -197,6 +210,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
         Route::post('credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
         Route::get('credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
 
+        // ─── BEGIN Phase 4: credit collections history (server-backed) ──────────────────────
+        Route::get('credit/payments', [CreditCustomerController::class, 'payments'])->name('credit.payments')->middleware('can:credit.view');
+        // ─── END Phase 4 ─────────────────────────────────────────────────────────────────────
+
         // التوافق مع المسارات السابقة (Backwards Compatibility Route Aliases)
         Route::prefix('sales')->name('sales.')->group(function () {
             Route::get('/pos', [PosController::class, 'index'])->name('pos')->middleware('can:pos.access');
@@ -204,12 +221,24 @@ Route::prefix('admin')->name('admin.')->group(function () {
             Route::get('/credit', [CreditCustomerController::class, 'index'])->name('credit')->middleware('can:credit.view');
             Route::post('/credit/settle', [CreditCustomerController::class, 'settlePayment'])->name('credit.settle')->middleware('can:credit.settle');
             Route::get('/credit/{customer}/statement', [CreditCustomerController::class, 'statement'])->name('credit.statement')->middleware('can:credit.view');
-            Route::get('/customers', function () {
-                return view('admin.sales.customers');
-            })->name('customers')->middleware('can:customers.view');
-            Route::get('/products', function () {
-                return view('admin.sales.products');
-            })->name('products')->middleware('can:products.view');
+            Route::get('/customers', [\App\Http\Controllers\Admin\CustomerController::class, 'index'])->name('customers')->middleware('can:customers.view');
+            Route::get('/products', [\App\Http\Controllers\Admin\ProductController::class, 'index'])->name('products')->middleware('can:products.view');
         });
+
+        // ─── BEGIN Phase 3: catalog backend (products / customers / vehicles) ───────────────
+        Route::get('products/search', [\App\Http\Controllers\Admin\ProductController::class, 'search'])->name('products.search')->middleware('can:products.view');
+        Route::post('products', [\App\Http\Controllers\Admin\ProductController::class, 'store'])->name('products.store')->middleware('can:products.create');
+        Route::put('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'update'])->name('products.update')->middleware('can:products.edit');
+        Route::delete('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'destroy'])->name('products.destroy')->middleware('can:products.delete');
+
+        Route::get('customers/search', [\App\Http\Controllers\Admin\CustomerController::class, 'search'])->name('customers.search')->middleware('can:customers.view');
+        Route::post('customers', [\App\Http\Controllers\Admin\CustomerController::class, 'store'])->name('customers.store')->middleware('can:customers.create');
+        Route::get('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'show'])->name('customers.show')->middleware('can:customers.view');
+        Route::put('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'update'])->name('customers.update')->middleware('can:customers.edit');
+        Route::delete('customers/{customer}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroy'])->name('customers.destroy')->middleware('can:customers.delete');
+        Route::post('customers/{customer}/vehicles', [\App\Http\Controllers\Admin\CustomerController::class, 'storeVehicle'])->name('customers.vehicles.store')->middleware('can:customers.edit');
+        Route::put('customers/{customer}/vehicles/{vehicle}', [\App\Http\Controllers\Admin\CustomerController::class, 'updateVehicle'])->name('customers.vehicles.update')->middleware('can:customers.edit')->scopeBindings();
+        Route::delete('customers/{customer}/vehicles/{vehicle}', [\App\Http\Controllers\Admin\CustomerController::class, 'destroyVehicle'])->name('customers.vehicles.destroy')->middleware('can:customers.edit')->scopeBindings();
+        // ─── END Phase 3 ─────────────────────────────────────────────────────────────────────
     });
 });

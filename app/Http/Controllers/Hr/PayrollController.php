@@ -36,6 +36,8 @@ class PayrollController extends Controller
             'employees' => $data['employees'],
             'recentDeductions' => $data['recentDeductions'],
             'latestPayroll' => $data['latestPayroll'],
+            'payrollConsistency' => $data['payrollConsistency'],
+            'latestItems' => $data['latestItems'],
         ]);
     }
 
@@ -64,12 +66,13 @@ class PayrollController extends Controller
     public function show(Payroll $payroll): View|JsonResponse
     {
         $detailedPayroll = $this->payrollService->getPayrollDetails($payroll);
+        $consistency = $this->payrollService->evaluateConsistency($detailedPayroll);
 
         if (request()->wantsJson()) {
-            return response()->json($detailedPayroll);
+            return response()->json(array_merge($detailedPayroll->toArray(), ['consistency' => $consistency]));
         }
 
-        return view('admin.hr.payroll_show', ['payroll' => $detailedPayroll]);
+        return view('admin.hr.payroll_show', ['payroll' => $detailedPayroll, 'consistency' => $consistency]);
     }
 
     public function approve(Request $request, Payroll $payroll): JsonResponse

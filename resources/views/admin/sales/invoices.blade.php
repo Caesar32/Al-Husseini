@@ -14,7 +14,7 @@
                         <div>
                             <p class="text-uppercase fw-bold text-muted fs-12 mb-1">إجمالي قيمة المبيعات</p>
                             <h3 class="fs-22 fw-extrabold text-primary mb-1 font-monospace">
-                                {{ number_format($stats['total_sales'] ?? 0, 2) }} ج.م
+                                <x-compact-money :amount="$stats['total_sales'] ?? 0" />
                             </h3>
                             <small class="text-muted fs-11">
                                 @if(request('date_from') || request('date_to'))
@@ -65,7 +65,7 @@
                                 {{ number_format($stats['credit_invoices_count'] ?? 0) }}
                             </h3>
                             <small class="text-danger fw-bold fs-11">
-                                متبقي: {{ number_format($stats['total_remaining_credit'] ?? 0, 2) }} ج.م
+                                متبقي: <x-compact-money :amount="$stats['total_remaining_credit'] ?? 0" />
                             </small>
                         </div>
                         <div class="avatar-sm">
@@ -104,6 +104,9 @@
     <div class="card shadow-sm border-0 mb-3">
         <div class="card-body p-3">
             <form method="GET" action="{{ request()->url() }}" id="invoicesFilterForm">
+                @if(request('branch_id'))
+                    <input type="hidden" name="branch_id" value="{{ request('branch_id') }}">
+                @endif
                 <!-- Row 1: Date Range, Search & Filter Controls -->
                 <div class="row g-2 align-items-center">
                     <!-- Date From -->
@@ -134,6 +137,9 @@
                             <option value="paid" {{ request('status') === 'paid' ? 'selected' : '' }}>مسددة بالكامل (خالصة)</option>
                             <option value="partially_paid" {{ request('status') === 'partially_paid' ? 'selected' : '' }}>سداد جزئي</option>
                             <option value="unpaid" {{ request('status') === 'unpaid' ? 'selected' : '' }}>غير مسددة (آجل)</option>
+                            <option value="refunded" {{ request('status') === 'refunded' ? 'selected' : '' }}>مرتجع بالكامل</option>
+                            <option value="partially_refunded" {{ request('status') === 'partially_refunded' ? 'selected' : '' }}>مرتجع جزئي</option>
+                            <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>ملغاة</option>
                         </select>
                     </div>
 

@@ -9,14 +9,14 @@ class StorePurchaseInvoiceRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return (bool) $this->user()?->can('purchases.create');
     }
 
     public function rules(): array
     {
         return [
             'supplier_id'             => ['required', 'exists:suppliers,id'],
-            'branch_id'               => ['nullable', 'exists:branches,id'],
+            'branch_id'               => ['nullable', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'invoice_number'          => ['required', 'string', 'max:50', 'unique:purchase_invoices,invoice_number'],
             'invoice_date'            => ['required', 'date'],
             'items'                   => ['required', 'array', 'min:1'],

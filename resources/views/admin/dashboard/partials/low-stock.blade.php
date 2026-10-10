@@ -3,9 +3,11 @@
         <h5 class="card-title mb-0 fw-bold fs-14 text-dark">
             <i class="ri-alarm-warning-line text-danger me-1"></i> تنبيهات نواقص المخزون (تحت حد الأمان)
         </h5>
+        @can('products.view')
         <a href="{{ route('admin.sales.products') }}" class="btn btn-sm btn-soft-danger rounded-pill px-3 py-1 fs-12">
             إدارة المخزون <i class="ri-arrow-left-s-line align-middle"></i>
         </a>
+        @endcan
     </div>
 
     <div class="card-body p-0 flex-grow-1 d-flex flex-column overflow-hidden">

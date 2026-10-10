@@ -118,6 +118,10 @@
 
     // تحميل التنبيهات عند تشغيل الصفحة
     document.addEventListener('DOMContentLoaded', () => {
+        // The bell is only rendered for users with notifications.view; everyone else must not
+        // poll an endpoint that answers 403.
+        if (!document.getElementById('notificationDropdown')) return;
+
         window.refreshAdminNotifications();
         // فحص دوري كل 30 ثانية
         setInterval(window.refreshAdminNotifications, 30000);

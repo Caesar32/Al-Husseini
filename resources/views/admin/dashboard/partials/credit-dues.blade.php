@@ -6,9 +6,11 @@
             </h5>
             <small class="text-muted fs-11">عملاء عليهم مستحقات مالية واجبة السداد</small>
         </div>
+        @can('credit.view')
         <a href="{{ route('admin.sales.credit') }}" class="btn btn-sm btn-soft-warning rounded-pill px-3 py-1 fs-12">
             سجل الآجل <i class="ri-arrow-left-s-line align-middle"></i>
         </a>
+        @endcan
     </div>
 
     <div class="card-body p-3">
@@ -26,9 +28,11 @@
                     </div>
                     <div class="text-end">
                         <strong class="text-danger font-monospace fs-13 d-block">{{ number_format($debtor->current_credit_balance, 2) }} ج.م</strong>
+                        @can('credit.view')
                         <a href="{{ route('admin.credit.statement', $debtor->id) }}" class="btn btn-sm btn-soft-warning rounded-pill py-0.5 px-2.5 fs-11 fw-bold shadow-none">
                             تحصيل <i class="ri-arrow-left-s-line"></i>
                         </a>
+                        @endcan
                     </div>
                 </div>
             @empty

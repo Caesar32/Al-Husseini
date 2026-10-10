@@ -11,9 +11,15 @@
         @include('admin.sales.pos.partials.search-and-categories')
 
         <!-- 3. Product Grid (Smooth Internal Scroll) -->
-        <div class="pos-catalog-scroll">
+        <div class="pos-catalog-scroll" id="posCatalogScrollContainer">
             <div class="row g-2" id="posCatalogGrid">
                 <!-- Rendered dynamically by JavaScript -->
+            </div>
+            <!-- Infinite scroll trigger: observed by IntersectionObserver; also a manual fallback button -->
+            <div id="catalogLoadMoreSentinel" class="text-center py-3 d-none">
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="catalogLoadMoreBtn" onclick="loadNextCatalogPage()">
+                    <i class="ri-add-line me-1"></i> تحميل المزيد
+                </button>
             </div>
         </div>
 

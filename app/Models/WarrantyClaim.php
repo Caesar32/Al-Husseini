@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WarrantyClaim extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $fillable = [
         'claim_number',
         'warranty_id',
@@ -19,11 +21,13 @@ class WarrantyClaim extends Model
         'cca_tested',
         'issue_description',
         'decision',
+        'rejection_reason',
         'replacement_invoice_id',
         'replacement_product_id',
         'replacement_battery_serial',
         'supplier_id',
         'supplier_resolution',
+        'settlement_notes',
         'received_by_user_id',
         'settled_by_user_id',
         'received_at',

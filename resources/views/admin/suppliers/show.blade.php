@@ -40,7 +40,7 @@
             <div class="card shadow-sm border-start border-start-primary border-3">
                 <div class="card-body">
                     <p class="text-muted mb-1 fs-12">الرصيد الدائن المستحق</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-danger">{{ number_format($stats['current_balance'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-danger"><x-compact-money :amount="$stats['current_balance']" /></h4>
                 </div>
             </div>
         </div>
@@ -48,7 +48,7 @@
             <div class="card shadow-sm border-start border-start-info border-3">
                 <div class="card-body">
                     <p class="text-muted mb-1 fs-12">إجمالي فواتير التوريد</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-primary">{{ number_format($stats['total_purchases'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-primary"><x-compact-money :amount="$stats['total_purchases']" /></h4>
                 </div>
             </div>
         </div>
@@ -56,7 +56,7 @@
             <div class="card shadow-sm border-start border-start-success border-3">
                 <div class="card-body">
                     <p class="text-muted mb-1 fs-12">المسدد للمورد</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-success">{{ number_format($stats['total_paid'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-success"><x-compact-money :amount="$stats['total_paid']" /></h4>
                 </div>
             </div>
         </div>
@@ -64,7 +64,7 @@
             <div class="card shadow-sm border-start border-start-warning border-3">
                 <div class="card-body">
                     <p class="text-muted mb-1 fs-12">سقف الائتمان المسموح به</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-dark">{{ number_format($stats['credit_limit'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-dark"><x-compact-money :amount="$stats['credit_limit']" /></h4>
                 </div>
             </div>
         </div>

@@ -57,6 +57,7 @@ test('cashier cannot apply discount without supervisor override code', function 
     $battery->update(['current_stock' => 10, 'retail_price' => 3000]);
 
     $response = $this->actingAs($cashier)->postJson(route('admin.pos.store'), [
+        'branch_id' => \App\Models\Branch::first()->id,
         'technician_id' => $technician->id,
         'items' => [
             [
@@ -82,7 +83,11 @@ test('cashier can apply discount with valid supervisor override code', function 
     $battery = Product::where('is_battery', true)->first();
     $battery->update(['current_stock' => 10, 'retail_price' => 3000]);
 
+    // Override secret must be configured explicitly (no built-in default code).
+    config(['finance.manager_override_hash' => \Illuminate\Support\Facades\Hash::make('supervisor-secret')]);
+
     $response = $this->actingAs($cashier)->postJson(route('admin.pos.store'), [
+        'branch_id' => \App\Models\Branch::first()->id,
         'technician_id'         => $technician->id,
         'items' => [
             [
@@ -93,7 +98,7 @@ test('cashier can apply discount with valid supervisor override code', function 
             ],
         ],
         'discount_amount'       => 200,
-        'manager_override_code' => '9999', // Default supervisor PIN
+        'manager_override_code' => 'supervisor-secret',
         'payments' => [
             ['method' => 'cash', 'amount' => 2800],
         ],

@@ -19,7 +19,11 @@ class SearchController extends Controller
     public function globalSearch(Request $request): JsonResponse
     {
         $query = (string) $request->input('q', $request->input('query', ''));
-        $results = $this->searchService->search($query);
+        $results = $this->searchService->search(
+            $query,
+            5,
+            \App\Services\SearchService::sectionsVisibleTo($request->user())
+        );
 
         return response()->json([
             'success' => true,

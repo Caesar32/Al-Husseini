@@ -3,13 +3,19 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ProfileController extends Controller
 {
+    private const AVATAR_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
+
     /**
      * عرض الصفحة الشخصية للمستخدم الحالي
      */
@@ -79,21 +85,43 @@ class ProfileController extends Controller
         ]);
 
         $user = Auth::user();
+        $file = $request->file('avatar');
 
-        if ($request->hasFile('avatar')) {
-            $file = $request->file('avatar');
-            $filename = 'avatar_' . $user->id . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $destinationPath = public_path('uploads/avatars');
+        // The extension comes from the detected content type, never from the client-supplied
+        // name, and the file is stored outside the web root (private "local" disk), so an
+        // uploaded file can never be requested or executed directly by the web server.
+        $extension = $file->guessExtension();
+        if (!in_array($extension, self::AVATAR_EXTENSIONS, true)) {
+            return redirect()->back()->withErrors(['avatar' => 'يجب أن تكون الصورة بصيغة JPG أو PNG أو WEBP.']);
+        }
 
-            if (!file_exists($destinationPath)) {
-                mkdir($destinationPath, 0755, true);
-            }
+        $path = $file->storeAs('avatars', $user->id . '-' . Str::random(32) . '.' . $extension, 'local');
+        if ($path === false) {
+            return redirect()->back()->withErrors(['avatar' => 'تعذر حفظ الصورة، يرجى المحاولة مرة أخرى.']);
+        }
 
-            $file->move($destinationPath, $filename);
+        $previous = (string) $user->avatar;
+        $user->update(['avatar' => $path]);
 
-            $user->update(['avatar' => $filename]);
+        if (str_starts_with($previous, 'avatars/')) {
+            Storage::disk('local')->delete($previous);
         }
 
         return redirect()->back()->with('status', 'تم تحديث الصورة الشخصية بنجاح.');
+    }
+
+    /**
+     * عرض الصورة الشخصية المخزنة خارج المجلد العام (للمستخدمين المسجلين فقط)
+     */
+    public function showAvatar(User $user): StreamedResponse
+    {
+        $path = (string) $user->avatar;
+
+        abort_unless(str_starts_with($path, 'avatars/') && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path, null, [
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
     }
 }

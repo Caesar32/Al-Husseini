@@ -9,9 +9,6 @@
 <script src="{{ asset('assets/libs/choices.js/public/assets/scripts/choices.min.js') }}"></script>
 <script src="{{ asset('assets/js/plugins.js') }}"></script>
 
-<!-- Al-Husseini Core Stores (Available to all views) -->
-<script src="{{ asset('assets/js/sales-store.js') }}"></script>
-<script src="{{ asset('assets/js/hr-store.js') }}"></script>
 
 <!-- App js -->
 <script src="{{ asset('assets/js/app.js') }}"></script>
@@ -19,8 +16,12 @@
 <!-- Global Spotlight Search Engine -->
 <script src="{{ asset('assets/js/global-spotlight-search.js') }}"></script>
 
+{{-- Page-owned scripts. The seamless navigation engine re-runs ONLY the scripts inside this
+     container after swapping .main-content; layout-owned inline scripts below must run once. --}}
+<div id="page-scripts">
 @yield('script')
 @stack('scripts')
+</div>
 
 <!-- Theme Icon & Sidebar State Sync (Bulletproof & Immediate) -->
 <script>
@@ -158,6 +159,441 @@ window.showHrToast = function(title, message, type) {
 </script>
 <!-- Al-Husseini Real-Time Admin Notifications -->
 <script src="{{ asset('assets/js/admin-notifications.js') }}"></script>
+
+<!-- Seamless Fullscreen Engine (نظام ملء الشاشة المستمر والتنقل السلس الاحترافي) -->
+<style>
+#alhusseini-top-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background: linear-gradient(90deg, #3577f1, #0ab39c);
+    box-shadow: 0 0 10px rgba(53, 119, 241, 0.7);
+    z-index: 9999999;
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+    pointer-events: none;
+    opacity: 0;
+}
+</style>
+<div id="alhusseini-top-progress"></div>
+
+<script>
+(function() {
+    'use strict';
+
+    // Clear any legacy storage
+    try { localStorage.removeItem('alhusseini-fullscreen'); } catch(e) {}
+
+    const btnSelector = '[data-toggle="fullscreen"]';
+    const progressBar = document.getElementById('alhusseini-top-progress');
+
+    // Progress bar controls
+    let progressTimer = null;
+    function startProgress() {
+        if (!progressBar) return;
+        clearTimeout(progressTimer);
+        progressBar.style.opacity = '1';
+        progressBar.style.width = '35%';
+        progressTimer = setTimeout(function() {
+            progressBar.style.width = '75%';
+        }, 150);
+    }
+
+    function finishProgress() {
+        if (!progressBar) return;
+        clearTimeout(progressTimer);
+        progressBar.style.width = '100%';
+        setTimeout(function() {
+            progressBar.style.opacity = '0';
+            setTimeout(function() {
+                progressBar.style.width = '0%';
+            }, 250);
+        }, 150);
+    }
+
+    function isFullscreen() {
+        return !!(
+            document.fullscreenElement ||
+            document.webkitFullscreenElement ||
+            document.mozFullScreenElement ||
+            document.msFullscreenElement ||
+            (window.innerHeight === screen.height && window.innerWidth === screen.width)
+        );
+    }
+
+    function updateIcons(active) {
+        const btns = document.querySelectorAll(btnSelector);
+        btns.forEach(function(btn) {
+            const icon = btn.querySelector('i');
+            if (!icon) return;
+            if (active) {
+                icon.className = 'bx bx-exit-fullscreen fs-22';
+                btn.setAttribute('title', 'الخروج من وضع ملء الشاشة');
+            } else {
+                icon.className = 'bx bx-fullscreen fs-22';
+                btn.setAttribute('title', 'وضع ملء الشاشة المستمر');
+            }
+        });
+    }
+
+    function enterFullscreen() {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+        if (req) {
+            try {
+                const p = req.call(el, Element.ALLOW_KEYBOARD_INPUT || undefined);
+                if (p && p.catch) p.catch(function(){});
+            } catch(e) {}
+        }
+        updateIcons(true);
+    }
+
+    function exitFullscreen() {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+        if (exit && (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement)) {
+            try {
+                const p = exit.call(document);
+                if (p && p.catch) p.catch(function(){});
+            } catch(e) {}
+        }
+        updateIcons(false);
+    }
+
+    // Attach button listener
+    function attachButtonListeners() {
+        const btns = document.querySelectorAll(btnSelector);
+        btns.forEach(function(btn) {
+            if (btn.dataset.fsAttached) return;
+            btn.dataset.fsAttached = '1';
+
+            // Clone to strip any conflicting legacy listeners
+            const clone = btn.cloneNode(true);
+            btn.parentNode.replaceChild(clone, btn);
+
+            clone.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (isFullscreen()) {
+                    exitFullscreen();
+                } else {
+                    enterFullscreen();
+                }
+            });
+        });
+        updateIcons(isFullscreen());
+    }
+
+    // ==============================================================
+    // Seamless Navigation Engine (Prevents Document Unload in Fullscreen)
+    // ==============================================================
+    let navAbort = null;
+
+    async function seamlessNavigate(url, pushState = true) {
+        if (navAbort) {
+            navAbort.abort();
+        }
+        const thisNavigation = new AbortController();
+        navAbort = thisNavigation;
+        // Last click wins: a navigation that has been superseded must not swap content,
+        // push history or fall back to a native load over the newer one.
+        const isCurrent = function() { return navAbort === thisNavigation; };
+
+        startProgress();
+
+        try {
+            const res = await fetch(url, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Al-Husseini-Seamless': '1'
+                },
+                signal: thisNavigation.signal
+            });
+
+            if (!isCurrent()) return;
+
+            if (!res.ok) {
+                window.location.href = url;
+                return;
+            }
+
+            const html = await res.text();
+            if (!isCurrent()) return;
+
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+
+            const currentMain = document.querySelector('.main-content');
+            const newMain = doc.querySelector('.main-content');
+
+            if (!currentMain || !newMain) {
+                window.location.href = url;
+                return;
+            }
+
+            // Update title
+            if (doc.title) {
+                document.title = doc.title;
+            }
+
+            // Update URL in browser
+            if (pushState) {
+                window.history.pushState({ seamless: true, url: url }, doc.title, url);
+            }
+
+            // Content Swap with subtle micro-transition
+            currentMain.style.opacity = '0.4';
+            currentMain.style.transition = 'opacity 0.08s ease';
+
+            setTimeout(async function() {
+                if (!isCurrent()) return;
+
+                currentMain.innerHTML = newMain.innerHTML;
+                currentMain.style.opacity = '1';
+
+                // Sync sidebar active link
+                syncSidebar(url);
+
+                try {
+                    // Run page-specific scripts (waiting for any library they load first);
+                    // collect the init handlers they register
+                    const pageInitHandlers = await runPageScripts(doc, currentMain);
+
+                    // A newer navigation replaced this page while its libraries were loading
+                    if (!isCurrent()) return;
+
+                    // Re-initialize core UI widgets, then run ONLY this page's init handlers
+                    reinitWidgets(pageInitHandlers);
+                } finally {
+                    finishProgress();
+                }
+            }, 80);
+
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.warn('Seamless navigation fell back to native:', err);
+                window.location.href = url;
+            }
+        }
+    }
+
+    function syncSidebar(targetUrl) {
+        try {
+            const urlObj = new URL(targetUrl, window.location.origin);
+            const path = urlObj.pathname;
+            document.querySelectorAll('#scrollbar .nav-link, .app-menu .nav-link').forEach(function(link) {
+                const linkHref = link.getAttribute('href');
+                if (!linkHref) return;
+                try {
+                    const lUrl = new URL(linkHref, window.location.origin);
+                    if (lUrl.pathname === path) {
+                        link.classList.add('active');
+                        const collapse = link.closest('.collapse');
+                        if (collapse) {
+                            collapse.classList.add('show');
+                        }
+                    } else {
+                        link.classList.remove('active');
+                    }
+                } catch(e) {}
+            });
+        } catch(e) {}
+    }
+
+    // Runs the scripts that belong to the page being swapped in, in document order, and returns the
+    // DOMContentLoaded / load handlers they registered (see reinitWidgets).
+    //
+    // Only scripts inside the new .main-content and inside the layout's #page-scripts container
+    // are page-owned. The layout's own inline scripts (this engine, theme sync, CSRF keep-alive)
+    // are siblings of that container and must NEVER be re-executed: doing so registered a new
+    // copy of every global listener per navigation, so one click started N parallel fetches
+    // and N swaps that raced each other (blank/dimmed/stale content).
+    //
+    // Scripts run sequentially: a newly added <script src> is awaited before the inline code that
+    // follows it, because that code usually depends on the library (e.g. ApexCharts); running it
+    // immediately threw "X is not defined" and left the page without its content.
+    async function runPageScripts(doc, container) {
+        const scriptList = [];
+        container.querySelectorAll('script').forEach(function(s) { scriptList.push(s); });
+        doc.querySelectorAll('#page-scripts script').forEach(function(s) { scriptList.push(s); });
+
+        const captured = [];
+
+        for (const s of scriptList) {
+            if (s.src) {
+                await loadExternalScript(s.src);
+            } else if (s.textContent.trim()) {
+                evalPageScript(s.textContent, captured);
+            }
+        }
+
+        return captured;
+    }
+
+    // Appends a page library once; resolves when it has loaded (or failed, so one broken
+    // library cannot stall the whole navigation).
+    function loadExternalScript(src) {
+        if (document.querySelector('script[src="' + src + '"]')) {
+            return Promise.resolve();
+        }
+
+        return new Promise(function(resolve) {
+            const el = document.createElement('script');
+            el.src = src;
+            el.async = false;
+            el.onload = resolve;
+            el.onerror = function() {
+                console.warn('Page script failed to load:', src);
+                resolve();
+            };
+            document.body.appendChild(el);
+        });
+    }
+
+    // Evaluates one inline page script in the global scope. Page scripts wire their init to
+    // DOMContentLoaded/load, which already fired for this document, so those registrations are
+    // captured instead of attached: they run exactly once (reinitWidgets) and never accumulate.
+    function evalPageScript(rawCode, captured) {
+        // Convert top-level let/const to var to prevent SyntaxError on repeat visits
+        const safeCode = rawCode
+            .replace(/(^|\n|\r|\;)\s*let\s+([a-zA-Z0-9_$]+)/g, '$1var $2')
+            .replace(/(^|\n|\r|\;)\s*const\s+([a-zA-Z0-9_$]+)/g, '$1var $2');
+
+        const docAdd = document.addEventListener;
+        const winAdd = window.addEventListener;
+        const capture = function(target, original) {
+            return function(type, listener, options) {
+                if ((type === 'DOMContentLoaded' || type === 'load') && listener) {
+                    captured.push({ target: target, type: type, listener: listener });
+                    return;
+                }
+                return original.call(this, type, listener, options);
+            };
+        };
+        document.addEventListener = capture(document, docAdd);
+        window.addEventListener = capture(window, winAdd);
+
+        try {
+            (1, eval)(safeCode);
+        } catch(e) {
+            console.warn('Script execution fallback:', e);
+        } finally {
+            document.addEventListener = docAdd;
+            window.addEventListener = winAdd;
+        }
+    }
+
+    function reinitWidgets(pageInitHandlers) {
+        if (typeof feather !== 'undefined') {
+            try { feather.replace(); } catch(e){}
+        }
+        if (typeof SimpleBar !== 'undefined') {
+            document.querySelectorAll('[data-simplebar]').forEach(function(el) {
+                try { new SimpleBar(el); } catch(e){}
+            });
+        }
+
+        // Run only the init handlers the swapped-in page registered. Dispatching
+        // DOMContentLoaded/load on document/window instead re-fired every handler of every page
+        // visited so far, plus layout one-time setup (e.g. admin-notifications.js starts a 30 s
+        // polling interval on DOMContentLoaded: one more poller per navigation).
+        (pageInitHandlers || []).forEach(function(entry) {
+            const event = new Event(entry.type);
+            try {
+                if (typeof entry.listener === 'function') {
+                    entry.listener.call(entry.target, event);
+                } else if (typeof entry.listener.handleEvent === 'function') {
+                    entry.listener.handleEvent(event);
+                }
+            } catch(e) {
+                console.warn('Page init handler failed:', e);
+            }
+        });
+
+        try { window.dispatchEvent(new Event('resize')); } catch(e){}
+    }
+
+    // Intercept link clicks when in fullscreen
+    document.addEventListener('click', function(e) {
+        if (!isFullscreen()) return; // Standard behavior when not in fullscreen
+
+        const link = e.target.closest('a');
+        if (!link) return;
+
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+        if (link.hasAttribute('download') || link.getAttribute('target') === '_blank') return;
+        if (link.dataset.noPjax || link.dataset.native || link.dataset.toggle === 'fullscreen') return;
+
+        const url = new URL(link.href, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+        if (url.pathname.includes('/logout') || url.pathname.includes('/api/')) return;
+        if (url.pathname === window.location.pathname && url.search === window.location.search && url.hash) return;
+
+        e.preventDefault();
+        seamlessNavigate(url.href, true);
+    }, true);
+
+    // Intercept GET filter/search forms when in fullscreen
+    document.addEventListener('submit', function(e) {
+        if (!isFullscreen()) return;
+
+        const form = e.target;
+        if (!form || (form.method || '').toUpperCase() !== 'GET') return;
+        if (form.dataset.noPjax || form.target === '_blank') return;
+
+        const action = form.action || window.location.href;
+        const url = new URL(action, window.location.origin);
+        if (url.origin !== window.location.origin) return;
+
+        e.preventDefault();
+        const formData = new FormData(form);
+        const searchParams = new URLSearchParams(formData);
+        const targetUrl = url.pathname + (searchParams.toString() ? '?' + searchParams.toString() : '');
+        seamlessNavigate(targetUrl, true);
+    }, true);
+
+    // Intercept Refresh (F5 and Ctrl+R) when in fullscreen
+    window.addEventListener('keydown', function(e) {
+        if (isFullscreen()) {
+            if (e.key === 'F5' || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r')) {
+                e.preventDefault();
+                seamlessNavigate(window.location.href, false);
+            }
+        }
+    });
+
+    // Handle browser Back / Forward buttons
+    window.addEventListener('popstate', function() {
+        if (isFullscreen()) {
+            seamlessNavigate(window.location.href, false);
+        }
+    });
+
+    // Monitor fullscreen changes (Esc key, F11, etc.)
+    ['fullscreenchange','webkitfullscreenchange','mozfullscreenchange','MSFullscreenChange'].forEach(function(ev) {
+        document.addEventListener(ev, function() {
+            updateIcons(isFullscreen());
+        });
+    });
+
+    window.addEventListener('resize', function() {
+        updateIcons(isFullscreen());
+    });
+
+    function init() {
+        attachButtonListeners();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+    window.addEventListener('load', init);
+})();
+</script>
 
 <!-- CSRF & Session Keep-Alive for Long Running Center Shifts -->
 <script>

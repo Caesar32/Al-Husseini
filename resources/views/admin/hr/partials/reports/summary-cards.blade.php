@@ -73,7 +73,7 @@
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
                         <p class="text-uppercase fw-semibold text-muted fs-12 mb-1">إجمالي الجزاءات والخصومات</p>
-                        <h4 class="fs-22 fw-bold text-primary mb-1" id="kpi-deductions-amount">0 ج.م</h4>
+                        <h4 class="fs-22 fw-bold text-primary mb-1" id="kpi-deductions-amount" style="cursor: help;" data-bs-toggle="tooltip" data-bs-placement="top" title="0.00 ج.م">0 ج.م</h4>
                         <p class="text-muted fs-12 mb-0">
                             عدد <span class="fw-semibold text-dark" id="kpi-deductions-count">0</span> قرار إداري معتمد
                         </p>

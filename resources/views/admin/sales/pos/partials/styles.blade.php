@@ -130,15 +130,51 @@
     .pos-category-scroll-container {
         display: flex;
         gap: 6px;
-        overflow-x: auto;
+        overflow-x: auto !important;
+        overflow-y: hidden;
         white-space: nowrap;
         -webkit-overflow-scrolling: touch;
-        scrollbar-width: none; /* Firefox */
-        -ms-overflow-style: none; /* IE/Edge */
-        padding: 2px 1px 4px 1px;
+        scrollbar-width: thin; /* Firefox: slim, visible scrollbar instead of hidden */
+        scrollbar-color: rgba(64, 81, 137, 0.35) transparent;
+        scroll-behavior: smooth;
+        cursor: grab;
+        padding: 2px 1px 6px 1px;
+    }
+    .pos-category-scroll-container:active,
+    .pos-category-scroll-container.is-dragging {
+        cursor: grabbing;
+        scroll-behavior: auto; /* smooth-scroll fights an active drag; disable it mid-drag */
     }
     .pos-category-scroll-container::-webkit-scrollbar {
-        display: none; /* Chrome, Safari, Opera */
+        height: 4px;
+        display: block; /* Chrome, Safari, Opera: slim visible scrollbar instead of hidden */
+    }
+    .pos-category-scroll-container::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .pos-category-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(64, 81, 137, 0.35);
+        border-radius: 4px;
+    }
+    .pos-category-nav-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .pos-category-nav-arrow {
+        flex-shrink: 0;
+        width: 26px;
+        height: 26px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 15px;
+        line-height: 1;
+    }
+    .pos-category-nav-arrow:disabled {
+        opacity: 0.35;
     }
     .pos-category-pill {
         flex-shrink: 0;
@@ -226,6 +262,56 @@
         z-index: 3;
     }
 
+    /* Quick-add autocomplete dropdown (replaces the old 7,340-option <select>) */
+    #quickAddResultsDropdown {
+        position: absolute;
+        top: calc(100% + 4px);
+        right: 0;
+        left: 0;
+        z-index: 1050;
+        max-height: 320px;
+        overflow-y: auto;
+        background: var(--vz-card-bg, #ffffff);
+        border: 1px solid var(--vz-border-color, #e2e8f0);
+        border-radius: 8px;
+        box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    }
+    .quick-add-result-item {
+        padding: 7px 10px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--vz-border-color, #eef0f2);
+    }
+    .quick-add-result-item:last-child {
+        border-bottom: none;
+    }
+    .quick-add-result-item:hover,
+    .quick-add-result-item.active {
+        background-color: var(--vz-light, #f3f6f9);
+    }
+    .quick-add-result-empty {
+        padding: 10px;
+        text-align: center;
+        font-size: 11.5px;
+        color: var(--vz-secondary-color, #878a99);
+    }
+
+    /* Skeleton loading state for catalog cards while a search/category fetch is in flight */
+    .pos-skeleton-card {
+        cursor: default;
+        pointer-events: none;
+    }
+    .pos-skeleton-line {
+        height: 10px;
+        border-radius: 4px;
+        background: linear-gradient(90deg, #eef0f2 25%, #e2e5e9 37%, #eef0f2 63%);
+        background-size: 400% 100%;
+        animation: pos-skeleton-shimmer 1.4s ease infinite;
+    }
+    @keyframes pos-skeleton-shimmer {
+        0% { background-position: 100% 50%; }
+        100% { background-position: 0 50%; }
+    }
+
     /* Mobile product card optimizations */
     @media (max-width: 575.98px) {
         .pos-product-card {
@@ -311,11 +397,69 @@
         font-weight: 800;
     }
 
-    .payment-method-card.active.pay-credit {
+    /* Payment mode selector (كامل الدفع / جزء من المبلغ / باقي المبلغ) */
+    .payment-mode-group {
+        display: flex;
+        gap: 4px;
+    }
+
+    .payment-mode-btn {
+        flex: 1 1 0;
+        cursor: pointer;
+        border: 2px solid var(--vz-border-color, #e9ebec);
+        border-radius: 8px;
+        padding: 5px 2px;
+        text-align: center;
+        line-height: 1.25;
+        background: var(--vz-card-bg, #ffffff);
+        color: var(--vz-body-color, #495057);
+        transition: all 0.15s ease;
+    }
+
+    .payment-mode-btn:hover {
+        border-color: var(--vz-border-color-translucent, #cbd5e1);
+    }
+
+    .payment-mode-btn:focus-visible {
+        outline: 2px solid var(--vz-primary);
+        outline-offset: 1px;
+    }
+
+    .payment-mode-btn.active.mode-full {
+        border-color: var(--vz-success);
+        background-color: var(--vz-success-bg-subtle, rgba(10, 179, 156, 0.1));
+        color: var(--vz-success);
+        font-weight: 800;
+    }
+
+    .payment-mode-btn.active.mode-partial {
+        border-color: var(--vz-primary);
+        background-color: var(--vz-primary-bg-subtle, rgba(64, 81, 137, 0.1));
+        color: var(--vz-primary);
+        font-weight: 800;
+    }
+
+    .payment-mode-btn.active.mode-remaining {
         border-color: var(--vz-warning);
         background-color: var(--vz-warning-bg-subtle, rgba(247, 184, 75, 0.12));
         color: var(--vz-warning-text-emphasis, #b45309);
         font-weight: 800;
+    }
+
+    [data-bs-theme="dark"] .payment-mode-btn {
+        background-color: #212529;
+        border-color: #32383e;
+        color: #ced4da;
+    }
+
+    [data-bs-theme="dark"] .payment-mode-btn.active {
+        color: #ffffff;
+    }
+
+    #paidNowInput[readonly],
+    #paidNowInput:disabled {
+        background-color: var(--vz-secondary-bg, #f3f6f9);
+        cursor: not-allowed;
     }
 
     /* Print styles */
@@ -456,12 +600,6 @@
         border-color: var(--vz-info) !important;
         color: var(--vz-info) !important;
     }
-    [data-bs-theme="dark"] .payment-method-card.active.pay-credit {
-        background-color: rgba(247, 184, 75, 0.2) !important;
-        border-color: var(--vz-warning) !important;
-        color: #f7b84b !important;
-    }
-
     /* Top Customer / Tech / Vehicle Header Bar */
     [data-bs-theme="dark"] .pos-catalog-panel .card-header,
     [data-bs-theme="dark"] .pos-cart-panel .card-header {
@@ -480,12 +618,12 @@
     [data-bs-theme="dark"] #posCustomerSelect,
     [data-bs-theme="dark"] #posTechnicianSelect,
     [data-bs-theme="dark"] #posTechnicianSelectCart,
-    [data-bs-theme="dark"] #quickAddProductSelect,
-    [data-bs-theme="dark"] #scrapCapacitySelect,
+    [data-bs-theme="dark"] #quickAddSearchInput,
+    [data-bs-theme="dark"] #scrapCapacityInput,
     [data-bs-theme="dark"] #scrapPriceInput,
     [data-bs-theme="dark"] #scrapCountInput,
     [data-bs-theme="dark"] #cashReceivedInput,
-    [data-bs-theme="dark"] #creditDepositInput {
+    [data-bs-theme="dark"] #paidNowInput {
         background-color: #1e2226 !important;
         color: #f8f9fa !important;
         border-color: #383f45 !important;
@@ -496,11 +634,38 @@
     [data-bs-theme="dark"] #catalogSearchInput:focus,
     [data-bs-theme="dark"] #posCustomerSelect:focus,
     [data-bs-theme="dark"] #posTechnicianSelect:focus,
-    [data-bs-theme="dark"] #quickAddProductSelect:focus {
+    [data-bs-theme="dark"] #quickAddSearchInput:focus {
         background-color: #212529 !important;
         color: #ffffff !important;
         border-color: var(--vz-primary) !important;
         box-shadow: 0 0 0 0.15rem rgba(64, 81, 137, 0.25) !important;
+    }
+    [data-bs-theme="dark"] #quickAddResultsDropdown {
+        background-color: #1e2226 !important;
+        border-color: #383f45 !important;
+    }
+    [data-bs-theme="dark"] .quick-add-result-item {
+        border-color: #32383e !important;
+        color: #f8f9fa !important;
+    }
+    [data-bs-theme="dark"] .quick-add-result-item:hover,
+    [data-bs-theme="dark"] .quick-add-result-item.active {
+        background-color: #262a2e !important;
+    }
+    [data-bs-theme="dark"] .pos-skeleton-card .pos-skeleton-line {
+        background: linear-gradient(90deg, #262a2e 25%, #32383e 37%, #262a2e 63%) !important;
+        background-size: 400% 100% !important;
+    }
+    [data-bs-theme="dark"] .pos-category-scroll-container {
+        scrollbar-color: rgba(141, 162, 251, 0.35) transparent;
+    }
+    [data-bs-theme="dark"] .pos-category-scroll-container::-webkit-scrollbar-thumb {
+        background: rgba(141, 162, 251, 0.35);
+    }
+    [data-bs-theme="dark"] .pos-category-nav-arrow {
+        background-color: #262a2e !important;
+        border-color: #383f45 !important;
+        color: #ced4da !important;
     }
     [data-bs-theme="dark"] .input-group-text {
         background-color: #262a2e !important;
@@ -524,6 +689,7 @@
 
     /* Financials & Helpers in Checkout Panel */
     [data-bs-theme="dark"] #cashPresetsBox,
+    [data-bs-theme="dark"] #paymentAmountBox,
     [data-bs-theme="dark"] .pos-cart-panel .bg-light {
         background-color: #212529 !important;
         border-color: #32383e !important;
@@ -531,7 +697,7 @@
     [data-bs-theme="dark"] .text-dark {
         color: #f8f9fa !important;
     }
-    [data-bs-theme="dark"] #creditBalanceOutput {
+    [data-bs-theme="dark"] #paymentRemainingOutput {
         background-color: #1a1d21 !important;
         border-color: #32383e !important;
     }

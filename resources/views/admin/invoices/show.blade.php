@@ -58,7 +58,7 @@
                     </a>
                 @endif
                 @can('invoices.cancel')
-                    @if($invoice->status !== 'returned' && $invoice->status !== 'cancelled')
+                    @if(!in_array($invoice->status, \App\Enums\InvoiceStatus::nonReturnableValues(), true) && $invoice->items->contains(fn($line) => $line->returnableQuantity() > 0))
                         <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#returnModal">
                             <i class="ri-arrow-go-back-line align-bottom me-1"></i> تسجيل مرتجع مبيعات
                         </button>
@@ -81,9 +81,11 @@
                         @php
                             $statusBadge = match($invoice->status) {
                                 'paid' => ['bg' => 'bg-success', 'label' => 'مدفوعة بالكامل'],
-                                'partial' => ['bg' => 'bg-warning text-dark', 'label' => 'مدفوعة جزئياً (آجل)'],
+                                'partially_paid' => ['bg' => 'bg-warning text-dark', 'label' => 'مدفوعة جزئياً (آجل)'],
                                 'unpaid' => ['bg' => 'bg-danger', 'label' => 'آجل غير مسدد'],
-                                'returned' => ['bg' => 'bg-secondary', 'label' => 'مرتجع'],
+                                'refunded' => ['bg' => 'bg-secondary', 'label' => 'مرتجع'],
+                                'partially_refunded' => ['bg' => 'bg-warning text-dark', 'label' => 'مرتجع جزئي'],
+                                'cancelled' => ['bg' => 'bg-dark', 'label' => 'ملغاة'],
                                 default => ['bg' => 'bg-info', 'label' => $invoice->status],
                             };
                         @endphp
@@ -156,9 +158,9 @@
                                             </span>
                                         </td>
                                         <td>
-                                            @if($item->serial_number)
+                                            @if($item->battery_serial_number)
                                                 <span class="badge bg-info-subtle text-info font-monospace fs-11">
-                                                    {{ $item->serial_number }}
+                                                    {{ $item->battery_serial_number }}
                                                 </span>
                                             @else
                                                 <span class="text-muted fs-12">-</span>
@@ -179,7 +181,7 @@
                     </div>
 
                     <!-- Scrap Battery Section (Trade-in) -->
-                    @if($invoice->scrapBattery || $invoice->scrap_discount > 0)
+                    @if($invoice->scrapBattery || $invoice->scrap_deduction_amount > 0)
                         <div class="alert alert-warning border-warning-subtle d-flex align-items-center justify-content-between p-3 mb-4">
                             <div>
                                 <h6 class="alert-heading fw-bold mb-1">
@@ -188,13 +190,13 @@
                                 <p class="mb-0 fs-13">
                                     تم خصم قيمة البطارية القديمة من الفاتورة وتم توريدها إلى مخزن الكهنة تلقائياً.
                                     @if($invoice->scrapBattery)
-                                        | الموديل: <strong>{{ $invoice->scrapBattery->brand ?? '' }} {{ $invoice->scrapBattery->capacity_ah ? $invoice->scrapBattery->capacity_ah . 'Ah' : '' }}</strong>
+                                        | الموديل: <strong>{{ $invoice->scrapBattery->capacity_ah ?? '' }}</strong>
                                     @endif
                                 </p>
                             </div>
                             <div class="text-end">
                                 <span class="badge bg-danger fs-13 font-monospace px-3 py-2">
-                                    -{{ number_format($invoice->scrap_discount, 2) }} ج.م
+                                    -{{ number_format($invoice->scrap_deduction_amount, 2) }} ج.م
                                 </span>
                             </div>
                         </div>
@@ -221,7 +223,7 @@
                                                 {{ $payment->payment_method }}
                                             </span>
                                         </td>
-                                        <td class="font-monospace text-muted">{{ $payment->reference_number ?? '-' }}</td>
+                                        <td class="font-monospace text-muted">{{ $payment->transaction_reference ?? '-' }}</td>
                                         <td class="text-end fw-bold font-monospace text-success">{{ number_format($payment->amount, 2) }} ج.م</td>
                                     </tr>
                                 @empty
@@ -317,10 +319,10 @@
                         </div>
                     @endif
 
-                    @if($invoice->scrap_discount > 0)
+                    @if($invoice->scrap_deduction_amount > 0)
                         <div class="d-flex justify-content-between py-2 border-bottom text-warning">
                             <span>بدل تخريد بطارية قديمة:</span>
-                            <span class="font-monospace fw-semibold">-{{ number_format($invoice->scrap_discount, 2) }} ج.م</span>
+                            <span class="font-monospace fw-semibold">-{{ number_format($invoice->scrap_deduction_amount, 2) }} ج.م</span>
                         </div>
                     @endif
 
@@ -333,7 +335,7 @@
 
                     <div class="d-flex justify-content-between py-3 border-bottom bg-light px-2 my-2 rounded">
                         <span class="fs-16 fw-bold">الصافي الإجمالي للفاتورة:</span>
-                        <span class="fs-18 fw-extrabold text-primary font-monospace">{{ number_format($invoice->total_amount, 2) }} ج.م</span>
+                        <span class="fs-18 fw-extrabold text-primary font-monospace">{{ number_format($invoice->final_amount, 2) }} ج.م</span>
                     </div>
 
                     <div class="d-flex justify-content-between py-2 border-bottom text-success">
@@ -372,16 +374,21 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">الأصناف المرتجعة:</label>
                         @foreach($invoice->items as $item)
-                            <div class="form-check border p-2 rounded mb-2 d-flex align-items-center justify-content-between">
+                            @php $returnable = $item->returnableQuantity(); @endphp
+                            <div class="form-check border p-2 rounded mb-2 d-flex align-items-center justify-content-between {{ $returnable === 0 ? 'opacity-50' : '' }}">
                                 <div>
-                                    <input class="form-check-input ms-2" type="checkbox" name="items[{{ $loop->index }}][product_id]" value="{{ $item->product_id }}" id="item_{{ $item->id }}" checked>
+                                    {{-- Unchecked rows post only a quantity and are dropped by ProcessSalesReturnRequest. --}}
+                                    <input class="form-check-input ms-2" type="checkbox" name="items[{{ $loop->index }}][invoice_item_id]" value="{{ $item->id }}" id="item_{{ $item->id }}" {{ $returnable === 0 ? 'disabled' : 'checked' }}>
                                     <label class="form-check-label fw-semibold" for="item_{{ $item->id }}">
                                         {{ $item->product?->name }}
+                                        @if((int) $item->returned_quantity > 0)
+                                            <span class="fs-11 text-muted d-block">سبق إرجاع {{ $item->returned_quantity }} من {{ $item->quantity }}</span>
+                                        @endif
                                     </label>
                                 </div>
                                 <div class="d-flex align-items-center" style="width: 120px;">
                                     <span class="fs-12 text-muted me-2">كمية:</span>
-                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ $item->quantity }}" min="1" max="{{ $item->quantity }}" required>
+                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ $returnable }}" min="1" max="{{ $returnable }}" {{ $returnable === 0 ? 'disabled' : '' }}>
                                 </div>
                             </div>
                         @endforeach

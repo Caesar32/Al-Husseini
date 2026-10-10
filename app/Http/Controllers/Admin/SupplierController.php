@@ -132,17 +132,25 @@ class SupplierController extends Controller
             'payment_method.required' => 'طريقة السداد مطلوبة.',
         ]);
 
-        $entry = $this->purchaseService->recordSupplierPayment(
-            $supplier->id,
-            (float) $validated['amount'],
-            $validated['payment_method'],
-            [
-                'cheque_number'  => $validated['cheque_number'] ?? null,
-                'receipt_number' => $validated['receipt_number'] ?? null,
-                'notes'          => $validated['notes'] ?? null,
-                'paid_by'        => auth()->id(),
-            ]
-        );
+        try {
+            $entry = $this->purchaseService->recordSupplierPayment(
+                $supplier->id,
+                (float) $validated['amount'],
+                $validated['payment_method'],
+                [
+                    'cheque_number'  => $validated['cheque_number'] ?? null,
+                    'receipt_number' => $validated['receipt_number'] ?? null,
+                    'notes'          => $validated['notes'] ?? null,
+                    'paid_by'        => auth()->id(),
+                ]
+            );
+        } catch (\DomainException|\InvalidArgumentException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+            }
+
+            return redirect()->back()->withErrors(['payment_error' => $e->getMessage()])->withInput();
+        }
 
         if ($request->wantsJson()) {
             return response()->json([

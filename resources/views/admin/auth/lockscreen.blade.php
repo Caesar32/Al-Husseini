@@ -44,7 +44,7 @@
                             </div>
 
                             <div class="user-thumb text-center my-3">
-                                <img src="{{ $user->avatar ? asset('uploads/avatars/' . $user->avatar) : asset('assets/images/users/avatar-1.jpg') }}" class="rounded-circle img-thumbnail avatar-lg shadow" alt="thumbnail">
+                                <img src="{{ $user->avatarUrl() }}" class="rounded-circle img-thumbnail avatar-lg shadow" alt="thumbnail">
                                 <h5 class="font-size-15 mt-3 fw-bold text-dark">{{ $user->name }}</h5>
                                 <p class="text-muted fs-13 mb-0">
                                     <span class="badge bg-primary-subtle text-primary">{{ $user->roles->first()?->name ?? 'super-admin' }}</span>

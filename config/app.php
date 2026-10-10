@@ -55,6 +55,12 @@ return [
     'url' => env('APP_URL', 'http://localhost'),
 
     /*
+    | Branch isolation (SEC-08): users confined to a branch only see that branch's records.
+    | Super-admins and users without a branch are unrestricted. Set BRANCH_ISOLATION=false to disable.
+    */
+    'branch_isolation' => env('BRANCH_ISOLATION', true),
+
+    /*
     |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------

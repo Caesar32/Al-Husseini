@@ -14,7 +14,7 @@ class StoreEmployeeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id' => ['required', 'exists:branches,id'],
+            'branch_id' => ['required', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'job_title_id' => ['required', 'exists:job_titles,id'],
             'employee_code' => ['required', 'string', 'max:30', 'unique:employees,employee_code'],
             'full_name' => ['required', 'string', 'max:150'],

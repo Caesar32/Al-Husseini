@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class Employee extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     use HasFactory, SoftDeletes;
 
     protected $fillable = [

@@ -88,7 +88,7 @@
                             <div class="p-3 bg-light rounded">
                                 <span class="text-muted fs-12 d-block mb-1">الرصيد المدين الحالي (المستحق):</span>
                                 <h3 class="fw-extrabold mb-0 font-monospace {{ $customer->current_credit_balance > 0 ? 'text-danger' : 'text-success' }}">
-                                    {{ number_format($customer->current_credit_balance, 2) }} ج.م
+                                    <x-compact-money :amount="$customer->current_credit_balance" />
                                 </h3>
                             </div>
                         </div>
@@ -96,7 +96,7 @@
                             <div class="p-3 bg-light rounded">
                                 <span class="text-muted fs-12 d-block mb-1">الحد الائتماني المسموح به:</span>
                                 <h3 class="fw-bold mb-0 font-monospace text-secondary">
-                                    {{ number_format($customer->credit_limit, 2) }} ج.م
+                                    <x-compact-money :amount="$customer->credit_limit" />
                                 </h3>
                             </div>
                         </div>
@@ -136,7 +136,7 @@
                                         <span class="badge bg-light text-dark me-1 border fs-11">{{ $it->product?->name }} (×{{ $it->quantity }})</span>
                                     @endforeach
                                 </td>
-                                <td class="text-end font-monospace fw-semibold">{{ number_format($inv->total_amount, 2) }} ج.م</td>
+                                <td class="text-end font-monospace fw-semibold">{{ number_format($inv->final_amount, 2) }} ج.م</td>
                                 <td class="text-end font-monospace text-success">{{ number_format($inv->paid_amount, 2) }} ج.م</td>
                                 <td class="text-end font-monospace fw-bold text-danger">{{ number_format($inv->remaining_amount, 2) }} ج.م</td>
                                 <td class="text-center">
@@ -153,6 +153,11 @@
                     </tbody>
                 </table>
             </div>
+            @if(isset($invoices) && $invoices instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $invoices->hasPages())
+                <div class="card-footer bg-transparent border-top py-2 d-flex justify-content-center">
+                    {{ $invoices->appends(request()->query())->links() }}
+                </div>
+            @endif
         </div>
     </div>
 
@@ -182,12 +187,13 @@
                         @forelse($customer->creditLedgers as $index => $entry)
                             @php
                                 $typeBadge = match($entry->entry_type) {
-                                    'sale_on_credit' => ['label' => 'فاتورة بيع بالآجل', 'class' => 'bg-danger-subtle text-danger'],
-                                    'payment_collection', 'payment_received' => ['label' => 'سداد دفعة نقدية', 'class' => 'bg-success-subtle text-success'],
-                                    'sales_return_refund' => ['label' => 'مرتجع مبيعات', 'class' => 'bg-info-subtle text-info'],
+                                    'invoice_debt' => ['label' => 'فاتورة بيع بالآجل', 'class' => 'bg-danger-subtle text-danger'],
+                                    'payment_collection' => ['label' => 'سداد دفعة نقدية', 'class' => 'bg-success-subtle text-success'],
+                                    'refund' => ['label' => 'مرتجع مبيعات', 'class' => 'bg-info-subtle text-info'],
+                                    'credit_adjustment' => ['label' => 'تسوية ائتمانية', 'class' => 'bg-warning-subtle text-warning'],
                                     default => ['label' => $entry->entry_type, 'class' => 'bg-secondary-subtle text-secondary'],
                                 };
-                                $isDebit = $entry->entry_type === 'sale_on_credit';
+                                $isDebit = $entry->entry_type === 'invoice_debt';
                             @endphp
                             <tr>
                                 <td>{{ $index + 1 }}</td>
@@ -214,6 +220,11 @@
                     </tbody>
                 </table>
             </div>
+            @if(isset($ledgers) && $ledgers instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $ledgers->hasPages())
+                <div class="card-footer bg-transparent border-top py-2 d-flex justify-content-center">
+                    {{ $ledgers->appends(request()->query())->links() }}
+                </div>
+            @endif
         </div>
     </div>
 </div>

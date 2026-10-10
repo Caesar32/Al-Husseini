@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class InvoiceItem extends Model
@@ -16,7 +17,13 @@ class InvoiceItem extends Model
         'total_price',
         'battery_serial_number',
         'warranty_duration_months',
+        'returned_quantity',
     ];
+
+    /**
+     * Net line value after returned units (quantity - returned_quantity) at the line price.
+     */
+    public const NET_LINE_SQL = '(quantity - returned_quantity) * unit_price';
 
     protected function casts(): array
     {
@@ -24,8 +31,14 @@ class InvoiceItem extends Model
             'unit_price' => 'decimal:2',
             'total_price' => 'decimal:2',
             'quantity' => 'integer',
+            'returned_quantity' => 'integer',
             'warranty_duration_months' => 'integer',
         ];
+    }
+
+    public function returnableQuantity(): int
+    {
+        return max(0, (int) $this->quantity - (int) $this->returned_quantity);
     }
 
     public function invoice(): BelongsTo
@@ -38,8 +51,28 @@ class InvoiceItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    /**
+     * The warranty issued when this line was sold. A warranty replacement creates a further
+     * warranty on the same invoice item, so the original is the oldest one.
+     */
     public function warranty(): HasOne
     {
-        return $this->hasOne(Warranty::class);
+        return $this->hasOne(Warranty::class)->oldestOfMany();
+    }
+
+    /**
+     * All warranties on this line: the original and any replacements issued by claims.
+     */
+    public function warranties(): HasMany
+    {
+        return $this->hasMany(Warranty::class);
+    }
+
+    /**
+     * The warranty currently in force for this line (the latest active one).
+     */
+    public function activeWarranty(): HasOne
+    {
+        return $this->hasOne(Warranty::class)->ofMany(['id' => 'max'], fn ($query) => $query->where('status', 'active'));
     }
 }

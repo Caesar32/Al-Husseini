@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Payroll extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     use HasFactory;
     protected $fillable = [
         'branch_id',

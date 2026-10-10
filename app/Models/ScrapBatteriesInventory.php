@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ScrapBatteriesInventory extends Model
 {
+    use \App\Models\Concerns\BelongsToBranch;
+
     protected $table = 'scrap_batteries_inventory';
 
     protected $fillable = [
@@ -17,6 +19,7 @@ class ScrapBatteriesInventory extends Model
         'lead_weight_kg',
         'status',
         'batch_number',
+        'scrap_sale_id',
         'received_by',
     ];
 
@@ -46,5 +49,10 @@ class ScrapBatteriesInventory extends Model
     public function receivedBy(): BelongsTo
     {
         return $this->receivedByEmployee();
+    }
+
+    public function scrapSale(): BelongsTo
+    {
+        return $this->belongsTo(ScrapSale::class);
     }
 }

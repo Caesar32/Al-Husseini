@@ -52,6 +52,10 @@ class ProcessWarrantyClaimRequest extends FormRequest
                 if ($warranty->status === 'voided') {
                     $validator->errors()->add('defective_serial', 'شهادة الضمان هذه ملغاة أو باطلة مسبقاً.');
                 }
+
+                if ($warranty->status === 'claimed') {
+                    $validator->errors()->add('defective_serial', 'تم صرف بديل مسبقاً لهذه البطارية؛ يرجى تقديم المطالبة على سيريال البطارية البديلة.');
+                }
             }
 
             // If replacement is decided:

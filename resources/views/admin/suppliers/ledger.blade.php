@@ -26,7 +26,7 @@
             <div class="card card-animate border-start border-start-primary border-3 shadow-sm">
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">الرصيد الدائن المستحق للمورد</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-danger">{{ number_format($statement['current_balance'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-danger"><x-compact-money :amount="$statement['current_balance']" /></h4>
                 </div>
             </div>
         </div>
@@ -34,7 +34,7 @@
             <div class="card card-animate border-start border-start-info border-3 shadow-sm">
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">إجمالي التوريدات والفواتير</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-primary">{{ number_format($statement['total_purchases'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-primary"><x-compact-money :amount="$statement['total_purchases']" /></h4>
                 </div>
             </div>
         </div>
@@ -42,7 +42,8 @@
             <div class="card card-animate border-start border-start-success border-3 shadow-sm">
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">إجمالي المدفوعات المسددة</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-success">{{ number_format($statement['total_payments'], 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-success"><x-compact-money :amount="$statement['total_payments']" /></h4>
+                    <p class="fs-11 text-muted mb-0">مرتجعات: {{ number_format($statement['total_returns'] ?? 0, 2) }} ج.م | تسويات وإشعارات خصم: {{ number_format($statement['total_adjustments'] ?? 0, 2) }} ج.م</p>
                 </div>
             </div>
         </div>
@@ -50,7 +51,7 @@
             <div class="card card-animate border-start border-start-warning border-3 shadow-sm">
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">سقف الائتمان المسموح</p>
-                    <h4 class="fs-20 fw-bold mb-0 text-dark">{{ number_format($supplier->credit_limit, 2) }} ج.م</h4>
+                    <h4 class="fs-20 fw-bold mb-0 text-dark"><x-compact-money :amount="$supplier->credit_limit" /></h4>
                 </div>
             </div>
         </div>

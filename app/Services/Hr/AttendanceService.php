@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\Branch;
 use App\Models\User;
 use App\Models\EmployeeLeave;
+use App\Jobs\DispatchOwnerPushNotification;
 use App\Notifications\EmployeeLateNotification;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
@@ -140,9 +141,10 @@ class AttendanceService implements AttendanceServiceInterface
                 $attendance->check_in = $punchTime;
                 $this->calculateLateness($attendance, $employee, $punchTime);
 
-                // الموظف في إجازة معتمدة: لا نلغي الإجازة، بل نجعل الحالة holiday
+                // الموظف في إجازة معتمدة: لا نلغي الإجازة، بل نجعل الحالة holiday (بدون تأخير؛ الساعات تُحتسب إضافي)
                 if ($isOnLeave) {
                     $attendance->status = 'holiday';
+                    $attendance->late_minutes = 0;
                 }
 
             } elseif ($isCheckOut) {
@@ -180,9 +182,20 @@ class AttendanceService implements AttendanceServiceInterface
 
             $attendance->save();
 
-            // إرسال إشعار فوري في حالة التأخير
-            if ($attendance->late_minutes > 0) {
+            // إرسال إشعار فوري في حالة التأخير — مرة واحدة فقط عند تسجيل التأخير، لا عند بصمة الانصراف
+            if ($attendance->late_minutes > 0 && $attendance->wasChanged('late_minutes')) {
                 $this->notifyAdminsAboutLateness($attendance);
+            }
+
+            // Owner alert: a cashier's shift closing out, so the owner gets a same-day summary
+            // nudge. Scoped to the cashier role only — every technician/cleaner clocking out
+            // would otherwise spam the owner's phone all day.
+            if ($isCheckOut && $employee->user?->hasRole('cashier')) {
+                DispatchOwnerPushNotification::dispatch(
+                    'إغلاق وردية كاشير 🧾',
+                    "أنهى الكاشير ({$employee->full_name}) ورديته اليوم الساعة " . $attendance->check_out->format('h:i A'),
+                    ['type' => 'shift_closed', 'employee_id' => $employee->id, 'attendance_id' => $attendance->id]
+                );
             }
 
             return $attendance;

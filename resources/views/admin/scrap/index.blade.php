@@ -50,7 +50,7 @@
             <div class="card card-animate border-start border-start-success border-3 shadow-sm">
                 <div class="card-body">
                     <p class="text-uppercase fw-medium text-muted text-truncate mb-1">القيمة التقديرية لرصيد الكهنة</p>
-                    <h4 class="fs-22 fw-bold mb-0 text-success">{{ number_format($metrics['total_scrap_value'], 2) }} ج.م</h4>
+                    <h4 class="fs-22 fw-bold mb-0 text-success"><x-compact-money :amount="$metrics['total_scrap_value']" /></h4>
                 </div>
             </div>
         </div>

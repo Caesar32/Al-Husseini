@@ -84,6 +84,7 @@ test('pos store endpoint creates invoice and returns 201 json payload', function
 
     $response = $this->actingAs($superAdmin)
         ->postJson(route('admin.pos.store'), [
+            'branch_id' => \App\Models\Branch::first()->id,
             'technician_id' => $technician->id,
             'items' => [
                 [

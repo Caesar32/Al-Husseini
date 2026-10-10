@@ -10,6 +10,8 @@ interface PosOrderServiceInterface
 {
     public function getPaginatedInvoices(array $filters = [], int $perPage = 15): LengthAwarePaginator;
 
+    public function getInvoiceStats(array $filters = []): array;
+
     public function processPosSale(array $data, int $cashierUserId): Invoice;
 
     public function processSalesReturn(int $invoiceId, array $items, string $reason, int $cashierUserId): Invoice;

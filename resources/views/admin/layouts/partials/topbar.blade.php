@@ -4,7 +4,7 @@
             <div class="d-flex">
                 <!-- LOGO -->
                 <div class="navbar-brand-box horizontal-logo">
-                    <a href="{{ route('admin.dashboard') }}" class="logo logo-dark">
+                    <a href="{{ route(auth()->user()->homeRouteName()) }}" class="logo logo-dark">
                         <span class="logo-sm">
                             <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                         </span>
@@ -16,7 +16,7 @@
                         </span>
                     </a>
 
-                    <a href="{{ route('admin.dashboard') }}" class="logo logo-light">
+                    <a href="{{ route(auth()->user()->homeRouteName()) }}" class="logo logo-light">
                         <span class="logo-sm">
                             <img src="{{ asset('assets/images/alhusseini-icon.jpg') }}" alt="Al-Husseini" height="28" class="rounded-3 shadow-sm" style="border: 1px solid rgba(212, 175, 55, 0.35);">
                         </span>
@@ -104,6 +104,7 @@
                     </button>
                 </div>
 
+                @can('notifications.view')
                 <!-- Notifications Dropdown -->
                 <div class="dropdown topbar-head-dropdown ms-1 header-item" id="notificationDropdown">
                     <button type="button" class="btn btn-icon btn-topbar material-shadow-none btn-ghost-secondary rounded-circle" id="page-header-notifications-dropdown" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-haspopup="true" aria-expanded="false">
@@ -139,6 +140,7 @@
                         </div>
                     </div>
                 </div>
+                @endcan
 
                 <!-- User Profile Dropdown -->
                 <div class="dropdown ms-sm-3 header-item topbar-user">
@@ -154,7 +156,9 @@
                     <div class="dropdown-menu dropdown-menu-end">
                         <h6 class="dropdown-header">مرحباً {{ auth()->user()->name ?? 'بك' }}!</h6>
                         <a class="dropdown-item" href="{{ route('admin.profile') }}"><i class="mdi mdi-account-circle text-muted fs-16 align-middle me-1"></i> <span class="align-middle">الملف الشخصي</span></a>
+                        @can('settings.manage')
                         <a class="dropdown-item" href="{{ route('admin.settings') }}"><i class="mdi mdi-cog-outline text-muted fs-16 align-middle me-1"></i> <span class="align-middle">إعدادات النظام</span></a>
+                        @endcan
                         <a class="dropdown-item" href="{{ route('admin.lockscreen') }}"><i class="mdi mdi-lock text-muted fs-16 align-middle me-1"></i> <span class="align-middle">قفل الشاشة</span></a>
                         <div class="dropdown-divider"></div>
                         <form action="{{ route('admin.logout') }}" method="POST" class="m-0 p-0">

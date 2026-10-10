@@ -3,6 +3,7 @@
 namespace App\Services\Sales;
 
 use App\Contracts\Sales\WarrantyServiceInterface;
+use App\Jobs\DispatchOwnerPushNotification;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
@@ -13,6 +14,16 @@ use Illuminate\Support\Facades\DB;
 
 class WarrantyService implements WarrantyServiceInterface
 {
+    /**
+     * Supplier settlement transitions: action => states it may be applied from.
+     */
+    private const SETTLEMENT_TRANSITIONS = [
+        'sent_to_supplier'    => ['pending'],
+        'settled_replacement' => ['pending', 'sent_to_supplier'],
+        'settled_credit_note' => ['pending', 'sent_to_supplier'],
+        'rejected'            => ['pending', 'sent_to_supplier'],
+    ];
+
     public function getPaginatedClaims(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = WarrantyClaim::query()
@@ -127,6 +138,18 @@ class WarrantyService implements WarrantyServiceInterface
                 throw new \DomainException('شهادة الضمان هذه ملغاة.');
             }
 
+            // A claimed warranty was already replaced; the replacement battery carries its own warranty.
+            if ($warranty->status === 'claimed') {
+                throw new \DomainException('تم صرف بديل مسبقاً لهذه البطارية؛ يرجى تقديم المطالبة على سيريال البطارية البديلة.');
+            }
+
+            $warranty->loadMissing('invoiceItem.product', 'invoiceItem.invoice');
+
+            $branchId = $data['branch_id'] ?? auth()->user()?->branch_id ?? $warranty->invoiceItem?->invoice?->branch_id;
+            if (empty($branchId)) {
+                throw new \InvalidArgumentException('تعذر تحديد الفرع المسؤول عن مطالبة الضمان.');
+            }
+
             $decision = $data['decision'] ?? 'replaced';
             $replacementProductId = $data['replacement_product_id'] ?? null;
             $replacementSerial = !empty($data['replacement_battery_serial']) ? trim($data['replacement_battery_serial']) : null;
@@ -144,7 +167,16 @@ class WarrantyService implements WarrantyServiceInterface
                 }
 
                 // Decrement 1 piece for instant customer replacement
+                $replacementStockBefore = (int) $replacementProduct->current_stock;
                 $replacementProduct->decrement('current_stock', 1);
+
+                if ($replacementStockBefore > 0 && $replacementStockBefore - 1 <= 0) {
+                    DispatchOwnerPushNotification::dispatch(
+                        'نفاد مخزون صنف حيوي ⚠️',
+                        "نفد مخزون الصنف ({$replacementProduct->name}) بعد صرفه كبطارية بديلة ضمن الضمان.",
+                        ['type' => 'critical_stock_zero', 'product_id' => $replacementProduct->id, 'sku' => $replacementProduct->sku]
+                    );
+                }
 
                 // Mark defective warranty as claimed
                 $warranty->update(['status' => 'claimed']);
@@ -156,21 +188,22 @@ class WarrantyService implements WarrantyServiceInterface
                     'customer_vehicle_id' => $warranty->customer_vehicle_id,
                     'serial_number'       => $replacementSerial,
                     'start_date'          => now()->toDateString(),
-                    'end_date'            => now()->addMonths($replacementProduct->warranty_months ?? 12)->toDateString(),
+                    'end_date'            => now()->addMonths((int) ($replacementProduct->warranty_months ?? \App\Models\Setting::number('warranty_months_default', 12, 0, 120)))->toDateString(),
                     'status'              => 'active',
                     'notes'               => "بديل معتمد لتذكرة الضمان للبطارية ({$defectiveSerial})",
                 ]);
 
-                // Identify Supplier to follow up defective unit return
-                $primarySupplier = $replacementProduct->primarySupplier()->first();
-                $supplierId = $primarySupplier?->id;
+                // The defective unit goes back to the supplier of the battery that was sold
+                // (not of the replacement given to the customer).
+                $soldProduct = $warranty->invoiceItem?->product;
+                $supplierId = $soldProduct?->primarySupplier()->first()?->id;
             }
 
             // 2. Create Claim Ticket (Observer will auto-generate claim_number CLM-YYYYMM-XXXX)
             $claim = WarrantyClaim::create([
                 'warranty_id'                => $warranty->id,
                 'customer_id'                => $warranty->customer_id,
-                'branch_id'                  => $data['branch_id'] ?? auth()->user()?->branch_id ?? 1,
+                'branch_id'                  => $branchId,
                 'defective_battery_serial'   => $defectiveSerial,
                 'replacement_product_id'     => $replacementProductId,
                 'replacement_battery_serial' => $replacementSerial,
@@ -181,6 +214,7 @@ class WarrantyService implements WarrantyServiceInterface
                 'cca_tested'                 => $data['cca_tested'] ?? null,
                 'issue_description'          => $data['issue_description'],
                 'decision'                   => $decision,
+                'rejection_reason'           => $decision === 'rejected' ? ($data['rejection_reason'] ?? null) : null,
                 'supplier_resolution'        => 'pending',
                 'received_by_user_id'        => $receivedByUserId,
                 'received_at'                => now(),
@@ -200,44 +234,59 @@ class WarrantyService implements WarrantyServiceInterface
         return DB::transaction(function () use ($claimId, $action, $resolutionData, $userId) {
             $claim = WarrantyClaim::with(['replacementProduct', 'supplier'])->lockForUpdate()->findOrFail($claimId);
 
-            if (!in_array($action, ['sent_to_supplier', 'settled_replacement', 'settled_credit_note', 'rejected'], true)) {
+            $allowedFrom = self::SETTLEMENT_TRANSITIONS[$action] ?? null;
+            if ($allowedFrom === null) {
                 throw new \InvalidArgumentException('إجراء تسوية المورد غير صالح.');
+            }
+
+            // Settlement is a one-way state machine: a settled or rejected claim is final, so stock
+            // and supplier credit can never be applied twice.
+            if (!in_array($claim->supplier_resolution, $allowedFrom, true)) {
+                throw new \DomainException("لا يمكن تنفيذ هذا الإجراء على مطالبة حالتها الحالية ({$claim->supplier_resolution}).");
             }
 
             // 1. If supplier sent replacement battery: replenish stock
             if ($action === 'settled_replacement') {
-                if ($claim->replacement_product_id) {
-                    $product = Product::where('id', $claim->replacement_product_id)->lockForUpdate()->first();
-                    $product?->increment('current_stock', 1);
+                if ($claim->decision !== 'replaced' || !$claim->replacement_product_id) {
+                    throw new \DomainException('التعويض ببطارية متاح فقط للمطالبات التي صُرف فيها بديل للعميل.');
                 }
+
+                $product = Product::where('id', $claim->replacement_product_id)->lockForUpdate()->firstOrFail();
+                $product->increment('current_stock', 1);
             }
 
             // 2. If supplier settled via credit note (إشعار خصم دائن في كشف الحساب)
-            if ($action === 'settled_credit_note' && $claim->supplier_id) {
-                $supplier = Supplier::where('id', $claim->supplier_id)->lockForUpdate()->firstOrFail();
-                $creditAmount = (float) ($resolutionData['credit_amount'] ?? $claim->replacementProduct?->cost_price ?? 0);
-
-                if ($creditAmount > 0) {
-                    $before = (float) $supplier->current_balance;
-                    $after = round($before - $creditAmount, 2);
-                    $supplier->update(['current_balance' => $after]);
-
-                    SupplierLedgerEntry::create([
-                        'supplier_id'    => $supplier->id,
-                        'entry_type'     => 'adjustment',
-                        'amount'         => $creditAmount,
-                        'balance_before' => $before,
-                        'balance_after'  => $after,
-                        'payment_method' => 'cash',
-                        'paid_by'        => $userId,
-                        'notes'          => "إشعار خصم ضمان لبطارية تالفة تذكرة رقم {$claim->claim_number}",
-                    ]);
+            if ($action === 'settled_credit_note') {
+                if (!$claim->supplier_id) {
+                    throw new \DomainException('لا يوجد مورد مرتبط بهذه المطالبة لتسجيل إشعار الخصم عليه.');
                 }
+
+                $creditAmount = round((float) ($resolutionData['credit_amount'] ?? $claim->replacementProduct?->cost_price ?? 0), 2);
+                if ($creditAmount <= 0) {
+                    throw new \DomainException('قيمة إشعار الخصم يجب أن تكون أكبر من صفر.');
+                }
+
+                $supplier = Supplier::where('id', $claim->supplier_id)->lockForUpdate()->firstOrFail();
+                $before = (float) $supplier->current_balance;
+                $after = round($before - $creditAmount, 2);
+                $supplier->update(['current_balance' => $after]);
+
+                SupplierLedgerEntry::create([
+                    'supplier_id'    => $supplier->id,
+                    'entry_type'     => 'adjustment',
+                    'amount'         => $creditAmount,
+                    'balance_before' => $before,
+                    'balance_after'  => $after,
+                    'payment_method' => 'cash',
+                    'paid_by'        => $userId,
+                    'notes'          => "إشعار خصم ضمان لبطارية تالفة تذكرة رقم {$claim->claim_number}",
+                ]);
             }
 
             // Update claim status
             $claim->update([
                 'supplier_resolution' => $action,
+                'settlement_notes'    => $resolutionData['notes'] ?? $claim->settlement_notes,
                 'settled_by_user_id'  => $userId,
                 'resolved_at'         => now(),
             ]);

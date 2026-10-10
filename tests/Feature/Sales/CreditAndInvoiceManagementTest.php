@@ -167,9 +167,8 @@ test('sales invoice show page loads invoice details, sold products, and payment 
         'final_amount'            => 3200,
         'paid_amount'             => 3200,
         'remaining_amount'        => 0,
-        'payment_status'          => 'paid',
+        'status'                  => 'paid',
         'payment_method'          => 'cash',
-        'invoice_type'            => 'retail',
     ]);
 
     InvoiceItem::create([
@@ -212,9 +211,8 @@ test('sales return on credit invoice deducts from customer debt and records refu
         'final_amount'            => 3500,
         'paid_amount'             => 0,
         'remaining_amount'        => 3500,
-        'payment_status'          => 'unpaid',
+        'status'                  => 'unpaid',
         'payment_method'          => 'credit',
-        'invoice_type'            => 'retail',
     ]);
 
     InvoiceItem::create([

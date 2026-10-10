@@ -68,20 +68,14 @@ class SystemDiagnosticService
         }
 
         // 2. فحص اتساق كشوف حساب العملاء (Customer Ledger vs Current Balance)
+        // كل قيد يجب أن ينقل الرصيد بقيمته وباتجاه نوعه، وأن يبدأ من رصيد القيد السابق،
+        // وآخر رصيد في الدفتر يجب أن يساوي الرصيد الحالي المخزن. العملاء بلا قيود (رصيد افتتاحي) لا يُقارنون.
         $customerMismatchCount = 0;
-        $customers = Customer::where('current_credit_balance', '>', 0)->get();
-        foreach ($customers as $customer) {
-            $ledgerDebt = CreditLedgerEntry::where('customer_id', $customer->id)
-                ->where('entry_type', 'invoice_debt')
-                ->sum('amount');
-            $ledgerPaid = CreditLedgerEntry::where('customer_id', $customer->id)
-                ->where('entry_type', 'payment_settlement')
-                ->sum('amount');
-            $calculatedBalance = round($ledgerDebt - $ledgerPaid, 2);
-            $actualBalance = round((float) $customer->current_credit_balance, 2);
-
-            // السماح بفرق طفيف إذا وُجد رصيد افتتاحي بدون قيد
-            if (abs($calculatedBalance - $actualBalance) > 1.0) {
+        $customerSigns = ['invoice_debt' => 1, 'payment_collection' => -1, 'refund' => -1];
+        $customerIds = CreditLedgerEntry::distinct()->pluck('customer_id');
+        foreach (Customer::whereIn('id', $customerIds)->get() as $customer) {
+            $entries = CreditLedgerEntry::where('customer_id', $customer->id)->orderBy('id')->get();
+            if ($this->ledgerChainIsBroken($entries, $customerSigns, (float) $customer->current_credit_balance)) {
                 $customerMismatchCount++;
             }
         }
@@ -97,19 +91,14 @@ class SystemDiagnosticService
         ];
 
         // 3. فحص اتساق كشوف حساب الموردين (Supplier Ledger vs Current Balance)
+        // نفس قاعدة سلسلة الأرصدة لكل الموردين الذين لهم قيود (بما فيها الأرصدة الصفرية والسالبة).
+        // adjustment = إشعار خصم ضمان من المورد (يُنقص المستحق للمورد).
         $supplierMismatchCount = 0;
-        $suppliers = Supplier::where('current_balance', '>', 0)->get();
-        foreach ($suppliers as $supplier) {
-            $ledgerDebt = SupplierLedgerEntry::where('supplier_id', $supplier->id)
-                ->where('entry_type', 'purchase_invoice')
-                ->sum('amount');
-            $ledgerPaid = SupplierLedgerEntry::where('supplier_id', $supplier->id)
-                ->where('entry_type', 'payment')
-                ->sum('amount');
-            $calculatedBalance = round($ledgerDebt - $ledgerPaid, 2);
-            $actualBalance = round((float) $supplier->current_balance, 2);
-
-            if (abs($calculatedBalance - $actualBalance) > 1.0) {
+        $supplierSigns = ['purchase_invoice' => 1, 'supplier_payment' => -1, 'purchase_return' => -1, 'adjustment' => -1];
+        $supplierIds = SupplierLedgerEntry::distinct()->pluck('supplier_id');
+        foreach (Supplier::withTrashed()->whereIn('id', $supplierIds)->get() as $supplier) {
+            $entries = SupplierLedgerEntry::where('supplier_id', $supplier->id)->orderBy('id')->get();
+            if ($this->ledgerChainIsBroken($entries, $supplierSigns, (float) $supplier->current_balance)) {
                 $supplierMismatchCount++;
             }
         }
@@ -145,12 +134,19 @@ class SystemDiagnosticService
         }
 
         // 5. فحص سلامة مسيرات الرواتب (Payroll Net Sum Verification)
+        // نفس تعريف الاتساق المستخدم عند الاعتماد والصرف (PayrollService::evaluateConsistency).
+        // صافي صفري رغم وجود مستحقات (مسير مستوعب بالكامل في الديون) حالة مراجعة وليس خطأ حسابياً.
         $payrollMismatch = 0;
-        $payrolls = Payroll::with('items')->get();
-        foreach ($payrolls as $payroll) {
-            $itemsNetSum = round((float) $payroll->items->sum('net_salary'), 2);
-            $payrollTotalNet = round((float) $payroll->total_net, 2);
-            if (abs($itemsNetSum - $payrollTotalNet) > 0.05) {
+        $payrollZeroNetReview = 0;
+        $payrollService = app(PayrollService::class);
+        foreach (Payroll::with('items')->get() as $payroll) {
+            $result = $payrollService->evaluateConsistency($payroll);
+            if ($result['consistent']) {
+                continue;
+            }
+            if ($result['zero_with_components'] && count($result['reasons']) === 1) {
+                $payrollZeroNetReview++;
+            } else {
                 $payrollMismatch++;
             }
         }
@@ -159,9 +155,10 @@ class SystemDiagnosticService
             'name'        => 'توازن مسيرات الرواتب ومطابقة الصافي (Payroll Net Sum)',
             'status'      => $payrollMismatch === 0 ? 'passed' : 'failed',
             'severity'    => 'high',
-            'details'     => $payrollMismatch === 0
+            'details'     => ($payrollMismatch === 0
                 ? 'جميع مسيرات الرواتب متوازنة حسابياً ومطابقة لمجموع بنود الموظفين.'
-                : "تم العثور على ({$payrollMismatch}) مسير راتب لا يتطابق إجماليه مع بنود الموظفين!",
+                : "تم العثور على ({$payrollMismatch}) مسير راتب لا يتطابق إجماليه مع بنود الموظفين!")
+                . ($payrollZeroNetReview > 0 ? " | ({$payrollZeroNetReview}) مسير بصافي صفري يحتاج مراجعة الديون." : ''),
             'count'       => $payrollMismatch,
         ];
         if ($payrollMismatch > 0) {
@@ -228,6 +225,39 @@ class SystemDiagnosticService
             'issues'       => $issues,
             'audited_at'   => now()->toDateTimeString(),
         ];
+    }
+
+    /**
+     * True when a ledger (ordered by id) is not a consistent running balance:
+     * an entry does not start where the previous one ended, an entry of a known type does not
+     * move the balance by its amount in that type's direction, or the final balance differs
+     * from the stored current balance. Entry types missing from $signs only need continuity.
+     *
+     * @param \Illuminate\Support\Collection<int, \Illuminate\Database\Eloquent\Model> $entries
+     * @param array<string, int> $signs entry_type => +1 / -1
+     */
+    private function ledgerChainIsBroken($entries, array $signs, float $currentBalance): bool
+    {
+        $eps = (float) config('finance.epsilon', 0.01);
+        $previousAfter = null;
+
+        foreach ($entries as $entry) {
+            $before = (float) $entry->balance_before;
+            $after = (float) $entry->balance_after;
+
+            if ($previousAfter !== null && abs($before - $previousAfter) > $eps) {
+                return true;
+            }
+
+            $sign = $signs[$entry->entry_type] ?? null;
+            if ($sign !== null && abs(($before + $sign * (float) $entry->amount) - $after) > $eps) {
+                return true;
+            }
+
+            $previousAfter = $after;
+        }
+
+        return $previousAfter !== null && abs($previousAfter - $currentBalance) > $eps;
     }
 
     /**
@@ -455,19 +485,33 @@ class SystemDiagnosticService
                     $rejectedWithoutCode = true;
                 }
 
-                // المحاولة مع كود المدير المعتمد
-                $invoiceOverridden = $posService->processPosSale([
-                    'branch_id'             => $branch->id,
-                    'customer_id'           => $customer->id,
-                    'technician_id'         => $technician->id,
-                    'manager_override_code' => 'mgr_override_99',
-                    'items'                 => [
-                        ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 2500.00],
-                    ],
-                    'payments'              => [
-                        ['method' => 'credit', 'amount' => 2500.00],
-                    ],
-                ], $user->id);
+                // المحاولة مع كود المدير المعتمد: كود عشوائي مؤقت يُضبط في الإعدادات أثناء المحاكاة فقط
+                // (لا يوجد كود ثابت داخل النظام؛ الإعداد الأصلي يُستعاد بعد الاستدعاء).
+                $simulationCode = bin2hex(random_bytes(8));
+                $originalOverride = [
+                    'finance.manager_override_hash' => config('finance.manager_override_hash'),
+                    'finance.manager_override_code' => config('finance.manager_override_code'),
+                ];
+                config([
+                    'finance.manager_override_hash' => \Illuminate\Support\Facades\Hash::make($simulationCode),
+                    'finance.manager_override_code' => null,
+                ]);
+                try {
+                    $invoiceOverridden = $posService->processPosSale([
+                        'branch_id'             => $branch->id,
+                        'customer_id'           => $customer->id,
+                        'technician_id'         => $technician->id,
+                        'manager_override_code' => $simulationCode,
+                        'items'                 => [
+                            ['product_id' => $product->id, 'quantity' => 1, 'unit_price' => 2500.00],
+                        ],
+                        'payments'              => [
+                            ['method' => 'credit', 'amount' => 2500.00],
+                        ],
+                    ], $user->id);
+                } finally {
+                    config($originalOverride);
+                }
 
                 $creditLimitPassed = $rejectedWithoutCode && ($invoiceOverridden !== null);
                 $steps[] = [
@@ -637,16 +681,20 @@ class SystemDiagnosticService
                 // اعتماد عمولة الفني لتظهر في مسير الراتب
                 TechnicianCommission::where('employee_id', $technician->id)->update(['status' => 'approved']);
 
-                // تسجيل 25 يوم حضور إضافي للموظف لاكتمال 26 يوم عمل شهري لتفادي خصم الغياب غير المبرر
+                // تسجيل 25 يوم حضور إضافي (غير يوم اليوم الذي سُجِّلت فيه بصمة التأخير) لاكتمال 26 يوم عمل شهري
+                // لتفادي خصم الغياب غير المبرر، أياً كان تاريخ تشغيل المحاكاة داخل الشهر.
                 $todayStr = now()->toDateString();
-                for ($d = 1; $d <= 25; $d++) {
+                $extraDays = 0;
+                for ($d = 1; $d <= now()->daysInMonth && $extraDays < 25; $d++) {
                     $dayDate = now()->startOfMonth()->addDays($d - 1)->toDateString();
-                    if ($dayDate !== $todayStr) {
-                        Attendance::firstOrCreate(
-                            ['employee_id' => $technician->id, 'work_date' => $dayDate],
-                            ['status' => 'present', 'check_in' => "{$dayDate} 09:00:00", 'check_out' => "{$dayDate} 17:00:00"]
-                        );
+                    if ($dayDate === $todayStr) {
+                        continue;
                     }
+                    Attendance::firstOrCreate(
+                        ['employee_id' => $technician->id, 'work_date' => $dayDate],
+                        ['status' => 'present', 'check_in' => "{$dayDate} 09:00:00", 'check_out' => "{$dayDate} 17:00:00"]
+                    );
+                    $extraDays++;
                 }
 
                 $payrollService = app(PayrollService::class);

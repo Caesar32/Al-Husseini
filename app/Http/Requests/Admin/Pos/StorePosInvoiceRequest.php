@@ -21,7 +21,7 @@ class StorePosInvoiceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'branch_id'             => ['nullable', 'exists:branches,id'],
+            'branch_id'             => ['nullable', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'customer_id'           => ['nullable', 'exists:customers,id'],
             'customer_vehicle_id'   => ['nullable', 'exists:customer_vehicles,id'],
             'technician_id'         => ['required', 'exists:employees,id'],
@@ -47,18 +47,34 @@ class StorePosInvoiceRequest extends FormRequest
             // Split Payments
             'payments'              => ['required', 'array', 'min:1'],
             'payments.*.method'     => ['required', 'in:cash,card,bank_transfer,credit'],
-            'payments.*.amount'     => ['required', 'numeric', 'min:0.01'],
+            // Currency: strictly positive, at most 2 decimals (no fractions of a piaster)
+            'payments.*.amount'     => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
             'payments.*.reference'  => ['nullable', 'string', 'max:100'],
 
             // Manager Override Code for Credit Limit Exceed
             'manager_override_code' => ['nullable', 'string'],
             'notes'                 => ['nullable', 'string', 'max:500'],
+            // Client-generated per-checkout key; a retried submission returns the original invoice.
+            'idempotency_key'       => ['nullable', 'string', 'max:64'],
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
+            // A retry of an already-committed checkout (same idempotency key) must not be re-validated:
+            // its serials and stock were consumed by the original sale. The service returns that invoice.
+            $idempotencyKey = trim((string) $this->input('idempotency_key', ''));
+            if ($idempotencyKey !== '') {
+                $existingCashierId = \App\Models\Invoice::where('idempotency_key', $idempotencyKey)->value('cashier_id');
+                if ($existingCashierId !== null) {
+                    if ((int) $existingCashierId !== (int) $this->user()?->id) {
+                        $validator->errors()->add('idempotency_key', 'مفتاح منع التكرار مستخدم لعملية بيع أخرى.');
+                    }
+                    return;
+                }
+            }
+
             $items = $this->input('items', []);
             if (!is_array($items) || empty($items)) {
                 return;
@@ -71,6 +87,16 @@ class StorePosInvoiceRequest extends FormRequest
             $batterySerials = [];
             $subtotal = 0.0;
 
+            // Total requested per product across lines (a product may appear on several lines).
+            $requestedPerProduct = [];
+            foreach ($items as $item) {
+                $pid = $item['product_id'] ?? null;
+                if ($pid !== null) {
+                    $requestedPerProduct[$pid] = ($requestedPerProduct[$pid] ?? 0) + (int) ($item['quantity'] ?? 1);
+                }
+            }
+            $stockErrorReported = [];
+
             foreach ($items as $index => $item) {
                 $productId = $item['product_id'] ?? null;
                 $qty = (int) ($item['quantity'] ?? 1);
@@ -80,11 +106,21 @@ class StorePosInvoiceRequest extends FormRequest
                     continue;
                 }
 
-                // Check stock
-                if ($product->current_stock < $qty) {
+                // Check stock against the total requested for this product
+                $requestedTotal = $requestedPerProduct[$productId] ?? $qty;
+                if ($product->current_stock < $requestedTotal && !isset($stockErrorReported[$productId])) {
+                    $stockErrorReported[$productId] = true;
                     $validator->errors()->add(
                         "items.{$index}.quantity",
-                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$qty}."
+                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$requestedTotal}."
+                    );
+                }
+
+                // Each battery unit carries its own serial and warranty, so a battery line covers exactly one unit.
+                if ($product->is_battery && $qty !== 1) {
+                    $validator->errors()->add(
+                        "items.{$index}.quantity",
+                        "كل بطارية تُسجَّل في سطر مستقل بسيريال خاص بها (الكمية في سطر البطارية يجب أن تكون 1)."
                     );
                 }
 
@@ -175,9 +211,16 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
 
-            // 4. Validate Final Amount vs Payments Sum
-            $tax = (float) $this->input('tax_amount', 0);
-            $finalAmount = max(0, ($subtotal + $tax) - $discount - $scrapDeduction);
+            // 4. Validate Discount + Scrap does not exceed gross
+            $tax = round((float) $this->input('tax_amount', 0), 2);
+            $gross = round($subtotal + $tax, 2);
+            if ($discount + $scrapDeduction > $gross + 0.01) {
+                $validator->errors()->add(
+                    'discount_amount',
+                    'مجموع الخصم وخصم الكهنة (' . number_format($discount + $scrapDeduction, 2) . ' ج.م) يتجاوز إجمالي الفاتورة قبل الخصم (' . number_format($gross, 2) . ' ج.م).'
+                );
+            }
+            $finalAmount = round(max(0, $gross - $discount - $scrapDeduction), 2);
 
             $payments = $this->input('payments', []);
             $totalPayments = 0.0;
@@ -191,11 +234,27 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
 
-            if (abs($totalPayments - $finalAmount) > 0.05) {
+            $eps = (float) config('finance.epsilon', 0.01);
+            // Exact comparison in piasters: amounts are limited to 2 decimals above, so no tolerance
+            // is needed, and a tolerance would let a one-piaster overpayment through.
+            $paidCents = (int) round($totalPayments * 100);
+            $dueCents = (int) round($finalAmount * 100);
+
+            if ($paidCents > $dueCents) {
+                // Paying more than is due is never allowed (the excess has no meaning on the invoice).
                 $validator->errors()->add(
                     'payments',
                     sprintf(
-                        'إجمالي مبالغ الدفعات المجزأة (%s ج.م) لا يتطابق مع صافي الفاتورة الإجمالي بعد خصم الكهنة (%s ج.م).',
+                        'مبلغ الدفع (%s ج.م) يتجاوز المبلغ المستحق (%s ج.م). لا يمكن دفع أكثر من المستحق.',
+                        number_format($totalPayments, 2),
+                        number_format($finalAmount, 2)
+                    )
+                );
+            } elseif ($paidCents < $dueCents) {
+                $validator->errors()->add(
+                    'payments',
+                    sprintf(
+                        'إجمالي الدفعات (%s ج.م) أقل من المبلغ المستحق (%s ج.م). أكمل الدفع أو سجّل المتبقي على الآجل.',
                         number_format($totalPayments, 2),
                         number_format($finalAmount, 2)
                     )
@@ -237,28 +296,7 @@ class StorePosInvoiceRequest extends FormRequest
 
     protected function isManagerOverrideValid(?string $code): bool
     {
-        if (empty($code)) {
-            return false;
-        }
-
-        // 1. Check fixed system override pin if configured
-        $configuredCode = (string) config('app.manager_override_code', '9999');
-        if ($code === $configuredCode) {
-            return true;
-        }
-
-        // 2. Check if code matches password of any user with admin or manager role
-        $managers = User::whereHas('roles', function ($query) {
-            $query->whereIn('name', ['admin', 'manager', 'branch_manager', 'super-admin', 'branch-manager']);
-        })->get();
-
-        foreach ($managers as $manager) {
-            if (Hash::check($code, $manager->password)) {
-                return true;
-            }
-        }
-
-        return false;
+        return app(\App\Services\Finance\ManagerOverrideService::class)->isValid($code);
     }
 
     public function messages(): array
@@ -276,6 +314,8 @@ class StorePosInvoiceRequest extends FormRequest
             'payments.*.method.required'        => 'طريقة الدفع مطلوبة.',
             'payments.*.amount.required'        => 'مبلغ الدفعة مطلوب.',
             'payments.*.amount.min'             => 'مبلغ الدفعة يجب أن يكون أكبر من الصفر.',
+            'payments.*.amount.numeric'         => 'مبلغ الدفعة يجب أن يكون رقماً.',
+            'payments.*.amount.decimal'         => 'مبلغ الدفعة يجب ألا يزيد عن خانتين عشريتين.',
         ];
     }
 }
