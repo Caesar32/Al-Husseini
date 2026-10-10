@@ -27,10 +27,10 @@ class ProductCategoriesSeeder extends Seeder
         ];
 
         foreach ($categories as $cat) {
-            Category::firstOrCreate(
-                ['name' => $cat['name']],
-                ['slug' => $cat['slug']]
-            );
+            // Another seeder may already own the slug (unique) under a different name.
+            if (! Category::where('slug', $cat['slug'])->orWhere('name', $cat['name'])->exists()) {
+                Category::create($cat);
+            }
         }
     }
 }
