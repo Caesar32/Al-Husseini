@@ -21,7 +21,8 @@ test('store employee request validates complete valid payload', function () {
 
     $data = [
         'branch_id' => $branch->id,
-        'job_title_id' => $jobTitle->id,
+        'department' => $jobTitle->department->name,
+        'job_title' => $jobTitle->title,
         'employee_code' => 'EMP-REQ-01',
         'full_name' => 'فني كهرباء سيارات',
         'national_id' => '29501011234567',
@@ -54,7 +55,8 @@ test('store employee request fails when employee code is duplicate', function ()
 
     $data = [
         'branch_id' => $existing->branch_id,
-        'job_title_id' => $existing->job_title_id,
+        'department' => $existing->jobTitle->department->name,
+        'job_title' => $existing->jobTitle->title,
         'employee_code' => $existing->employee_code,
         'full_name' => 'موظف مكرر',
         'national_id' => '29501019999999',

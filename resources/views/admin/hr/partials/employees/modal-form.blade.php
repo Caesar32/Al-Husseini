@@ -30,21 +30,18 @@
                         </div>
 
                         <div class="col-md-6">
-                            <label for="empJobTitle" class="form-label fw-semibold">المسمى الوظيفي والقسم <span class="text-danger">*</span></label>
-                            <select class="form-select" id="empJobTitle" required>
-                                @foreach($departments as $dept)
-                                    <optgroup label="{{ $dept->name }}">
-                                        @foreach($dept->jobTitles as $jt)
-                                            <option value="{{ $jt->id }}">{{ $jt->title_name }}</option>
-                                        @endforeach
-                                    </optgroup>
-                                @endforeach
-                            </select>
+                            <label for="empDepartment" class="form-label fw-semibold">القسم <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="empDepartment" required maxlength="100">
                         </div>
 
                         <div class="col-md-6">
-                            <label for="empNationalId" class="form-label fw-semibold">الرقم القومي (14 رقم) <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control font-monospace" id="empNationalId" required maxlength="14" placeholder="29501011234567">
+                            <label for="empJobTitle" class="form-label fw-semibold">المسمى الوظيفي <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="empJobTitle" required maxlength="100">
+                        </div>
+
+                        <div class="col-md-6">
+                            <label for="empNationalId" class="form-label fw-semibold">الرقم القومي (14 رقم)</label>
+                            <input type="text" class="form-control font-monospace" id="empNationalId" maxlength="14" placeholder="29501011234567">
                         </div>
 
                         <div class="col-md-6">

@@ -15,10 +15,11 @@ class StoreEmployeeRequest extends FormRequest
     {
         return [
             'branch_id' => ['required', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
-            'job_title_id' => ['required', 'exists:job_titles,id'],
+            'department' => ['required', 'string', 'max:100'],
+            'job_title' => ['required', 'string', 'max:100'],
             'employee_code' => ['required', 'string', 'max:30', 'unique:employees,employee_code'],
             'full_name' => ['required', 'string', 'max:150'],
-            'national_id' => ['required', 'string', 'size:14', 'unique:employees,national_id'],
+            'national_id' => ['nullable', 'string', 'size:14', 'unique:employees,national_id'],
             'phone' => ['required', 'string', 'max:20', 'unique:employees,phone'],
             'hire_date' => ['required', 'date'],
             'shift_start_time' => ['required', 'date_format:H:i'],
@@ -36,7 +37,8 @@ class StoreEmployeeRequest extends FormRequest
     {
         return [
             'branch_id.required' => 'يرجى اختيار الفرع التابع له الموظف.',
-            'job_title_id.required' => 'يرجى تحديد المسمى الوظيفي.',
+            'department.required' => 'يرجى إدخال القسم.',
+            'job_title.required' => 'يرجى إدخال المسمى الوظيفي.',
             'employee_code.required' => 'كود الموظف مطلوب.',
             'employee_code.unique' => 'كود الموظف مسجل مسبقاً.',
             'full_name.required' => 'الاسم الكامل للموظف مطلوب.',

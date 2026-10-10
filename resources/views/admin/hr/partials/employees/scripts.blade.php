@@ -257,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <h4 class="fw-bold mb-1">${emp.full_name}</h4>
                                 <p class="text-muted mb-1 fs-14">${emp.job_title?.title_name || 'موظف'} | <span class="badge bg-primary-subtle text-primary">${emp.branch?.name || ''}</span></p>
                                 <span class="badge bg-light text-body font-monospace">${emp.employee_code}</span>
-                                <span class="badge bg-secondary-subtle text-secondary ms-1">الرقم القومي: ${emp.national_id}</span>
+                                <span class="badge bg-secondary-subtle text-secondary ms-1">الرقم القومي: ${emp.national_id || "-"}</span>
                             </div>
                         </div>
 
@@ -351,8 +351,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('empName').value = emp.full_name;
                     document.getElementById('empCode').value = emp.employee_code;
                     document.getElementById('empBranch').value = emp.branch_id;
-                    document.getElementById('empJobTitle').value = emp.job_title_id;
-                    document.getElementById('empNationalId').value = emp.national_id;
+                    document.getElementById('empDepartment').value = emp.job_title?.department?.name || '';
+                    document.getElementById('empJobTitle').value = emp.job_title?.title || '';
+                    document.getElementById('empNationalId').value = emp.national_id || '';
                     document.getElementById('empPhone').value = emp.phone;
                     document.getElementById('empHireDate').value = emp.hire_date;
                     document.getElementById('empStatus').value = emp.status;
@@ -431,10 +432,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const payload = {
             branch_id: document.getElementById('empBranch').value,
-            job_title_id: document.getElementById('empJobTitle').value,
+            department: document.getElementById('empDepartment').value.trim(),
+            job_title: document.getElementById('empJobTitle').value.trim(),
             employee_code: document.getElementById('empCode').value.trim(),
             full_name: document.getElementById('empName').value.trim(),
-            national_id: document.getElementById('empNationalId').value.trim(),
+            national_id: document.getElementById('empNationalId').value.trim() || null,
             phone: document.getElementById('empPhone').value.trim(),
             hire_date: document.getElementById('empHireDate').value,
             shift_start_time: document.getElementById('empStartTime').value,

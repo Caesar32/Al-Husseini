@@ -22,7 +22,8 @@ test('service creates an employee and associates current salary structure', func
     $code = 'EMP-UNIT-' . rand(1000, 9999);
     $employee = $this->service->createEmployee([
         'branch_id' => $branch->id,
-        'job_title_id' => $jobTitle->id,
+        'department' => $jobTitle->department->name,
+        'job_title' => $jobTitle->title,
         'employee_code' => $code,
         'full_name' => 'مهندس صيانة تجريبي',
         'national_id' => '2990101' . rand(1000000, 9999999),

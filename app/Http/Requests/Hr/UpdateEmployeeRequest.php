@@ -18,10 +18,11 @@ class UpdateEmployeeRequest extends FormRequest
 
         return [
             'branch_id' => ['required', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
-            'job_title_id' => ['required', 'exists:job_titles,id'],
+            'department' => ['required', 'string', 'max:100'],
+            'job_title' => ['required', 'string', 'max:100'],
             'employee_code' => ['required', 'string', 'max:30', Rule::unique('employees', 'employee_code')->ignore($employeeId)],
             'full_name' => ['required', 'string', 'max:150'],
-            'national_id' => ['required', 'string', 'size:14', Rule::unique('employees', 'national_id')->ignore($employeeId)],
+            'national_id' => ['nullable', 'string', 'size:14', Rule::unique('employees', 'national_id')->ignore($employeeId)],
             'phone' => ['required', 'string', 'max:20', Rule::unique('employees', 'phone')->ignore($employeeId)],
             'hire_date' => ['required', 'date'],
             'shift_start_time' => ['required'],

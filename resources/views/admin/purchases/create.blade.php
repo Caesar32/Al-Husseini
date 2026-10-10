@@ -41,16 +41,22 @@
             </div>
             <div class="card-body">
                 <div class="row g-3">
-                    <div class="col-md-4">
+                    <div class="col-md-4 position-relative">
                         <label class="form-label">شركة التوريد / المورد <span class="text-danger">*</span></label>
-                        <select name="supplier_id" id="supplierSelect" class="form-select" required>
-                            <option value="">-- اختر المورد --</option>
-                            @foreach($suppliers as $sup)
-                            <option value="{{ $sup->id }}" data-balance="{{ $sup->current_balance }}" data-limit="{{ $sup->credit_limit }}">
-                                {{ $sup->company_name }} ({{ $sup->name }}) - رصيد: {{ number_format($sup->current_balance, 2) }} ج.م
-                            </option>
-                            @endforeach
-                        </select>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="ri-search-2-line"></i></span>
+                            <input type="text" id="supplierSearchInput" class="form-control" autocomplete="off"
+                                   placeholder="ابحث باسم المورد أو الشركة (من أول حرف)..." required
+                                   value="{{ old('supplier_id') ? ($suppliers->firstWhere('id', old('supplier_id'))?->company_name ?? '') : '' }}">
+                            <button class="btn btn-outline-secondary" type="button" id="clearSupplierBtn" title="تفريغ">
+                                <i class="ri-close-line"></i>
+                            </button>
+                        </div>
+                        <input type="hidden" name="supplier_id" id="selectedSupplierId" required value="{{ old('supplier_id') }}">
+                        <div id="supplierSearchResults" class="list-group position-absolute w-100 shadow d-none" style="z-index: 1060; max-height: 260px; overflow-y: auto;"></div>
+                        <div id="supplierInfoBadge" class="mt-1 {{ old('supplier_id') ? '' : 'd-none' }}">
+                            <span class="badge bg-primary-subtle text-primary" id="supplierBalanceBadge"></span>
+                        </div>
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">رقم فاتورة المورد / الشحنة <span class="text-danger">*</span></label>
@@ -81,6 +87,11 @@
                 </button>
             </div>
             <div class="card-body">
+                <div class="position-relative mb-3">
+                    <input type="text" id="productSearchInput" class="form-control" autocomplete="off"
+                           placeholder="ابحث بالاسم أو SKU أو الباركود لإضافة صنف فوراً...">
+                    <div id="productSearchResults" class="list-group position-absolute w-100 shadow d-none" style="z-index:1050; max-height:320px; overflow-y:auto;"></div>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-bordered align-middle" id="itemsTable">
                         <thead class="table-light">
@@ -198,12 +209,34 @@
         </div>
     </form>
 </div>
+@endsection
 
 @section('script')
+@php
+$searchSuppliers = $suppliers->map(function ($s) {
+    return [
+        'id' => $s->id,
+        'company_name' => $s->company_name,
+        'name' => $s->name,
+        'balance' => (float) $s->current_balance,
+        'limit' => (float) $s->credit_limit,
+    ];
+})->values()->all();
+
+$searchProducts = $products->map(function ($p) {
+    return [
+        'id' => $p->id,
+        'name' => $p->name,
+        'sku' => $p->sku,
+        'barcode' => $p->barcode,
+        'cost' => (float) $p->cost_price,
+        'stock' => (int) $p->current_stock,
+    ];
+})->values()->all();
+@endphp
 <script>
-document-ready:
 document.addEventListener('DOMContentLoaded', function () {
-    let rowIndex = 1;
+    let rowIndex = {{ count(old('items', [1])) }};
     const itemsBody = document.getElementById('itemsBody');
     const addRowBtn = document.getElementById('addRowBtn');
     const subtotalDisplay = document.getElementById('subtotalDisplay');
@@ -213,6 +246,101 @@ document.addEventListener('DOMContentLoaded', function () {
     const discountInput = document.getElementById('discountInput');
     const paidInput = document.getElementById('paidInput');
 
+    // --- Supplier Live Search ---
+    const searchSuppliers = {!! json_encode($searchSuppliers, JSON_UNESCAPED_UNICODE) !!};
+    const supplierSearchInput = document.getElementById('supplierSearchInput');
+    const supplierSearchResults = document.getElementById('supplierSearchResults');
+    const selectedSupplierId = document.getElementById('selectedSupplierId');
+    const supplierInfoBadge = document.getElementById('supplierInfoBadge');
+    const supplierBalanceBadge = document.getElementById('supplierBalanceBadge');
+    const clearSupplierBtn = document.getElementById('clearSupplierBtn');
+    let supplierMatches = [], activeSupplierIdx = -1;
+
+    function renderSupplierResults() {
+        supplierSearchResults.innerHTML = '';
+        supplierMatches.forEach((s, idx) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center' + (idx === activeSupplierIdx ? ' active' : '');
+            btn.innerHTML = `
+                <div>
+                    <strong>${s.company_name}</strong>
+                    ${s.name ? `<small class="text-muted d-block">${s.name}</small>` : ''}
+                </div>
+                <span class="badge bg-secondary-subtle text-secondary">رصيد: ${Number(s.balance).toLocaleString()} ج.م</span>
+            `;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                selectSupplier(s);
+            });
+            supplierSearchResults.appendChild(btn);
+        });
+        supplierSearchResults.classList.toggle('d-none', supplierMatches.length === 0);
+    }
+
+    function selectSupplier(s) {
+        selectedSupplierId.value = s.id;
+        supplierSearchInput.value = s.company_name + (s.name ? ` (${s.name})` : '');
+        supplierBalanceBadge.textContent = `رصيد المورد: ${Number(s.balance).toLocaleString()} ج.م | حد الائتمان: ${Number(s.limit).toLocaleString()} ج.م`;
+        supplierInfoBadge.classList.remove('d-none');
+        supplierMatches = [];
+        activeSupplierIdx = -1;
+        renderSupplierResults();
+    }
+
+    supplierSearchInput.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        if (q.length < 1) {
+            supplierMatches = [];
+            activeSupplierIdx = -1;
+            renderSupplierResults();
+            return;
+        }
+        supplierMatches = searchSuppliers.filter(s =>
+            (s.company_name && s.company_name.toLowerCase().includes(q)) ||
+            (s.name && s.name.toLowerCase().includes(q))
+        ).slice(0, 15);
+        activeSupplierIdx = supplierMatches.length ? 0 : -1;
+        renderSupplierResults();
+    });
+
+    supplierSearchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!supplierMatches.length) return;
+            e.preventDefault();
+            activeSupplierIdx = (activeSupplierIdx + (e.key === 'ArrowDown' ? 1 : -1) + supplierMatches.length) % supplierMatches.length;
+            renderSupplierResults();
+        } else if (e.key === 'Enter') {
+            if (supplierMatches.length && activeSupplierIdx >= 0) {
+                e.preventDefault();
+                selectSupplier(supplierMatches[activeSupplierIdx]);
+            }
+        } else if (e.key === 'Escape') {
+            supplierMatches = [];
+            renderSupplierResults();
+        }
+    });
+
+    supplierSearchInput.addEventListener('blur', function () {
+        setTimeout(() => {
+            supplierMatches = [];
+            renderSupplierResults();
+        }, 200);
+    });
+
+    clearSupplierBtn.addEventListener('click', function () {
+        selectedSupplierId.value = '';
+        supplierSearchInput.value = '';
+        supplierInfoBadge.classList.add('d-none');
+        supplierSearchInput.focus();
+    });
+
+    if (selectedSupplierId.value) {
+        const pre = searchSuppliers.find(s => s.id == selectedSupplierId.value);
+        if (pre) selectSupplier(pre);
+    }
+
+    // --- Calculations ---
     function calculateTotals() {
         let subtotal = 0;
         document.querySelectorAll('.item-row').forEach(row => {
@@ -235,7 +363,7 @@ document.addEventListener('DOMContentLoaded', function () {
         remainingDisplay.innerText = remaining.toFixed(2) + ' ج.م';
     }
 
-    addRowBtn.addEventListener('click', function () {
+    function appendRow() {
         const firstRow = document.querySelector('.item-row');
         const clone = firstRow.cloneNode(true);
 
@@ -254,6 +382,99 @@ document.addEventListener('DOMContentLoaded', function () {
         itemsBody.appendChild(clone);
         rowIndex++;
         calculateTotals();
+        return clone;
+    }
+
+    addRowBtn.addEventListener('click', appendRow);
+
+    // --- Products Live Search ---
+    const searchProducts = {!! json_encode($searchProducts, JSON_UNESCAPED_UNICODE) !!};
+    const productSearchInput = document.getElementById('productSearchInput');
+    const productSearchResults = document.getElementById('productSearchResults');
+    let productMatches = [], activeProductIdx = -1;
+
+    function renderProductResults() {
+        productSearchResults.innerHTML = '';
+        productMatches.forEach((p, i) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center' + (i === activeProductIdx ? ' active' : '');
+            btn.innerHTML = `
+                <div>
+                    <strong>${p.name}</strong>
+                    <div class="small text-muted">
+                        ${p.sku ? `<span class="me-2">SKU: ${p.sku}</span>` : ''}
+                        ${p.barcode ? `<span>باركود: ${p.barcode}</span>` : ''}
+                    </div>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-success-subtle text-success me-1">تكلفة: ${Number(p.cost).toLocaleString()} ج.م</span>
+                    <span class="badge bg-secondary-subtle text-secondary">مخزون: ${p.stock}</span>
+                </div>
+            `;
+            btn.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                pickProduct(p);
+            });
+            productSearchResults.appendChild(btn);
+        });
+        productSearchResults.classList.toggle('d-none', productMatches.length === 0);
+    }
+
+    function pickProduct(p) {
+        const first = itemsBody.querySelector('.item-row');
+        const row = (itemsBody.children.length === 1 && !first.querySelector('.product-select').value)
+            ? first : appendRow();
+        row.querySelector('.product-select').value = p.id;
+        row.querySelector('.qty-input').value = 1;
+        row.querySelector('.price-input').value = parseFloat(p.cost || 0).toFixed(2);
+        calculateTotals();
+        productSearchInput.value = '';
+        productMatches = [];
+        activeProductIdx = -1;
+        renderProductResults();
+        productSearchInput.focus();
+    }
+
+    productSearchInput.addEventListener('input', function () {
+        const q = this.value.trim().toLowerCase();
+        if (q.length < 1) {
+            productMatches = [];
+            activeProductIdx = -1;
+            renderProductResults();
+            return;
+        }
+        productMatches = searchProducts.filter(p =>
+            (p.name && p.name.toLowerCase().includes(q)) ||
+            (p.sku && p.sku.toLowerCase().includes(q)) ||
+            (p.barcode && p.barcode.toLowerCase().includes(q))
+        ).slice(0, 15);
+        activeProductIdx = productMatches.length ? 0 : -1;
+        renderProductResults();
+    });
+
+    productSearchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+            if (!productMatches.length) return;
+            e.preventDefault();
+            activeProductIdx = (activeProductIdx + (e.key === 'ArrowDown' ? 1 : -1) + productMatches.length) % productMatches.length;
+            renderProductResults();
+        } else if (e.key === 'Enter') {
+            if (productMatches.length && activeProductIdx >= 0) {
+                e.preventDefault();
+                pickProduct(productMatches[activeProductIdx]);
+            }
+        } else if (e.key === 'Escape') {
+            productMatches = [];
+            renderProductResults();
+        }
+    });
+
+    productSearchInput.addEventListener('blur', function () {
+        setTimeout(() => {
+            productMatches = [];
+            renderProductResults();
+        }, 200);
     });
 
     itemsBody.addEventListener('input', function (e) {
@@ -265,7 +486,7 @@ document.addEventListener('DOMContentLoaded', function () {
     itemsBody.addEventListener('change', function (e) {
         if (e.target.classList.contains('product-select')) {
             const selected = e.target.selectedOptions[0];
-            const cost = selected.getAttribute('data-cost');
+            const cost = selected ? selected.getAttribute('data-cost') : 0;
             const row = e.target.closest('.item-row');
             if (cost) {
                 row.querySelector('.price-input').value = parseFloat(cost).toFixed(2);
@@ -289,5 +510,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-@endsection
 @endsection

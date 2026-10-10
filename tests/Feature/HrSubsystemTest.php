@@ -40,7 +40,8 @@ test('can create an employee with salary structure', function () {
 
     $response = $this->postJson('/admin/hr/employees', [
         'branch_id' => $branch->id,
-        'job_title_id' => $jobTitle->id,
+        'department' => $jobTitle->department->name,
+        'job_title' => $jobTitle->title,
         'employee_code' => $code,
         'full_name' => 'موظف تجريبي جديد',
         'national_id' => $nationalId,
@@ -73,7 +74,8 @@ test('can update an employee', function () {
 
     $response = $this->putJson("/admin/hr/employees/{$emp->id}", [
         'branch_id' => $emp->branch_id,
-        'job_title_id' => $emp->job_title_id,
+        'department' => $emp->jobTitle->department->name,
+        'job_title' => $emp->jobTitle->title,
         'employee_code' => $emp->employee_code,
         'full_name' => 'الاسم المحدث للموظف',
         'national_id' => $emp->national_id,

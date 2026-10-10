@@ -6,6 +6,7 @@ use App\Contracts\Hr\EmployeeServiceInterface;
 use App\Models\Employee;
 use App\Models\Branch;
 use App\Models\Department;
+use App\Models\JobTitle;
 use App\Models\SalaryStructure;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -76,15 +77,26 @@ class EmployeeService implements EmployeeServiceInterface
     /**
      * {@inheritDoc}
      */
+    private function resolveJobTitleId(string $department, string $title): int
+    {
+        $department = trim($department);
+        $dept = Department::firstOrCreate(
+            ['name' => $department],
+            ['code' => 'DEP-' . strtoupper(substr(md5($department), 0, 8))]
+        );
+
+        return JobTitle::firstOrCreate(['department_id' => $dept->id, 'title' => trim($title)])->id;
+    }
+
     public function createEmployee(array $data): Employee
     {
         return DB::transaction(function () use ($data) {
             $employee = Employee::create([
                 'branch_id' => $data['branch_id'],
-                'job_title_id' => $data['job_title_id'],
+                'job_title_id' => $this->resolveJobTitleId($data['department'], $data['job_title']),
                 'employee_code' => $data['employee_code'],
                 'full_name' => $data['full_name'],
-                'national_id' => $data['national_id'],
+                'national_id' => $data['national_id'] ?? null,
                 'phone' => $data['phone'],
                 'hire_date' => $data['hire_date'],
                 'shift_start_time' => $data['shift_start_time'],
@@ -114,6 +126,9 @@ class EmployeeService implements EmployeeServiceInterface
     public function updateEmployee(Employee $employee, array $data): bool
     {
         return DB::transaction(function () use ($employee, $data) {
+            if (isset($data['department'], $data['job_title'])) {
+                $data['job_title_id'] = $this->resolveJobTitleId($data['department'], $data['job_title']);
+            }
             $employee->update($data);
 
             if (isset($data['basic_salary'])) {
