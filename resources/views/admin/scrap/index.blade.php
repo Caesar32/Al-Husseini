@@ -3,7 +3,7 @@
 @section('title', 'مخزن بطاريات الكهنة وتجارة الرصاص | مركز الحسيني')
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid" data-page="scrap.index">
     <div class="row">
         <div class="col-12">
             <div class="page-title-box d-sm-flex align-items-center justify-content-between">
@@ -104,7 +104,7 @@
         <div class="card-header border-bottom-dashed d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">سجل بطاريات الكهنة المستلمة بالفرع ({{ $inventory->total() }})</h5>
             <div>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn">تحديد الكل بالمخزن</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn" data-action="scrap.select-all">تحديد الكل بالمخزن</button>
             </div>
         </div>
         <div class="card-body">
@@ -113,7 +113,7 @@
                     <thead class="table-light">
                         <tr>
                             <th style="width: 4%;">
-                                <input type="checkbox" id="checkAllMaster" class="form-check-input">
+                                <input type="checkbox" id="checkAllMaster" class="form-check-input" data-action="scrap.check-all" data-action-on="change">
                             </th>
                             <th>#</th>
                             <th>سعة البطارية (Ah)</th>
@@ -131,7 +131,7 @@
                         <tr>
                             <td>
                                 @if($item->status === 'in_stock')
-                                <input type="checkbox" class="form-check-input scrap-checkbox" value="{{ $item->id }}" data-value="{{ $item->scrap_value }}">
+                                <input type="checkbox" class="form-check-input scrap-checkbox" value="{{ $item->id }}" data-value="{{ $item->scrap_value }}" data-action="scrap.select" data-action-on="change">
                                 @else
                                 <i class="ri-check-line text-muted"></i>
                                 @endif
@@ -276,66 +276,5 @@
     </div>
 </div>
 
-@section('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const checkboxes = document.querySelectorAll('.scrap-checkbox');
-    const checkAllMaster = document.getElementById('checkAllMaster');
-    const selectAllBtn = document.getElementById('selectAllBtn');
-    const openSellBtn = document.getElementById('openSellModalBtn');
-    const selectedCountDisplay = document.getElementById('selectedCountDisplay');
-    const modalBatchCount = document.getElementById('modalBatchCount');
-    const modalBatchCost = document.getElementById('modalBatchCost');
-    const hiddenInputs = document.getElementById('hiddenInputsContainer');
-
-    function updateSelection() {
-        let count = 0;
-        let totalCost = 0;
-        hiddenInputs.innerHTML = '';
-
-        checkboxes.forEach(cb => {
-            if (cb.checked) {
-                count++;
-                totalCost += parseFloat(cb.getAttribute('data-value')) || 0;
-
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'scrap_battery_ids[]';
-                input.value = cb.value;
-                hiddenInputs.appendChild(input);
-            }
-        });
-
-        selectedCountDisplay.innerText = count;
-        modalBatchCount.innerText = count;
-        modalBatchCost.innerText = totalCost.toFixed(2);
-
-        if (count > 0) {
-            openSellBtn.removeAttribute('disabled');
-        } else {
-            openSellBtn.setAttribute('disabled', 'disabled');
-        }
-    }
-
-    checkboxes.forEach(cb => {
-        cb.addEventListener('change', updateSelection);
-    });
-
-    if (checkAllMaster) {
-        checkAllMaster.addEventListener('change', function () {
-            checkboxes.forEach(cb => cb.checked = this.checked);
-            updateSelection();
-        });
-    }
-
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('click', function () {
-            checkboxes.forEach(cb => cb.checked = true);
-            if (checkAllMaster) checkAllMaster.checked = true;
-            updateSelection();
-        });
-    }
-});
-</script>
-@endsection
+<script src="{{ asset('assets/js/admin/scrap.js') }}"></script>
 @endsection

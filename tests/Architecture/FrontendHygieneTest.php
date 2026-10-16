@@ -7,7 +7,7 @@
 
 const FRONTEND_BUDGET = [
     'handlers' => 0,
-    'scripts' => 7,
+    'scripts' => 6,
     'styles' => 145,
     'style_blocks' => 12,
     'raw_echo' => 0,
