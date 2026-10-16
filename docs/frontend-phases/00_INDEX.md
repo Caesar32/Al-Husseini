@@ -36,12 +36,12 @@ F4 depends only on F0 and can run in parallel with F1-F3.
 ## Recorded values
 | Key | Value |
 |---|---|
-| `FE0_SHA` (F0 start) | |
-| Hygiene baseline (inline handlers / inline scripts / style attrs / `<style>` blocks) | 134 / 49 / 163 / 12 (audit above; F0 re-measures) |
+| `FE0_SHA` (F0 start) | `772ddd2` (full suite 465 passed at `c9327fc`; no code changed since) |
+| Hygiene baseline (inline handlers / inline scripts / style attrs / `<style>` blocks) | Audit grep: 134 / 49 / 163 / 12. Ratchet regexes (F0): 139 handlers (adds blur/focus/keypress) / 26 inline scripts (no `src`, not JSON) / 163 / 12 |
 | Hygiene after each phase | |
-| Owner decision D-F1 (JS delivery: static files vs Vite) | |
-| Owner decision D-F2 (Alpine.js: no / yes) | |
-| Owner decision D-F3 (visual regression tool: manual screenshots / Playwright) | |
+| Owner decision D-F1 (JS delivery: static files vs Vite) | Static files under `public/assets/js/admin/` (recommended default; owner asked for autonomous execution without questions, 2026-10-16) |
+| Owner decision D-F2 (Alpine.js: no / yes) | No (recommended default, same basis) |
+| Owner decision D-F3 (visual regression tool: manual screenshots / Playwright) | Manual screenshots (recommended default); taking them is an owner action |
 | Full test count per phase | |
 
 ## Owner decisions (do not implement before they are recorded above)
