@@ -89,3 +89,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M1-03, M1-04 | Done: sales models on readers; amounts are `Money` (server display strings); detail adds scrap deduction, refunded, item returned qty; new `ReturnSummary` | 98 |
 | M1-05 | Done: auth, cash drawer, credit, inventory, live pulse, periods, staff models on readers; `creditLimit` null when raw ≤ 0 (F-11); adds `utilizationRate`, `depletionRatio`, `hasActiveShift` | 120 |
 | M1-06 | Folded: `PaginationMeta` shipped in M0-04; `Paged<T>` moves to M2-04 | — |
+| M2-01 | Done: sealed `AsyncState<T>` (idle/loading/data/failure, keeps previous value) + `toApiFailure`; `fake_async` dev dependency | 123 |
