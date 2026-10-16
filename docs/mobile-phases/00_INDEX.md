@@ -45,7 +45,7 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 |---|---|---|---|
 | M0 | `M0_BASELINE_AND_NETWORKING.md` | Typed failures, a single 401 path, 429/5xx/non-JSON handling, injectable client | Done |
 | M1 | `M1_MODELS_AND_SERIALIZATION.md` | Null-safe parse helpers; fix F-01, F-03, F-04, F-08, F-11; model unit tests from real payloads | Done |
-| M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Not started |
+| M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Done |
 | M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Not started |
 | M4 | `M4_SECURITY_AND_PERSISTENCE.md` | Secure token storage, base-URL lock, offline/stale indicator, rate-limit UX | Not started |
 | M5 | `M5_QUALITY_AND_TESTING.md` | Provider and widget tests, stricter lints, release APK build gate | Not started |
@@ -94,3 +94,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M2-03 | Done: `DashboardProvider` on `AsyncState` (legacy getters kept as shims); poll pauses in background, resumes on foreground; background failures keep data + `lastPollFailure`; 401 stops polling; `isStale` | 137 |
 | M2-04 | Done: `Paged<T>`; sales repository returns pages (returns use `ReturnSummary`, F-03 data side); `SalesProvider` load-more for invoices and returns with dedupe and `loadMoreError`; legacy getters kept | 148 |
 | M2-05, M2-06 | Done: inventory paginated (`loadMoreAlerts`, no `branch_id`: F-14); cash drawer, staff, credit providers on `AsyncState`; all repositories use envelope helpers | 165 |
+| M2-07 | Done: selected branch persisted through `AuthStorage` (cleared on logout/401) | 168 |

@@ -56,7 +56,10 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authRepository)),
         ChangeNotifierProvider(
-          create: (_) => DashboardProvider(dashboardRepository),
+          create: (_) => DashboardProvider(
+            dashboardRepository,
+            storage: authStorage,
+          ),
         ),
         ChangeNotifierProvider(create: (_) => SalesProvider(salesRepository)),
         ChangeNotifierProvider(

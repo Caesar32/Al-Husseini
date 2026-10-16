@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../core/constants/api_constants.dart';
 import '../core/network/api_failure.dart';
+import '../core/storage/auth_storage.dart';
 import '../data/models/live_pulse_data.dart';
 import '../data/models/period_metrics.dart';
 import '../data/repositories/dashboard_repository.dart';
@@ -12,6 +13,7 @@ import 'async_state.dart';
 class DashboardProvider extends ChangeNotifier with WidgetsBindingObserver {
   final DashboardRepository _repository;
   final DateTime Function() _now;
+  final AuthStorage? _storage;
 
   AsyncState<LivePulseData> _live = const AsyncIdle();
   AsyncState<PeriodMetrics> _metrics = const AsyncIdle();
@@ -27,8 +29,13 @@ class DashboardProvider extends ChangeNotifier with WidgetsBindingObserver {
   ApiFailure? _lastPollFailure;
   bool _disposed = false;
 
-  DashboardProvider(this._repository, {DateTime Function()? clock})
-      : _now = clock ?? DateTime.now;
+  DashboardProvider(
+    this._repository, {
+    DateTime Function()? clock,
+    AuthStorage? storage,
+  })  : _now = clock ?? DateTime.now,
+        _storage = storage,
+        _selectedBranchId = storage?.getSelectedBranchId();
 
   AsyncState<LivePulseData> get liveState => _live;
   AsyncState<PeriodMetrics> get metricsState => _metrics;
@@ -151,6 +158,7 @@ class DashboardProvider extends ChangeNotifier with WidgetsBindingObserver {
   void setSelectedBranch(int? branchId) {
     if (_selectedBranchId != branchId) {
       _selectedBranchId = branchId;
+      unawaited(_storage?.saveSelectedBranchId(branchId));
       unawaited(fetchLivePulse(isBackground: false));
       unawaited(fetchPeriodMetrics(_selectedPeriod));
     }

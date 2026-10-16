@@ -187,12 +187,46 @@ void main() {
     context.provider.setSelectedBranch(2);
     expect(context.provider.selectedBranchId, 2);
   });
+
+  test('restores the selected branch from storage', () async {
+    final context = await _createContext(
+      initialValues: {'owner_selected_branch_id': 3},
+    );
+    addTearDown(context.dispose);
+
+    expect(context.provider.selectedBranchId, 3);
+  });
+
+  test('setSelectedBranch persists the selected branch', () async {
+    final context = await _createContext();
+    addTearDown(context.dispose);
+
+    context.provider.setSelectedBranch(5);
+    await Future<void>.delayed(Duration.zero);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getInt('owner_selected_branch_id'), 5);
+  });
+
+  test('setSelectedBranch(null) removes the selected branch', () async {
+    final context = await _createContext(
+      initialValues: {'owner_selected_branch_id': 3},
+    );
+    addTearDown(context.dispose);
+
+    context.provider.setSelectedBranch(null);
+    await Future<void>.delayed(Duration.zero);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.containsKey('owner_selected_branch_id'), isFalse);
+  });
 }
 
 Future<_DashboardContext> _createContext({
   DateTime Function()? clock,
+  Map<String, Object> initialValues = const <String, Object>{},
 }) async {
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues(initialValues);
 
   final preferences = await SharedPreferences.getInstance();
   final storage = AuthStorage(preferences);
@@ -203,7 +237,11 @@ Future<_DashboardContext> _createContext({
     }),
   );
   final repository = _FakeDashboardRepository(apiService);
-  final provider = DashboardProvider(repository, clock: clock);
+  final provider = DashboardProvider(
+    repository,
+    clock: clock,
+    storage: storage,
+  );
 
   return _DashboardContext(apiService, repository, provider);
 }
