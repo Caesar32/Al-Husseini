@@ -11,7 +11,7 @@ Each phase file is self-contained: rules, context, contracts, Codex prompts and 
 |---|---|---|---|---|---|
 | 0 | [00_phase_baseline.md](docs/refactor/00_phase_baseline.md) | Clean tree, test baseline, HR edits decision | `app/Services/Hr/EmployeeService.php`, `resources/views/admin/hr/partials/employees/modal-form.blade.php` | none | [x] baseline done (HR decision pending owner) |
 | 1 | [01_phase_security_and_correctness.md](docs/refactor/01_phase_security_and_correctness.md) | B1 owner token revocation, B2/B3 XSS, B4/B5 push job, B6 tests | `routes/api.php`, `bootstrap/app.php`, `app/Http/Middleware/EnsureOwnerTokenIsValid.php` (new), `resources/views/admin/purchases/create.blade.php`, `resources/views/admin/warranties/index.blade.php`, `app/Jobs/DispatchOwnerPushNotification.php` | 0 | [ ] |
-| 2 | [02_phase_stock_movement_journal.md](docs/refactor/02_phase_stock_movement_journal.md) | Single stock writer + `stock_movements` | `app/Services/Catalog/StockLedgerService.php` (new), `PosOrderService.php`, `WarrantyService.php`, `PurchaseService.php`, `ImportStockCommand.php` | 1 | [ ] |
+| 2 | [02_phase_stock_movement_journal.md](docs/refactor/02_phase_stock_movement_journal.md) | Single stock writer + `stock_movements` | `app/Services/Catalog/StockLedgerService.php` (new), `PosOrderService.php`, `WarrantyService.php`, `PurchaseService.php`, `ImportStockCommand.php` | 1 | [x] `4671566`..`dc565ca`; dev MySQL `php artisan migrate` pending (owner) |
 | 3 | [03_phase_shared_dashboard_metrics.md](docs/refactor/03_phase_shared_dashboard_metrics.md) | One metrics service; 7-day trend from 21 queries to 1 | `Admin/DashboardController.php`, `Api/V1/Owner/DashboardController.php`, `app/Services/Dashboard/DashboardMetricsService.php` (new) | 1 | [ ] |
 | 4 | [04_phase_split_pos_order_service.md](docs/refactor/04_phase_split_pos_order_service.md) | Extract returns and debt collection; DI instead of `app()` | `PosOrderService.php`, `SalesReturnService.php` (new), `CreditCollectionService.php`, `StorePosInvoiceRequest.php`, `CreditCustomerController.php` | 2 | [ ] |
 | 5 | [05_phase_hardcoded_urls.md](docs/refactor/05_phase_hardcoded_urls.md) | JS `/admin/...` URLs to `route()` | `admin-notifications.js`, `global-spotlight-search.js`, HR `scripts.blade.php` partials, `warranties/index.blade.php` | 1 | [ ] |
@@ -27,13 +27,17 @@ Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2
 | HR edits decision (Phase 0) | Pending owner (A/B/C). The two edited files stay uncommitted and are excluded from every refactor commit. |
 | `N0` (baseline passed count) | 411 passed, 0 failed, 0 skipped (3020 assertions), at `4de75b5` plus the uncommitted HR edits |
 | `N1` | Targeted only (owner protocol: full suite at Phases 0 and 7). Phase 1 added 14 tests (OwnerAuth 4, PurchaseCreateXss 1, Warranty 1, OwnerPush 4, EmployeeNationalId 4); expected full count 425; all targeted suites green |
-| `N2` .. `N6` | |
+| `N2` | Targeted only. Phase 2 added 17 tests (StockLedger 4, POS 1, Warranty 2, Purchases 1, Import 1, Diagnostics 1, Architecture 8 incl. 7 dataset cases); Sales, Warranty, Purchases, Admin, Catalog, Architecture all green |
+| `N3` .. `N6` | |
 | Admin dashboard query count before / after (Phase 3) | |
 | Phase 6 index names confirmed (SQLite / MySQL) | |
 
 ## Findings during execution
 - Phase 1 (B3): `resources/views/admin/warranties/index.blade.php` put its script in `@section('scripts')` nested inside `content`. The layout yields only `script` and `@stack('scripts')`, so the verify box and claim modal never ran. Fixed in `7af4719`.
 - Same defect, not fixed (outside the roadmap's files): `resources/views/admin/scrap/index.blade.php:279` (`@section('scripts')` nested in `content`, page JS never rendered). Owner decision: fix it the same way.
+
+- Phase 2: `ImportLegacyDataCommand.php:660` uses `updateOrCreate` with `'current_stock' => 0`, so re-running the legacy import resets the stock of existing products without a journal row. Not matched by the single-writer pattern (not `update([`). Owner decision.
+- Phase 2: `stock_movements` has no history before the migration; the diagnostic only compares products that have movements.
 
 ## Global rules (repeated in every phase file)
 - Never weaken, skip or delete tests. Never disable SQLite FK/CHECK enforcement. Every bug fix gets a regression test.
