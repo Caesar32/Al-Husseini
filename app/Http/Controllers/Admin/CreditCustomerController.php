@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
-use App\Contracts\Sales\PosOrderServiceInterface;
+use App\Contracts\Sales\CustomerDebtServiceInterface;
 use App\Http\Controllers\Controller;
 use App\Models\Customer;
 use App\Models\CreditLedgerEntry;
@@ -15,7 +15,7 @@ use Illuminate\View\View;
 class CreditCustomerController extends Controller
 {
     public function __construct(
-        protected PosOrderServiceInterface $posOrderService,
+        protected CustomerDebtServiceInterface $customerDebts,
         protected CreditCollectionService $collections
     ) {}
 
@@ -130,7 +130,7 @@ class CreditCustomerController extends Controller
         ]);
 
         try {
-            $ledgerEntry = $this->posOrderService->settleCustomerDebt(
+            $ledgerEntry = $this->customerDebts->settleCustomerDebt(
                 customerId:    (int) $validated['customer_id'],
                 amount:        (float) $validated['amount'],
                 paymentMethod: $validated['payment_method'],

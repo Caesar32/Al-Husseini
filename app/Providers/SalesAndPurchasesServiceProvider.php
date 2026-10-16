@@ -25,6 +25,7 @@ class SalesAndPurchasesServiceProvider extends ServiceProvider
         $this->app->bind(PurchaseServiceInterface::class, PurchaseService::class);
         $this->app->bind(PosOrderServiceInterface::class, PosOrderService::class);
         $this->app->bind(\App\Contracts\Sales\SalesReturnServiceInterface::class, \App\Services\Sales\SalesReturnService::class);
+        $this->app->bind(\App\Contracts\Sales\CustomerDebtServiceInterface::class, \App\Services\Sales\CreditCollectionService::class);
         $this->app->bind(WarrantyServiceInterface::class, WarrantyService::class);
         $this->app->bind(ScrapBatteryServiceInterface::class, ScrapBatteryService::class);
         $this->app->bind(\App\Contracts\Catalog\ProductServiceInterface::class, \App\Services\Catalog\ProductService::class);
