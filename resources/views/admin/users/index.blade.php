@@ -202,7 +202,7 @@
                                     @csrf
                                     <button type="submit" class="btn btn-sm {{ $u->is_active ? 'btn-soft-warning' : 'btn-soft-success' }}" 
                                             title="{{ $u->is_active ? 'تعطيل الحساب' : 'تفعيل الحساب' }}"
-                                            onclick="return confirm('{{ $u->is_active ? 'هل أنت متأكد من تعطيل هذا الحساب؟' : 'هل أنت متأكد من تفعيل هذا الحساب؟' }}')">
+                                            data-confirm-message="{{ $u->is_active ? 'هل أنت متأكد من تعطيل هذا الحساب؟' : 'هل أنت متأكد من تفعيل هذا الحساب؟' }}">
                                         <i class="{{ $u->is_active ? 'ri-user-unfollow-line text-warning' : 'ri-user-follow-line text-success' }} fs-14"></i>
                                     </button>
                                 </form>
@@ -291,7 +291,7 @@
                             <label class="form-label fw-semibold">كلمة المرور الجديدة <span class="text-danger">*</span></label>
                             <div class="input-group">
                                 <input type="password" name="password" id="reset_password_{{ $u->id }}" class="form-control font-monospace" placeholder="أدخل كلمة المرور الجديدة (8 أحرف فأكثر)" required minlength="8" autocomplete="new-password">
-                                <button type="button" class="btn btn-outline-secondary" onclick="togglePassVisibility('reset_password_{{ $u->id }}', this)">
+                                <button type="button" class="btn btn-outline-secondary" data-action="toggle-password" data-target="reset_password_{{ $u->id }}" aria-label="إظهار كلمة المرور">
                                     <i class="ri-eye-line"></i>
                                 </button>
                             </div>
@@ -335,7 +335,7 @@
                         </x-form.select>
                         <x-form.input name="password" type="password" id="edit_password_{{ $u->id }}" label="كلمة المرور الجديدة (اختياري)" help="اتركه فارغاً إذا كنت لا ترغب في تغيير كلمة المرور." placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية" minlength="8" autocomplete="new-password" :stateful="false">
                             <x-slot:append>
-                                <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('edit_password_{{ $u->id }}', this)">
+                                <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" data-action="toggle-password" data-target="edit_password_{{ $u->id }}">
                                     <i class="ri-eye-line" aria-hidden="true"></i>
                                 </button>
                             </x-slot:append>
@@ -363,7 +363,7 @@
                     <x-form.select name="role" id="add_user_role" label="الدور والصلاحيات" required help="عند اختيار دور كاشير مبيعات سيتم توجيهه تلقائياً لشاشة الـ POS." :options="$roles->mapWithKeys(fn ($r) => [$r->name => $r->display_label.' ('.$r->name.')'])" placeholder="-- اختر الدور --" />
                     <x-form.input name="password" type="password" id="add_user_password" label="كلمة المرور الأولية" required placeholder="8 أحرف على الأقل" minlength="8" autocomplete="new-password">
                         <x-slot:append>
-                            <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('add_user_password', this)">
+                            <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" data-action="toggle-password" data-target="add_user_password">
                                 <i class="ri-eye-line" aria-hidden="true"></i>
                             </button>
                         </x-slot:append>
@@ -377,25 +377,3 @@
 </x-modal>
 @endsection
 
-@push('scripts')
-<script>
-function togglePassVisibility(inputId, btn) {
-    const input = document.getElementById(inputId);
-    if (!input) return;
-    const icon = btn.querySelector('i');
-    if (input.type === 'password') {
-        input.type = 'text';
-        if (icon) {
-            icon.classList.remove('ri-eye-line');
-            icon.classList.add('ri-eye-off-line');
-        }
-    } else {
-        input.type = 'password';
-        if (icon) {
-            icon.classList.remove('ri-eye-off-line');
-            icon.classList.add('ri-eye-line');
-        }
-    }
-}
-</script>
-@endpush

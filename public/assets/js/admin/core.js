@@ -227,6 +227,32 @@
     // Shared actions.
     actions.register('print', () => window.print());
 
+    // <button data-action="toggle-password" data-target="inputId"><i class="ri-eye-line"></i></button>
+    actions.register('toggle-password', (button) => {
+        const input = document.getElementById(button.dataset.target);
+        if (!input) {
+            return;
+        }
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        const icon = button.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('ri-eye-line', !show);
+            icon.classList.toggle('ri-eye-off-line', show);
+        }
+        button.setAttribute('aria-pressed', show ? 'true' : 'false');
+    });
+
+    // <button type="submit" data-confirm-message="..."> asks before the form submits
+    // (replaces onclick="return confirm(...)"). Capture phase: runs before other handlers.
+    document.addEventListener('click', (event) => {
+        const el = event.target.closest('[data-confirm-message]');
+        if (el && !window.confirm(el.dataset.confirmMessage)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => page.boot());
     } else {

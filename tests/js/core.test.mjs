@@ -11,10 +11,13 @@ function makeElement({ tag = 'BUTTON', attrs = {}, dataset = {}, parent = null }
         dataset: { ...dataset },
         parent,
         getAttribute: (name) => attrs[name] ?? null,
+        setAttribute: (name, value) => { attrs[name] = value; },
+        attrs,
         closest(selector) {
             let node = this;
             while (node) {
                 if (selector === '[data-action]' && node.dataset.action) return node;
+                if (selector === '[data-confirm-message]' && node.dataset.confirmMessage) return node;
                 node = node.parent;
             }
             return null;
@@ -24,22 +27,33 @@ function makeElement({ tag = 'BUTTON', attrs = {}, dataset = {}, parent = null }
 }
 
 function loadCore({ roots = [] } = {}) {
-    const listeners = {};
+    const listeners = { bubble: {}, capture: {} };
     const document = {
         readyState: 'complete',
-        addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+        addEventListener: (type, fn, capture) => { ((capture ? listeners.capture : listeners.bubble)[type] ||= []).push(fn); },
         querySelector: () => null,
         querySelectorAll: (selector) => (selector === '[data-page]' ? roots : []),
+        getElementById: () => null,
     };
-    const window = { console };
+    const window = { console, confirm: () => true };
     const context = vm.createContext({ window, document, console, CSS: { escape: (s) => s } });
     vm.runInContext(readFileSync(new URL('../../public/assets/js/admin/core.js', import.meta.url), 'utf8'), context);
+    // Capture listeners first, then bubbling ones, like a browser at the document node.
     const fire = (type, target) => {
-        const event = { type, target, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; } };
-        (listeners[type] || []).forEach((fn) => fn(event));
+        const event = {
+            type, target, defaultPrevented: false, stopped: false,
+            preventDefault() { this.defaultPrevented = true; },
+            stopImmediatePropagation() { this.stopped = true; },
+        };
+        for (const phase of ['capture', 'bubble']) {
+            for (const fn of listeners[phase][type] || []) {
+                if (event.stopped) return event;
+                fn(event);
+            }
+        }
         return event;
     };
-    return { Admin: window.Admin, fire };
+    return { Admin: window.Admin, fire, document, window };
 }
 
 test('esc escapes the five HTML-significant characters and nullish values', () => {
@@ -84,11 +98,10 @@ test('data-action-on overrides the default event', () => {
     assert.equal(count, 1);
 });
 
-test('the print action is registered', () => {
-    const { Admin, fire } = loadCore();
+test('the shared print action calls window.print', () => {
+    const { fire, window } = loadCore();
     let printed = 0;
-    // core captured `window` at load; replace print on the same object.
-    Admin.actions.register('print', () => printed++);
+    window.print = () => printed++;
     fire('click', makeElement({ dataset: { action: 'print' } }));
     assert.equal(printed, 1);
 });
@@ -111,4 +124,39 @@ test('boot runs each registered page once with its parsed config; leave runs cle
     Admin.page.leave();
     Admin.page.leave();
     assert.equal(cleaned, 1);
+});
+
+test('toggle-password flips the target input type, the eye icon and aria-pressed', () => {
+    const { fire, document } = loadCore();
+    const input = { type: 'password' };
+    document.getElementById = (id) => (id === 'pw' ? input : null);
+    const classes = new Set(['ri-eye-line']);
+    const button = makeElement({ dataset: { action: 'toggle-password', target: 'pw' } });
+    button.querySelector = () => ({ classList: { toggle: (c, on) => (on ? classes.add(c) : classes.delete(c)) } });
+
+    fire('click', button);
+    assert.equal(input.type, 'text');
+    assert.ok(classes.has('ri-eye-off-line') && !classes.has('ri-eye-line'));
+    assert.equal(button.attrs['aria-pressed'], 'true');
+
+    fire('click', button);
+    assert.equal(input.type, 'password');
+    assert.equal(button.attrs['aria-pressed'], 'false');
+});
+
+test('a data-confirm-message click is cancelled when the user declines and passes when accepted', () => {
+    const { Admin, fire, window } = loadCore();
+    let ran = 0;
+    Admin.actions.register('go', () => ran++);
+    const button = makeElement({ dataset: { action: 'go', confirmMessage: 'متأكد؟' } });
+
+    window.confirm = () => false;
+    const declined = fire('click', button);
+    assert.equal(declined.defaultPrevented, true);
+    assert.equal(ran, 0);
+
+    window.confirm = () => true;
+    const accepted = fire('click', button);
+    assert.equal(accepted.defaultPrevented, false);
+    assert.equal(ran, 1);
 });
