@@ -3,6 +3,16 @@
 
 document.addEventListener('DOMContentLoaded', function() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    // Server-generated URLs (FE-08): a route rename or sub-path deploy needs no JS edit.
+    @php
+        $routes = [
+            'attendance' => route('admin.hr.attendance'),
+            'punch' => route('admin.hr.attendance.punch'),
+            'markAbsent' => route('admin.hr.attendance.mark_absent'),
+            'deductions' => route('admin.hr.deductions.store'),
+        ];
+    @endphp
+    const ROUTES = @json($routes);
     const quickDeductionModal = new bootstrap.Modal(document.getElementById('quickDeductionModal'));
 
     let currentFilterTab = 'all'; // 'all' | 'present' | 'late' | 'absent'
@@ -27,7 +37,7 @@ document.addEventListener('DOMContentLoaded', function() {
     function fetchAttendance() {
         const date = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
 
-        fetch(`/admin/hr/attendance?date=${date}`, {
+        fetch(`${ROUTES.attendance}?date=${date}`, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -314,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
             punchTimestamp = `${selectedDate} ${hours}:${minutes}:${seconds}`;
         }
 
-        fetch('/admin/hr/attendance/punch', {
+        fetch(ROUTES.punch, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -452,7 +462,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const notes = document.getElementById('quickDedNotes').value;
         const date = document.getElementById('attendanceDateFilter').value || new Date().toISOString().split('T')[0];
 
-        fetch('/admin/hr/deductions', {
+        fetch(ROUTES.deductions, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -507,7 +517,7 @@ document.addEventListener('DOMContentLoaded', function() {
             cancelButtonColor: '#6c757d',
             showLoaderOnConfirm: true,
             preConfirm: (reason) => {
-                return fetch('/admin/hr/attendance/mark-absent', {
+                return fetch(ROUTES.markAbsent, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

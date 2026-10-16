@@ -1,6 +1,19 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    // Server-generated URLs (FE-08): a route rename or sub-path deploy needs no JS edit.
+    @php
+        $routes = [
+            'generate' => route('admin.hr.payroll.generate'),
+            'deductions' => route('admin.hr.deductions.store'),
+            'payroll' => route('admin.hr.payroll.show', ['payroll' => '__ID__']),
+            'approve' => route('admin.hr.payroll.approve', ['payroll' => '__ID__']),
+            'disburse' => route('admin.hr.payroll.disburse', ['payroll' => '__ID__']),
+            'deductionStatus' => route('admin.hr.deductions.status', ['deduction' => '__ID__']),
+        ];
+    @endphp
+    const ROUTES = @json($routes);
+    const routeFor = (name, id) => ROUTES[name].replace('__ID__', encodeURIComponent(id));
     const generatePayrollModal = new bootstrap.Modal(document.getElementById('generatePayrollModal'));
     const managerDeductionModal = new bootstrap.Modal(document.getElementById('managerDeductionModal'));
     const payslipModal = new bootstrap.Modal(document.getElementById('payslipModal'));
@@ -26,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const year = document.getElementById('genYearInput').value;
         const month = document.getElementById('genMonthInput').value;
 
-        fetch('/admin/hr/payroll/generate', {
+        fetch(ROUTES.generate, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -67,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const reason = document.getElementById('deductReasonSelect').value;
         const notes = document.getElementById('deductNotesInput').value;
 
-        fetch('/admin/hr/deductions', {
+        fetch(ROUTES.deductions, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -118,7 +131,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelButtonText: 'إلغاء'
             }).then((res) => {
                 if (res.isConfirmed) {
-                    fetch(`/admin/hr/payroll/${id}/approve`, {
+                    fetch(routeFor('approve', id), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -158,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 confirmButtonColor: '#0ab39c'
             }).then((res) => {
                 if (res.isConfirmed) {
-                    fetch(`/admin/hr/payroll/${id}/disburse`, {
+                    fetch(routeFor('disburse', id), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -194,7 +207,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 cancelButtonText: 'تراجع'
             }).then(result => {
                 if (result.isConfirmed) {
-                    fetch(`/admin/hr/deductions/${id}/status`, {
+                    fetch(routeFor('deductionStatus', id), {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -228,7 +241,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const branchName = this.getAttribute('data-branch') || '';
             if (!payrollId) return;
 
-            fetch(`{{ url('/admin/hr/payroll') }}/${encodeURIComponent(payrollId)}`, {
+            fetch(routeFor('payroll', payrollId), {
                 headers: { 'Accept': 'application/json' }
             })
             .then(async res => {

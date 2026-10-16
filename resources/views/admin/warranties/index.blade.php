@@ -364,13 +364,14 @@ document.addEventListener('DOMContentLoaded', function () {
         modal.show();
     };
 
-    // Settle supplier modal handling
+    // Settle supplier modal handling (URL from the route, FE-08)
+    const settleUrl = @json(route('admin.warranties.claims.settle', ['claim' => '__ID__']));
     document.querySelectorAll('.settle-btn').forEach(btn => {
         btn.addEventListener('click', function () {
             const claimId = this.getAttribute('data-claim-id');
             const claimNum = this.getAttribute('data-claim-number');
             document.getElementById('settleClaimNumberDisplay').value = claimNum;
-            document.getElementById('settleForm').action = "/admin/warranties/claims/" + claimId + "/settle";
+            document.getElementById('settleForm').action = settleUrl.replace('__ID__', encodeURIComponent(claimId));
         });
     });
 });

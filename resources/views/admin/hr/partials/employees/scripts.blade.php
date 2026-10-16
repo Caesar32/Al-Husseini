@@ -1,6 +1,15 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+    // Server-generated URLs (FE-08): a route rename or sub-path deploy needs no JS edit.
+    @php
+        $routes = [
+            'employees' => route('admin.hr.employees'),
+            'employee' => route('admin.hr.employees.show', ['employee' => '__ID__']),
+        ];
+    @endphp
+    const ROUTES = @json($routes);
+    const employeeUrl = id => ROUTES.employee.replace('__ID__', encodeURIComponent(id));
     const employeeModal = new bootstrap.Modal(document.getElementById('employeeModal'));
     const employeeProfileModal = new bootstrap.Modal(document.getElementById('employeeProfileModal'));
 
@@ -21,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function () {
             ...(status && { status: status })
         });
 
-        fetch(`/admin/hr/employees?${params.toString()}`, {
+        fetch(`${ROUTES.employees}?${params.toString()}`, {
             headers: {
                 'Accept': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'
@@ -224,7 +233,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 `;
                 employeeProfileModal.show();
 
-                fetch(`/admin/hr/employees/${id}`, {
+                fetch(employeeUrl(id), {
                     headers: { 'Accept': 'application/json' }
                 })
                 .then(res => res.json())
@@ -341,7 +350,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.btn-edit-emp').forEach(btn => {
             btn.onclick = function() {
                 const id = this.getAttribute('data-id');
-                fetch(`/admin/hr/employees/${id}`, {
+                fetch(employeeUrl(id), {
                     headers: { 'Accept': 'application/json' }
                 })
                 .then(res => res.json())
@@ -387,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     confirmButtonColor: '#e63946'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        fetch(`/admin/hr/employees/${id}`, {
+                        fetch(employeeUrl(id), {
                             method: 'DELETE',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -450,7 +459,7 @@ document.addEventListener('DOMContentLoaded', function () {
             other_allowances: document.getElementById('empOtherAllowances').value || 0,
         };
 
-        const url = isEdit ? `/admin/hr/employees/${id}` : '/admin/hr/employees';
+        const url = isEdit ? employeeUrl(id) : ROUTES.employees;
         const method = isEdit ? 'PUT' : 'POST';
 
         fetch(url, {
