@@ -6,9 +6,9 @@
  */
 
 const FRONTEND_BUDGET = [
-    'handlers' => 47,
-    'scripts' => 8,
-    'styles' => 152,
+    'handlers' => 0,
+    'scripts' => 7,
+    'styles' => 145,
     'style_blocks' => 12,
     'raw_echo' => 0,
 ];

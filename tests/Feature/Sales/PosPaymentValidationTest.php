@@ -238,7 +238,11 @@ test('the POS shows the three payment modes and no hard-coded deposit', function
         ->toContain('باقي المبلغ')
         ->toContain('id="paidNowInput"')
         ->toContain('id="paymentRemainingOutput"')
-        ->toContain('setPaymentMode(')
+        ->toContain('data-action="pos.payment-mode"')
+        ->toContain('data-mode="full"')
+        ->toContain('data-mode="partial"')
+        ->toContain('data-mode="remaining"')
+        ->not->toContain('setPaymentMode(')
         ->not->toContain('creditDepositInput')
         ->not->toContain('value="500"');
 });

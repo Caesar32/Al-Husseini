@@ -8,7 +8,7 @@
                 <h5 class="modal-title fw-bold text-dark fs-15"><i class="ri-user-add-line text-primary me-1"></i> تسجيل عميل وسيارة جديدة</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <form id="newCustomerForm" onsubmit="saveQuickCustomer(event)">
+            <form id="newCustomerForm" data-action="pos.save-customer">
                 <div class="modal-body p-4">
                     <div class="mb-3">
                         <label class="form-label fw-bold text-dark fs-13">اسم العميل بالكامل <span class="text-danger">*</span></label>

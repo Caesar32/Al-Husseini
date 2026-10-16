@@ -9,7 +9,7 @@
             <h6 class="card-title fw-bold text-dark mb-0 fs-13">
                 <i class="ri-shopping-cart-2-line text-primary me-1"></i> سلة الفاتورة (<span id="cartCountBadge" class="badge bg-primary">0</span>)
             </h6>
-            <button type="button" class="btn btn-sm btn-soft-danger py-0 px-2 fs-11" onclick="clearCart()" title="إفراغ السلة بالكامل">
+            <button type="button" class="btn btn-sm btn-soft-danger py-0 px-2 fs-11" data-action="pos.clear-cart" title="إفراغ السلة بالكامل">
                 <i class="ri-delete-bin-line me-1"></i> تفريغ السلة
             </button>
         </div>
@@ -32,7 +32,7 @@
                         <i class="ri-recycle-line text-success fs-14"></i>
                         تسليم بطاريات كهنة (قديمة / استبدال)
                     </label>
-                    <input class="form-check-input me-0" type="checkbox" role="switch" id="tradeInCheck" onchange="toggleTradeInFields()">
+                    <input class="form-check-input me-0" type="checkbox" role="switch" id="tradeInCheck" data-action="pos.trade-in">
                 </div>
 
                 <!-- Flexible Details (Count + Custom Price) -->
@@ -41,19 +41,19 @@
                         <div class="col-4">
                             <label class="form-label fs-9 text-muted mb-0 fw-bold">العدد:</label>
                             <div class="input-group input-group-sm">
-                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" onclick="adjustScrapCount(-1)">-</button>
-                                <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCountInput" value="1" min="1" max="20" oninput="onScrapCapacityChange()">
-                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" onclick="adjustScrapCount(1)">+</button>
+                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" data-action="pos.scrap-count" data-delta="-1">-</button>
+                                <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCountInput" value="1" min="1" max="20" data-action="pos.scrap-capacity">
+                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" data-action="pos.scrap-count" data-delta="1">+</button>
                             </div>
                         </div>
                         <div class="col-4">
                             <label class="form-label fs-9 text-muted mb-0 fw-bold">السعة (Ah):</label>
-                            <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCapacityInput" value="70" min="30" max="250" oninput="onScrapCapacityChange()">
+                            <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCapacityInput" value="70" min="30" max="250" data-action="pos.scrap-capacity">
                         </div>
                         <div class="col-4">
                             <label class="form-label fs-9 text-muted mb-0 fw-bold">سعر الكهنة:</label>
                             <div class="input-group input-group-sm">
-                                <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center p-0 fs-11" id="scrapPriceInput" placeholder="السعر" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" oninput="calculateCartTotal()">
+                                <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center p-0 fs-11" id="scrapPriceInput" placeholder="السعر" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" data-action="pos.recalc">
                             </div>
                         </div>
                     </div>
@@ -73,7 +73,7 @@
                 </div>
                 <div class="d-flex justify-content-between align-items-center mb-0 gap-2">
                     <label for="cartDiscountInput" class="text-muted mb-0 text-nowrap">خصم إضافي:</label>
-                    <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 110px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" oninput="calculateCartTotal()">
+                    <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 110px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" data-action="pos.recalc">
                 </div>
                 <div class="d-flex justify-content-between mb-0 text-danger d-none" id="cartScrapDiscountRow">
                     <span>خصم الكهنة المسترجعة:</span>
@@ -88,15 +88,15 @@
             <!-- Payment mode: how much of the amount due is paid now -->
             <div class="mb-1">
                 <div class="payment-mode-group" role="radiogroup" aria-label="طريقة سداد الفاتورة">
-                    <button type="button" class="payment-mode-btn mode-full active" id="mode-full" role="radio" aria-checked="true" onclick="setPaymentMode('full')">
+                    <button type="button" class="payment-mode-btn mode-full active" id="mode-full" role="radio" aria-checked="true" data-action="pos.payment-mode" data-mode="full">
                         <i class="ri-checkbox-circle-line fs-14 d-block"></i>
                         <span class="fs-10">كامل الدفع</span>
                     </button>
-                    <button type="button" class="payment-mode-btn mode-partial" id="mode-partial" role="radio" aria-checked="false" onclick="setPaymentMode('partial')">
+                    <button type="button" class="payment-mode-btn mode-partial" id="mode-partial" role="radio" aria-checked="false" data-action="pos.payment-mode" data-mode="partial">
                         <i class="ri-pie-chart-2-line fs-14 d-block"></i>
                         <span class="fs-10">جزء من المبلغ</span>
                     </button>
-                    <button type="button" class="payment-mode-btn mode-remaining" id="mode-remaining" role="radio" aria-checked="false" onclick="setPaymentMode('remaining')">
+                    <button type="button" class="payment-mode-btn mode-remaining" id="mode-remaining" role="radio" aria-checked="false" data-action="pos.payment-mode" data-mode="remaining">
                         <i class="ri-hand-coin-line fs-14 d-block"></i>
                         <span class="fs-10">باقي المبلغ</span>
                     </button>
@@ -108,19 +108,19 @@
             <div class="mb-1" id="paymentMethodBox">
                 <div class="row g-1 text-center">
                     <div class="col-4">
-                        <div class="payment-method-card active pay-cash py-1" id="pay-cash" onclick="setPaymentMethod('cash')">
+                        <div class="payment-method-card active pay-cash py-1" id="pay-cash" data-action="pos.payment-method" data-method="cash">
                             <i class="ri-money-dollar-circle-line fs-14 d-block mb-0 text-success"></i>
                             <span class="fs-10">كاش</span>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="payment-method-card pay-instapay py-1" id="pay-instapay" onclick="setPaymentMethod('instapay')">
+                        <div class="payment-method-card pay-instapay py-1" id="pay-instapay" data-action="pos.payment-method" data-method="instapay">
                             <i class="ri-smartphone-line fs-14 d-block mb-0 text-primary"></i>
                             <span class="fs-10">إنستاباي</span>
                         </div>
                     </div>
                     <div class="col-4">
-                        <div class="payment-method-card pay-card py-1" id="pay-card" onclick="setPaymentMethod('card')">
+                        <div class="payment-method-card pay-card py-1" id="pay-card" data-action="pos.payment-method" data-method="card">
                             <i class="ri-bank-card-line fs-14 d-block mb-0 text-info"></i>
                             <span class="fs-10">فيزا</span>
                         </div>
@@ -135,7 +135,7 @@
                         <label for="paidNowInput" class="form-label fs-9 fw-bold text-dark mb-0">المبلغ المدفوع الآن:</label>
                         <input type="number" inputmode="decimal" step="0.01" min="0.01" autocomplete="off"
                                class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" id="paidNowInput" placeholder="0.00"
-                               aria-describedby="paidNowMessage" oninput="onPaidNowInput()" onkeydown="blockNonNumericKeys(event)">
+                               aria-describedby="paidNowMessage" data-action="pos.paid-now">
                     </div>
                     <div class="col-6">
                         <label for="paymentRemainingOutput" class="form-label fs-9 fw-bold mb-0" id="paymentRemainingLabel">المتبقي:</label>
@@ -151,7 +151,7 @@
                     <div class="col-6">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-body fs-9 py-0 px-1">المستلم:</span>
-                            <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" oninput="calculateCashChange()" onkeydown="blockNonNumericKeys(event)">
+                            <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" data-action="pos.cash-change">
                         </div>
                     </div>
                     <div class="col-6 text-end">
@@ -168,7 +168,7 @@
                     <label class="form-label fs-10 fw-bold text-dark mb-0"><i class="ri-user-settings-line text-primary me-1"></i> العامل / الفني القائم بالتركيب:</label>
                     <span class="badge bg-danger text-white fs-9">إجباري *</span>
                 </div>
-                <select class="form-select form-select-sm fw-bold fs-11 border-danger" id="posTechnicianSelectCart" required onchange="if(document.getElementById('posTechnicianSelect')) document.getElementById('posTechnicianSelect').value = this.value">
+                <select class="form-select form-select-sm fw-bold fs-11 border-danger" id="posTechnicianSelectCart" required data-action="pos.sync-tech" data-target="posTechnicianSelect">
                     <option value="">-- اختر العامل / الفني المسؤول عن التركيب --</option>
                     @foreach($technicians as $tech)
                         <option value="{{ $tech->id }}">{{ $tech->full_name }} ({{ $tech->employee_code }})</option>
@@ -177,7 +177,7 @@
             </div>
 
             <!-- Submit Invoice Button -->
-            <button type="button" class="btn btn-success w-100 fw-bold fs-13 py-1 shadow-sm mt-1" id="btnSubmitInvoice" onclick="submitFullInvoice()">
+            <button type="button" class="btn btn-success w-100 fw-bold fs-13 py-1 shadow-sm mt-1" id="btnSubmitInvoice" data-action="pos.submit">
                 <i class="ri-check-double-line me-1"></i> اعتماد الفاتورة والضمان (Enter ↵)
             </button>
 

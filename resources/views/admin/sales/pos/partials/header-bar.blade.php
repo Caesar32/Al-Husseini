@@ -4,7 +4,7 @@
         <!-- Customer Selection -->
         <div class="d-flex align-items-center gap-1 flex-grow-1" style="min-width: 220px; max-width: 380px;">
             <span class="fs-12 fw-bold text-muted text-nowrap"><i class="ri-user-smile-line text-primary fs-14"></i> العميل:</span>
-            <select class="form-select form-select-sm fw-bold fs-12 border-primary" id="posCustomerSelect" onchange="onCustomerSelected()">
+            <select class="form-select form-select-sm fw-bold fs-12 border-primary" id="posCustomerSelect" data-action="pos.customer">
                 <option value="WALK_IN">عميل نقدي مباشر بالمعرض / الورشة</option>
             </select>
         </div>
@@ -12,7 +12,7 @@
         <!-- Technician Selection -->
         <div class="d-flex align-items-center gap-1 flex-grow-1" style="min-width: 180px; max-width: 270px;">
             <span class="fs-11 fw-bold text-danger text-nowrap"><i class="ri-user-settings-line text-primary fs-13"></i> الفني <span class="text-danger">*</span>:</span>
-            <select class="form-select form-select-sm fw-bold fs-11 border-danger" id="posTechnicianSelect" required onchange="if(document.getElementById('posTechnicianSelectCart')) document.getElementById('posTechnicianSelectCart').value = this.value">
+            <select class="form-select form-select-sm fw-bold fs-11 border-danger" id="posTechnicianSelect" required data-action="pos.sync-tech" data-target="posTechnicianSelectCart">
                 <option value="">-- اختر الفني المسؤول * --</option>
                 @foreach($technicians as $tech)
                     <option value="{{ $tech->id }}">{{ $tech->full_name }} ({{ $tech->employee_code }})</option>

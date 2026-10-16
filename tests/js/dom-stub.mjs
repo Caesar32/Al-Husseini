@@ -27,6 +27,8 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
     const document = {
         readyState: 'complete',
         addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn); },
+        removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
+        listeners,
         getElementById: element,
         querySelector: (sel) => (sel.startsWith('meta[name="csrf-token"]') ? { getAttribute: () => 'csrf-test' } : null),
         querySelectorAll: () => [],
@@ -34,6 +36,9 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
 
     const window = {
         location: { search: '', reloads: 0, reload() { this.reloads++; } },
+        listeners: {},
+        addEventListener(type, fn) { (this.listeners[type] ||= []).push(fn); },
+        removeEventListener(type, fn) { this.listeners[type] = (this.listeners[type] || []).filter((f) => f !== fn); },
         console,
     };
 
@@ -43,6 +48,7 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
         setTimeout: (fn) => { fn(); return 0; },
         setInterval: (fn, ms) => { calls.intervals.push(ms); return calls.intervals.length; },
         clearInterval: (id) => calls.cleared.push(id),
+        clearTimeout: () => {},
         bootstrap: { Modal: function (el) { this.show = () => calls.modal.push(['show', el?.id]); this.hide = () => calls.modal.push(['hide', el?.id]); } },
         ...globals,
         Swal: { fire: (...args) => { calls.swal.push(args); return Promise.resolve({ isConfirmed: false }); }, showValidationMessage() {} },
@@ -70,5 +76,5 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
 
     const flush = () => new Promise((resolve) => setImmediate(resolve));
 
-    return { window, document, Admin: window.Admin, element, calls, load, click, flush };
+    return { window, document, Admin: window.Admin, element, calls, load, click, flush, ids: () => Object.keys(elements), context };
 }

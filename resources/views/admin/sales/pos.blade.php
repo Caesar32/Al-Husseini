@@ -7,7 +7,18 @@
 @endsection
 
 @section('content')
-<div class="pos-container-fluid">
+@php
+    $pageConfig = [
+        'data' => ['products' => $products, 'customers' => $customers, 'scrapTiers' => $scrapTiers],
+        'routes' => [
+            'store' => route('admin.pos.store'),
+            'customerStore' => route('admin.customers.store'),
+            'invoiceShow' => route('admin.invoices.show', ['invoice' => '__ID__']),
+            'productsSearch' => route('admin.pos.products.search'),
+        ],
+    ];
+@endphp
+<div class="pos-container-fluid" data-page="pos" data-config='@json($pageConfig)'>
     <div class="row g-2 pos-grid-row">
 
         <!-- ============================================================== -->

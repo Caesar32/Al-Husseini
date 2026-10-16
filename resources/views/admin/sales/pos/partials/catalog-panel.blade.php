@@ -17,7 +17,7 @@
             </div>
             <!-- Infinite scroll trigger: observed by IntersectionObserver; also a manual fallback button -->
             <div id="catalogLoadMoreSentinel" class="text-center py-3 d-none">
-                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="catalogLoadMoreBtn" onclick="loadNextCatalogPage()">
+                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="catalogLoadMoreBtn" data-action="pos.load-more">
                     <i class="ri-add-line me-1"></i> تحميل المزيد
                 </button>
             </div>

@@ -6,17 +6,17 @@
             <span class="input-group-text bg-light text-primary border-end-0">
                 <i class="ri-barcode-box-line me-1"></i> <i class="ri-search-line"></i>
             </span>
-            <input type="text" class="form-control fw-bold border-start-0 border-end-0" id="catalogSearchInput" placeholder="ابحث باسم الصنف، الماركة، أو امسح الباركود 📷 (Enter للإضافة)..." oninput="onCatalogSearchInput()" onkeydown="handleBarcodeEnter(event)">
-            <button class="btn btn-light border border-start-0 text-muted" type="button" onclick="clearCatalogSearch()" title="مسح البحث">
+            <input type="text" class="form-control fw-bold border-start-0 border-end-0" id="catalogSearchInput" placeholder="ابحث باسم الصنف، الماركة، أو امسح الباركود 📷 (Enter للإضافة)..." data-action="pos.search">
+            <button class="btn btn-light border border-start-0 text-muted" type="button" data-action="pos.clear-search" title="مسح البحث">
                 <i class="ri-close-line"></i>
             </button>
         </div>
         <!-- View Mode Toggle: Grid vs Table List -->
         <div class="btn-group btn-group-sm shrink-0" role="group">
-            <button type="button" class="btn btn-light border active px-2" id="viewModeGridBtn" onclick="setViewMode('grid')" title="عرض بطاقات كروت">
+            <button type="button" class="btn btn-light border active px-2" id="viewModeGridBtn" data-action="pos.view" data-mode="grid" title="عرض بطاقات كروت">
                 <i class="ri-grid-fill"></i>
             </button>
-            <button type="button" class="btn btn-light border px-2" id="viewModeListBtn" onclick="setViewMode('list')" title="عرض جدول مدمج سريع">
+            <button type="button" class="btn btn-light border px-2" id="viewModeListBtn" data-action="pos.view" data-mode="list" title="عرض جدول مدمج سريع">
                 <i class="ri-list-check"></i>
             </button>
         </div>
@@ -24,20 +24,20 @@
 
     <!-- Row 2: Fluid Horizontal Scrollable Category Ribbon (server-driven: real categories + cached counts) -->
     <div class="pos-category-nav-row mb-2">
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" onclick="scrollCategoryRibbon(-1)" title="للخلف" aria-label="تمرير القائمة للخلف">
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" data-action="pos.ribbon" data-direction="-1" title="للخلف" aria-label="تمرير القائمة للخلف">
             <i class="ri-arrow-left-s-line"></i>
         </button>
         <div class="pos-category-scroll-container" id="categoryTabsContainer">
-            <button type="button" class="btn btn-sm btn-primary pos-category-pill text-nowrap" id="cat-tab-all" data-slug="all" onclick="filterByCategory('all')">
+            <button type="button" class="btn btn-sm btn-primary pos-category-pill text-nowrap" id="cat-tab-all" data-slug="all" data-action="pos.category" data-category="all">
                 الكل (<span id="pillCount-all">{{ $categories->sum('count') }}</span>)
             </button>
             @foreach ($categories as $cat)
-                <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-{{ $cat['slug'] }}" data-slug="{{ $cat['slug'] }}" onclick="filterByCategory('{{ $cat['slug'] }}')">
+                <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-{{ $cat['slug'] }}" data-slug="{{ $cat['slug'] }}" data-action="pos.category" data-category="{{ $cat['slug'] }}">
                     {{ $cat['icon'] }} {{ $cat['name'] }} (<span id="pillCount-{{ $cat['slug'] }}">{{ $cat['count'] }}</span>)
                 </button>
             @endforeach
         </div>
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" onclick="scrollCategoryRibbon(1)" title="للأمام" aria-label="تمرير القائمة للأمام">
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" data-action="pos.ribbon" data-direction="1" title="للأمام" aria-label="تمرير القائمة للأمام">
             <i class="ri-arrow-right-s-line"></i>
         </button>
     </div>
@@ -49,7 +49,7 @@
             <div class="flex-grow-1 position-relative">
                 <input type="text" class="form-control form-select-sm fw-bold fs-11" id="quickAddSearchInput" autocomplete="off"
                        placeholder="-- اكتب للبحث السريع أو امسح الباركود لإضافة صنف مباشرة --"
-                       oninput="onQuickAddInput()" onkeydown="onQuickAddKeydown(event)" onblur="onQuickAddBlur()">
+                       data-action="pos.quick-add">
                 <div id="quickAddResultsDropdown" class="d-none"></div>
             </div>
         </div>
