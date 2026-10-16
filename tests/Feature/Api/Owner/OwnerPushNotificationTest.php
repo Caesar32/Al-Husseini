@@ -59,3 +59,48 @@ test('push notification job executes and finds owner devices', function () {
 
     expect(UserDevice::where('user_id', $this->owner->id)->count())->toBe(2);
 });
+
+test('push notification job is dispatched only after the surrounding transaction commits (B4)', function () {
+    expect((new DispatchOwnerPushNotification('t', 'b'))->afterCommit)->toBeTrue();
+});
+
+test('push notification job is not handled when the surrounding transaction rolls back (B4)', function () {
+    config(['queue.default' => 'sync']);
+    Log::spy();
+
+    try {
+        DB::transaction(function () {
+            DispatchOwnerPushNotification::dispatch('t', 'b');
+            throw new RuntimeException('rollback');
+        });
+    } catch (RuntimeException) {
+    }
+
+    Log::shouldNotHaveReceived('info', [Mockery::on(fn ($message) => str_starts_with($message, '[Owner Push]'))]);
+});
+
+test('push notification job is handled once the surrounding transaction commits (B4)', function () {
+    config(['queue.default' => 'sync']);
+    Log::spy();
+
+    DB::transaction(function () {
+        DispatchOwnerPushNotification::dispatch('t', 'b');
+    });
+
+    Log::shouldHaveReceived('info')->withArgs(fn ($message) => str_starts_with($message, '[Owner Push]'));
+});
+
+test('push notification job never logs the device token (B5)', function () {
+    UserDevice::create([
+        'user_id'      => $this->owner->id,
+        'platform'     => 'ios',
+        'device_token' => 'apns-secret-device-token-value',
+        'device_name'  => 'Owner iPhone',
+    ]);
+    Log::spy();
+
+    (new DispatchOwnerPushNotification('t', 'b'))->handle();
+
+    Log::shouldHaveReceived('debug')->withArgs(fn ($message) => str_starts_with($message, '[Owner Push] Sent to device ID'));
+    Log::shouldNotHaveReceived('debug', [Mockery::on(fn ($message) => str_contains($message, 'apns-secret'))]);
+});

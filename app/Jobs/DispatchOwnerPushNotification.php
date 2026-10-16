@@ -29,7 +29,10 @@ class DispatchOwnerPushNotification implements ShouldQueue
         public string $title,
         public string $body,
         public array $data = []
-    ) {}
+    ) {
+        // Callers dispatch inside DB::transaction; a rolled-back sale must not notify (B4).
+        $this->afterCommit();
+    }
 
     /**
      * Execute the job: Fan-out push notifications to all registered owner devices.
@@ -64,11 +67,11 @@ class DispatchOwnerPushNotification implements ShouldQueue
         foreach ($devices as $device) {
             // Note: When APNs / Firebase SDK credentials are provided by the owner,
             // the HTTP v1 client call is executed here using $device->device_token.
+            // Never log the device token: it is a push credential (B5).
             Log::debug(sprintf(
-                '[Owner Push] Sent to device ID %d (%s) token: %s',
+                '[Owner Push] Sent to device ID %d (%s)',
                 $device->id,
-                $device->platform,
-                substr($device->device_token, 0, 15) . '...'
+                $device->platform
             ));
         }
     }
