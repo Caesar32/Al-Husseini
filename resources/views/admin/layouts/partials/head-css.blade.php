@@ -42,6 +42,8 @@
 
 <!-- SweetAlert2 Css -->
 <link href="{{ asset('assets/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
+<!-- Design tokens (frontend F0): --ah-* variables used below and by components -->
+<link href="{{ asset('assets/css/tokens.css') }}" rel="stylesheet" type="text/css" />
 
 <style>
     /* =======================================================
@@ -49,31 +51,31 @@
        ======================================================= */
     :root {
         /* Typography Variables (Propagate into Velzon & Bootstrap components) */
-        --vz-body-font-family: 'Cairo', 'Almarai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        --vz-font-sans-serif: 'Cairo', 'Almarai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        --vz-font-family-secondary: 'Cairo', 'Almarai', sans-serif !important;
-        --bs-body-font-family: 'Cairo', 'Almarai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        --bs-font-sans-serif: 'Cairo', 'Almarai', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-        --vz-btn-font-family: 'Cairo', 'Almarai', sans-serif !important;
-        --vz-font-monospace: 'Outfit', 'Poppins', 'Segoe UI', Consolas, monospace !important;
-        --bs-font-monospace: 'Outfit', 'Poppins', 'Segoe UI', Consolas, monospace !important;
+        --vz-body-font-family: var(--ah-font-sans) !important;
+        --vz-font-sans-serif: var(--ah-font-sans) !important;
+        --vz-font-family-secondary: var(--ah-font-sans-short) !important;
+        --bs-body-font-family: var(--ah-font-sans) !important;
+        --bs-font-sans-serif: var(--ah-font-sans) !important;
+        --vz-btn-font-family: var(--ah-font-sans-short) !important;
+        --vz-font-monospace: var(--ah-font-numeric) !important;
+        --bs-font-monospace: var(--ah-font-numeric) !important;
 
         /* Brand Colors Matching Al-Husseini Royal Emblem */
-        --brand-sapphire: #1a4480;
-        --brand-sapphire-dark: #123363;
-        --brand-sapphire-light: #2563eb;
-        --brand-gold: #c59b27;
-        --brand-gold-accent: #d4af37;
-        --brand-gold-light: #fdf5d7;
-        --brand-navy-dark: #0c141f;
+        --brand-sapphire: var(--ah-color-primary);
+        --brand-sapphire-dark: var(--ah-color-primary-dark);
+        --brand-sapphire-light: var(--ah-color-primary-light);
+        --brand-gold: var(--ah-color-accent);
+        --brand-gold-accent: var(--ah-color-accent-strong);
+        --brand-gold-light: var(--ah-color-accent-soft);
+        --brand-navy-dark: var(--ah-color-ink);
 
         /* Base Border Radii for Modern Sleek Finish (8px default) */
-        --vz-border-radius: 0.5rem;
-        --vz-border-radius-sm: 0.375rem;
-        --vz-border-radius-lg: 0.75rem;
-        --vz-border-radius-xl: 0.875rem;
-        --vz-border-radius-2xl: 1rem;
-        --vz-border-radius-pill: 50rem;
+        --vz-border-radius: var(--ah-radius-md);
+        --vz-border-radius-sm: var(--ah-radius-sm);
+        --vz-border-radius-lg: var(--ah-radius-lg);
+        --vz-border-radius-xl: var(--ah-radius-xl);
+        --vz-border-radius-2xl: var(--ah-radius-2xl);
+        --vz-border-radius-pill: var(--ah-radius-pill);
     }
 
     /* =======================================================
