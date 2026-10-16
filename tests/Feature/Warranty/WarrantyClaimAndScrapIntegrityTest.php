@@ -223,8 +223,13 @@ test('scrap inventory list follows the same branch scope as its metrics', functi
 test('warranty serial verify escapes results and passes the serial through a data attribute (B3)', function () {
     $html = $this->actingAs($this->user)->get(route('admin.warranties.index'))->assertOk()->getContent();
 
+    // F4: the verify script is the warranties module; the page loads it and the module escapes.
+    $module = file_get_contents(public_path('assets/js/admin/warranties.js'));
     expect($html)
         ->not->toContain("onclick=\"openClaimModal('\${serial}')\"")
+        ->toContain(asset('assets/js/admin/warranties.js'))
+        ->toContain('data-page="warranties.index"')
+        ->and($module)
         ->toContain('data-serial="${esc(serial)}"')
         ->toContain('${esc(data.message)}');
 });

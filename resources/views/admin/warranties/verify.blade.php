@@ -76,9 +76,9 @@
                 <!-- Quick Serial Suggestions -->
                 <div class="mt-2 d-flex flex-wrap align-items-center gap-2">
                     <span class="text-muted fs-12">سيريالات سريعة للاختبار:</span>
-                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-serial="SN-ACD-297456">SN-ACD-297456</button>
-                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-serial="SN-CHL-858016">SN-CHL-858016</button>
-                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-serial="SN-HAN-512824">SN-HAN-512824</button>
+                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-action="warranties.sample" data-serial="SN-ACD-297456">SN-ACD-297456</button>
+                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-action="warranties.sample" data-serial="SN-CHL-858016">SN-CHL-858016</button>
+                    <button type="button" class="badge bg-light text-body border sample-serial-btn" data-action="warranties.sample" data-serial="SN-HAN-512824">SN-HAN-512824</button>
                 </div>
             </div>
 
@@ -160,7 +160,7 @@
                                         class="btn btn-light text-danger fw-bold shadow-sm" 
                                         data-bs-toggle="modal" 
                                         data-bs-target="#newClaimModal" 
-                                        onclick="prefillClaimModal('{{ $w->serial_number }}')">
+                                        data-action="warranties.prefill-claim" data-serial="{{ $w->serial_number }}">
                                     <i class="ri-alarm-warning-line me-1"></i> صرف استبدال فوري
                                 </button>
                             @else
@@ -262,10 +262,10 @@
                     قم بمسح الباركود الخاص بالبطارية أو كتابة السيريال ثم اضغط على زر "فحص الضمان" لعرض كامل بيانات الفاتورة وسريان الضمان.
                 </p>
                 <div class="d-inline-flex gap-2">
-                    <button type="button" class="btn btn-outline-primary btn-sm sample-serial-btn" data-serial="SN-ACD-297456">
+                    <button type="button" class="btn btn-outline-primary btn-sm sample-serial-btn" data-action="warranties.sample" data-serial="SN-ACD-297456">
                         <i class="ri-magic-line me-1"></i> تجربة سيريال: SN-ACD-297456
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm sample-serial-btn" data-serial="SN-CHL-858016">
+                    <button type="button" class="btn btn-outline-secondary btn-sm sample-serial-btn" data-action="warranties.sample" data-serial="SN-CHL-858016">
                         <i class="ri-magic-line me-1"></i> تجربة سيريال: SN-CHL-858016
                     </button>
                 </div>
@@ -312,7 +312,7 @@
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">القرار الفني المعتمد <span class="text-danger">*</span></label>
-                        <select name="decision" id="decisionSelect" class="form-select" required>
+                        <select name="decision" id="decisionSelect" class="form-select" required data-action="warranties.decision">
                             <option value="replaced">استبدال فوري ببطارية جديدة من المخزن</option>
                             <option value="recharged">إعادة شحن وتسليم نفس البطارية</option>
                             <option value="rejected">رفض الضمان (سوء استخدام / دينامو زائد)</option>
@@ -347,36 +347,5 @@
 @endsection
 
 @section('script')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const serialInput = document.getElementById('serialInput');
-    const sampleBtns = document.querySelectorAll('.sample-serial-btn');
-
-    sampleBtns.forEach(btn => {
-        btn.addEventListener('click', function () {
-            serialInput.value = this.dataset.serial;
-            document.getElementById('verifyForm').submit();
-        });
-    });
-
-    const decisionSelect = document.getElementById('decisionSelect');
-    const replacementFields = document.querySelectorAll('.replacement-fields');
-    if (decisionSelect) {
-        decisionSelect.addEventListener('change', function () {
-            if (this.value === 'replaced') {
-                replacementFields.forEach(el => el.classList.remove('d-none'));
-            } else {
-                replacementFields.forEach(el => el.classList.add('d-none'));
-            }
-        });
-    }
-});
-
-function prefillClaimModal(serial) {
-    const input = document.getElementById('modalDefectiveSerial');
-    if (input) {
-        input.value = serial;
-    }
-}
-</script>
+<script src="{{ asset('assets/js/admin/warranties.js') }}"></script>
 @endsection

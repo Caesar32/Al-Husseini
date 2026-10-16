@@ -166,7 +166,7 @@
                             <a href="{{ route('admin.pos.index') }}" class="btn btn-sm btn-success fw-bold px-3">
                                 <i class="ri-add-circle-line align-middle me-1"></i> فاتورة POS
                             </a>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportTableToCSV()">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" data-action="invoices.export">
                                 <i class="ri-file-excel-2-line align-middle me-1"></i> تصدير Excel
                             </button>
                         </div>
@@ -179,19 +179,19 @@
                         <span class="fs-12 text-muted fw-bold me-2">
                             <i class="ri-time-line align-middle"></i> اختصارات الأيام:
                         </span>
-                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12 {{ request('date_from') === date('Y-m-d') && request('date_to') === date('Y-m-d') ? 'active fw-bold' : '' }}" onclick="applyDatePreset('today')">
+                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12 {{ request('date_from') === date('Y-m-d') && request('date_to') === date('Y-m-d') ? 'active fw-bold' : '' }}" data-action="invoices.preset" data-preset="today">
                             اليوم
                         </button>
-                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12 {{ request('date_from') === date('Y-m-d', strtotime('-1 day')) && request('date_to') === date('Y-m-d', strtotime('-1 day')) ? 'active fw-bold' : '' }}" onclick="applyDatePreset('yesterday')">
+                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12 {{ request('date_from') === date('Y-m-d', strtotime('-1 day')) && request('date_to') === date('Y-m-d', strtotime('-1 day')) ? 'active fw-bold' : '' }}" data-action="invoices.preset" data-preset="yesterday">
                             أمس
                         </button>
-                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12" onclick="applyDatePreset('last7')">
+                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12" data-action="invoices.preset" data-preset="last7">
                             آخر 7 أيام
                         </button>
-                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12" onclick="applyDatePreset('this_month')">
+                        <button type="button" class="btn btn-xs btn-outline-primary py-1 px-2 fs-12" data-action="invoices.preset" data-preset="this_month">
                             هذا الشهر
                         </button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2 fs-12" onclick="applyDatePreset('clear')">
+                        <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2 fs-12" data-action="invoices.preset" data-preset="clear">
                             كل التواريخ (مسح)
                         </button>
 
@@ -434,82 +434,5 @@
 @endsection
 
 @section('script')
-<script>
-'use strict';
-
-// Apply Quick Date Presets
-function applyDatePreset(preset) {
-    const today = new Date();
-    const dateFromInput = document.getElementById('filter_date_from');
-    const dateToInput = document.getElementById('filter_date_to');
-    const form = document.getElementById('invoicesFilterForm');
-
-    function formatDate(d) {
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
-        const day = String(d.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    }
-
-    if (preset === 'today') {
-        const todayStr = formatDate(today);
-        dateFromInput.value = todayStr;
-        dateToInput.value = todayStr;
-    } else if (preset === 'yesterday') {
-        const yest = new Date();
-        yest.setDate(today.getDate() - 1);
-        const yestStr = formatDate(yest);
-        dateFromInput.value = yestStr;
-        dateToInput.value = yestStr;
-    } else if (preset === 'last7') {
-        const d7 = new Date();
-        d7.setDate(today.getDate() - 6);
-        dateFromInput.value = formatDate(d7);
-        dateToInput.value = formatDate(today);
-    } else if (preset === 'this_month') {
-        const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-        dateFromInput.value = formatDate(startOfMonth);
-        dateToInput.value = formatDate(today);
-    } else if (preset === 'clear') {
-        dateFromInput.value = '';
-        dateToInput.value = '';
-    }
-
-    if (form) {
-        form.submit();
-    }
-}
-
-// Export Table to CSV
-function exportTableToCSV() {
-    const table = document.getElementById('invoicesTable');
-    if (!table) return;
-
-    let csv = [];
-    const rows = table.querySelectorAll('tr');
-
-    for (let i = 0; i < rows.length; i++) {
-        let row = [], cols = rows[i].querySelectorAll('td, th');
-        // Exclude the last action column
-        for (let j = 0; j < cols.length - 1; j++) {
-            let data = cols[j].innerText.replace(/(\r\n|\n|\r)/gm, ' ').replace(/(\s\s+)/gm, ' ').trim();
-            data = data.replace(/"/g, '""');
-            row.push('"' + data + '"');
-        }
-        if (row.length > 0) {
-            csv.push(row.join(','));
-        }
-    }
-
-    const csvFile = new Blob(['\uFEFF' + csv.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    const downloadLink = document.createElement('a');
-    const dateStr = new Date().toISOString().split('T')[0];
-    downloadLink.download = `فواتير_مبيعات_مركز_الحسيني_${dateStr}.csv`;
-    downloadLink.href = window.URL.createObjectURL(csvFile);
-    downloadLink.style.display = 'none';
-    document.body.appendChild(downloadLink);
-    downloadLink.click();
-    document.body.removeChild(downloadLink);
-}
-</script>
+<script src="{{ asset('assets/js/admin/sales/invoices.js') }}"></script>
 @endsection

@@ -66,10 +66,10 @@
                     <p class="text-muted small mb-0">اختر الصلاحيات التي يستطيع شاغل هذا الدور الوصول إليها وتنفيذها.</p>
                 </div>
                 <div class="d-flex align-items-center gap-2">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAllGlobal">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnSelectAllGlobal" data-action="roles.select-all">
                         <i class="ri-checkbox-multiple-line me-1"></i> تحديد الكل
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnDeselectAllGlobal">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btnDeselectAllGlobal" data-action="roles.deselect-all">
                         <i class="ri-checkbox-blank-line me-1"></i> إلغاء تحديد الكل
                     </button>
                     <a href="{{ route('admin.roles.index') }}" class="btn btn-light btn-sm">إلغاء</a>
@@ -93,7 +93,7 @@
                         </span>
                         <h6 class="card-title mb-0 fw-bold fs-14">{{ $group['title'] }}</h6>
                     </div>
-                    <button type="button" class="btn btn-ghost-primary btn-sm fs-12 px-2 py-1 btn-toggle-category" data-target="{{ $groupKey }}">
+                    <button type="button" class="btn btn-ghost-primary btn-sm fs-12 px-2 py-1 btn-toggle-category" data-action="roles.toggle-category" data-target="{{ $groupKey }}">
                         <i class="ri-check-line me-1"></i> تحديد الكل بالقسم
                     </button>
                 </div>
@@ -152,28 +152,6 @@
 </form>
 
 @push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    // Select All Global
-    document.getElementById('btnSelectAllGlobal')?.addEventListener('click', function () {
-        document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = true);
-    });
-
-    // Deselect All Global
-    document.getElementById('btnDeselectAllGlobal')?.addEventListener('click', function () {
-        document.querySelectorAll('.perm-checkbox').forEach(cb => cb.checked = false);
-    });
-
-    // Toggle by category
-    document.querySelectorAll('.btn-toggle-category').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const cat = this.getAttribute('data-target');
-            const checkboxes = document.querySelectorAll('.category-' + cat);
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            checkboxes.forEach(cb => cb.checked = !allChecked);
-        });
-    });
-});
-</script>
+<script src="{{ asset('assets/js/admin/roles/permissions.js') }}"></script>
 @endpush
 @endsection

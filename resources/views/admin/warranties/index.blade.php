@@ -3,7 +3,13 @@
 @section('title', 'إدارة الضمانات ومطالبات البطاريات المعيبة | مركز الحسيني')
 
 @section('content')
-<div class="container-fluid">
+@php
+    $pageConfig = [
+        'verifyUrl' => route('admin.warranties.verify'),
+        'settleUrl' => route('admin.warranties.claims.settle', ['claim' => '__ID__']),
+    ];
+@endphp
+<div class="container-fluid" data-page="warranties.index" data-config='@json($pageConfig)'>
     <div class="row">
         <div class="col-12">
             <div class="page-title-box d-sm-flex align-items-center justify-content-between">
@@ -300,80 +306,5 @@
 @endsection
 
 @section('script')
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const searchInput = document.getElementById('serialSearchInput');
-    const searchBtn = document.getElementById('serialSearchBtn');
-    const resultBox = document.getElementById('verificationResultBox');
-    // Escapes server data and the typed serial before they go into innerHTML (B3).
-    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-    function verifySerial() {
-        const serial = searchInput.value.trim();
-        if (!serial) return;
-
-        resultBox.classList.remove('d-none');
-        resultBox.innerHTML = '<div class="text-muted"><i class="ri-loader-4-line spin"></i> جاري الفحص في قاعدة البيانات...</div>';
-
-        fetch("{{ route('admin.warranties.verify') }}?serial_number=" + encodeURIComponent(serial))
-            .then(res => res.json())
-            .then(data => {
-                if (!data.exists) {
-                    resultBox.innerHTML = `
-                        <div class="alert alert-danger mb-0">
-                            <strong><i class="ri-close-circle-line me-1"></i> السيريال غير مسجل:</strong> ${esc(data.message)}
-                        </div>
-                    `;
-                } else {
-                    const statusClass = data.is_valid ? 'alert-success' : 'alert-warning';
-                    resultBox.innerHTML = `
-                        <div class="alert ${statusClass} mb-0">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <h6 class="fw-bold mb-1"><i class="ri-shield-check-line me-1"></i> ${esc(data.message)}</h6>
-                                    <div>العميل: <strong>${esc(data.warranty.customer ? data.warranty.customer.name : 'عميل نقدي')}</strong> (${esc(data.warranty.customer ? data.warranty.customer.phone : '')})</div>
-                                    <div>تاريخ الانتهاء: <strong>${esc(data.warranty.end_date)}</strong> (المتبقي: ${esc(data.days_remaining)} يوم)</div>
-                                </div>
-                                <div>
-                                    <button type="button" class="btn btn-danger btn-sm js-open-claim" data-serial="${esc(serial)}">
-                                        <i class="ri-alarm-warning-line me-1"></i> فتح تذكرة استبدال فوري
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    resultBox.querySelector('.js-open-claim')?.addEventListener('click', e => openClaimModal(e.currentTarget.dataset.serial));
-                }
-            })
-            .catch(() => {
-                resultBox.innerHTML = '<div class="alert alert-danger mb-0">حدث خطأ أثناء الاتصال بقاعدة البيانات.</div>';
-            });
-    }
-
-    searchBtn.addEventListener('click', verifySerial);
-    searchInput.addEventListener('keypress', function (e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            verifySerial();
-        }
-    });
-
-    window.openClaimModal = function(serial) {
-        document.getElementById('modalDefectiveSerial').value = serial;
-        const modal = new bootstrap.Modal(document.getElementById('newClaimModal'));
-        modal.show();
-    };
-
-    // Settle supplier modal handling (URL from the route, FE-08)
-    const settleUrl = @json(route('admin.warranties.claims.settle', ['claim' => '__ID__']));
-    document.querySelectorAll('.settle-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const claimId = this.getAttribute('data-claim-id');
-            const claimNum = this.getAttribute('data-claim-number');
-            document.getElementById('settleClaimNumberDisplay').value = claimNum;
-            document.getElementById('settleForm').action = settleUrl.replace('__ID__', encodeURIComponent(claimId));
-        });
-    });
-});
-</script>
+<script src="{{ asset('assets/js/admin/warranties.js') }}"></script>
 @endsection
