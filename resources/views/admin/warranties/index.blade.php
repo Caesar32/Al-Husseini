@@ -297,12 +297,16 @@
     </div>
 </div>
 
-@section('scripts')
+@endsection
+
+@section('script')
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const searchInput = document.getElementById('serialSearchInput');
     const searchBtn = document.getElementById('serialSearchBtn');
     const resultBox = document.getElementById('verificationResultBox');
+    // Escapes server data and the typed serial before they go into innerHTML (B3).
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
     function verifySerial() {
         const serial = searchInput.value.trim();
@@ -317,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (!data.exists) {
                     resultBox.innerHTML = `
                         <div class="alert alert-danger mb-0">
-                            <strong><i class="ri-close-circle-line me-1"></i> السيريال غير مسجل:</strong> ${data.message}
+                            <strong><i class="ri-close-circle-line me-1"></i> السيريال غير مسجل:</strong> ${esc(data.message)}
                         </div>
                     `;
                 } else {
@@ -326,18 +330,19 @@ document.addEventListener('DOMContentLoaded', function () {
                         <div class="alert ${statusClass} mb-0">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <h6 class="fw-bold mb-1"><i class="ri-shield-check-line me-1"></i> ${data.message}</h6>
-                                    <div>العميل: <strong>${data.warranty.customer ? data.warranty.customer.name : 'عميل نقدي'}</strong> (${data.warranty.customer ? data.warranty.customer.phone : ''})</div>
-                                    <div>تاريخ الانتهاء: <strong>${data.warranty.end_date}</strong> (المتبقي: ${data.days_remaining} يوم)</div>
+                                    <h6 class="fw-bold mb-1"><i class="ri-shield-check-line me-1"></i> ${esc(data.message)}</h6>
+                                    <div>العميل: <strong>${esc(data.warranty.customer ? data.warranty.customer.name : 'عميل نقدي')}</strong> (${esc(data.warranty.customer ? data.warranty.customer.phone : '')})</div>
+                                    <div>تاريخ الانتهاء: <strong>${esc(data.warranty.end_date)}</strong> (المتبقي: ${esc(data.days_remaining)} يوم)</div>
                                 </div>
                                 <div>
-                                    <button type="button" class="btn btn-danger btn-sm" onclick="openClaimModal('${serial}')">
+                                    <button type="button" class="btn btn-danger btn-sm js-open-claim" data-serial="${esc(serial)}">
                                         <i class="ri-alarm-warning-line me-1"></i> فتح تذكرة استبدال فوري
                                     </button>
                                 </div>
                             </div>
                         </div>
                     `;
+                    resultBox.querySelector('.js-open-claim')?.addEventListener('click', e => openClaimModal(e.currentTarget.dataset.serial));
                 }
             })
             .catch(() => {
@@ -370,5 +375,4 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 });
 </script>
-@endsection
 @endsection

@@ -219,3 +219,12 @@ test('scrap inventory list follows the same branch scope as its metrics', functi
     expect($branchIds)->toBe([$other->id])
         ->and($response->json('metrics.total_units'))->toBe(1);
 });
+
+test('warranty serial verify escapes results and passes the serial through a data attribute (B3)', function () {
+    $html = $this->actingAs($this->user)->get(route('admin.warranties.index'))->assertOk()->getContent();
+
+    expect($html)
+        ->not->toContain("onclick=\"openClaimModal('\${serial}')\"")
+        ->toContain('data-serial="${esc(serial)}"')
+        ->toContain('${esc(data.message)}');
+});
