@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const paidInput = document.getElementById('paidInput');
 
     // --- Supplier Live Search ---
-    const searchSuppliers = {!! json_encode($searchSuppliers, JSON_UNESCAPED_UNICODE) !!};
+    const searchSuppliers = @json($searchSuppliers);
     const supplierSearchInput = document.getElementById('supplierSearchInput');
     const supplierSearchResults = document.getElementById('supplierSearchResults');
     const selectedSupplierId = document.getElementById('selectedSupplierId');
@@ -262,13 +262,21 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center' + (idx === activeSupplierIdx ? ' active' : '');
-            btn.innerHTML = `
-                <div>
-                    <strong>${s.company_name}</strong>
-                    ${s.name ? `<small class="text-muted d-block">${s.name}</small>` : ''}
-                </div>
-                <span class="badge bg-secondary-subtle text-secondary">رصيد: ${Number(s.balance).toLocaleString()} ج.م</span>
-            `;
+            // Server values go through textContent only (B2: stored XSS).
+            const details = document.createElement('div');
+            const companyName = document.createElement('strong');
+            companyName.textContent = s.company_name;
+            details.appendChild(companyName);
+            if (s.name) {
+                const contactName = document.createElement('small');
+                contactName.className = 'text-muted d-block';
+                contactName.textContent = s.name;
+                details.appendChild(contactName);
+            }
+            const balance = document.createElement('span');
+            balance.className = 'badge bg-secondary-subtle text-secondary';
+            balance.textContent = `رصيد: ${Number(s.balance).toLocaleString()} ج.م`;
+            btn.append(details, balance);
             btn.addEventListener('mousedown', function (e) {
                 e.preventDefault();
                 selectSupplier(s);
@@ -388,7 +396,7 @@ document.addEventListener('DOMContentLoaded', function () {
     addRowBtn.addEventListener('click', appendRow);
 
     // --- Products Live Search ---
-    const searchProducts = {!! json_encode($searchProducts, JSON_UNESCAPED_UNICODE) !!};
+    const searchProducts = @json($searchProducts);
     const productSearchInput = document.getElementById('productSearchInput');
     const productSearchResults = document.getElementById('productSearchResults');
     let productMatches = [], activeProductIdx = -1;
@@ -399,19 +407,34 @@ document.addEventListener('DOMContentLoaded', function () {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center' + (i === activeProductIdx ? ' active' : '');
-            btn.innerHTML = `
-                <div>
-                    <strong>${p.name}</strong>
-                    <div class="small text-muted">
-                        ${p.sku ? `<span class="me-2">SKU: ${p.sku}</span>` : ''}
-                        ${p.barcode ? `<span>باركود: ${p.barcode}</span>` : ''}
-                    </div>
-                </div>
-                <div class="text-end">
-                    <span class="badge bg-success-subtle text-success me-1">تكلفة: ${Number(p.cost).toLocaleString()} ج.م</span>
-                    <span class="badge bg-secondary-subtle text-secondary">مخزون: ${p.stock}</span>
-                </div>
-            `;
+            // Server values go through textContent only (B2: stored XSS).
+            const details = document.createElement('div');
+            const productName = document.createElement('strong');
+            productName.textContent = p.name;
+            const metadata = document.createElement('div');
+            metadata.className = 'small text-muted';
+            if (p.sku) {
+                const sku = document.createElement('span');
+                sku.className = 'me-2';
+                sku.textContent = `SKU: ${p.sku}`;
+                metadata.append(sku, ' ');
+            }
+            if (p.barcode) {
+                const barcode = document.createElement('span');
+                barcode.textContent = `باركود: ${p.barcode}`;
+                metadata.appendChild(barcode);
+            }
+            details.append(productName, metadata);
+            const summary = document.createElement('div');
+            summary.className = 'text-end';
+            const cost = document.createElement('span');
+            cost.className = 'badge bg-success-subtle text-success me-1';
+            cost.textContent = `تكلفة: ${Number(p.cost).toLocaleString()} ج.م`;
+            const stock = document.createElement('span');
+            stock.className = 'badge bg-secondary-subtle text-secondary';
+            stock.textContent = `مخزون: ${p.stock}`;
+            summary.append(cost, ' ', stock);
+            btn.append(details, summary);
             btn.addEventListener('mousedown', function (e) {
                 e.preventDefault();
                 pickProduct(p);
