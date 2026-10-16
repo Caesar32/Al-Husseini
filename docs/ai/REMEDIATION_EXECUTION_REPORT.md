@@ -79,6 +79,16 @@ Branch `remediation/2026-10` (from `main` 45b9ccc). The plan is in MASTER_REMEDI
 - 86077c4: SEC-08 branch isolation (BranchScope + BelongsToBranch on 7 models; WithinUserBranch rule on 5 requests; BRANCH_ISOLATION flag).
 - c29f94e: last employee-id-1 fallback removed from POS scrap recording.
 
+### Batch 6: refactor roadmap on `main` (COMPLETE except manual checks)
+Plan: `REFACTOR_PLAN.md` + `docs/refactor/00..07`. Base `PHASE0_SHA` = `0fa6996`; one commit per step, not pushed.
+- Phase 0: baseline N0 = 411 passed; `docs/refactor/baseline-diagnose.txt` (8/8).
+- Phase 1 (69fd415..a438126): B1 `owner.valid` middleware revokes owner tokens on deactivation or role loss, and deactivation deletes tokens; B2 purchase-create search uses `@json` + textContent; B3 warranty verify escapes results, uses data-serial, and the page script now renders (it sat in a never-yielded `@section('scripts')`); B4 owner push job `afterCommit`; B5 device token no longer logged; B6 tests for optional `national_id`.
+- Phase 2 (4671566..dc565ca): ARC-04 `StockLedgerInterface` is the only writer of `products.current_stock`; every change appends a `stock_movements` row (sale, sale_return, purchase, purchase_return, warranty_replacement, supplier_replacement, adjustment). Guarded by `tests/Architecture/StockWriterTest.php` and the read-only diagnostic `stock_journal_consistency`.
+- Phase 3 (782c1e4..2321670): ARC-06 `DashboardMetricsService` serves both dashboards with their own period semantics; characterization test pins every KPI; admin dashboard 71 -> 48 queries (`invoice_items` 26 -> 3).
+- Phase 4 (f3644e2..d8179d3): `SalesReturnService` extracted; `settleCustomerDebt` moved to `CreditCollectionService` (`CustomerDebtServiceInterface`); `app()` service location removed from PosOrderService, ScrapBatteryService and StorePosInvoiceRequest.
+- Phase 5 (260a4c9..f3b545b): FE-08 no literal `/admin/...` URL left in JS; Blade partials use `route()` maps, static JS reads layout meta tags.
+- Phase 6 (be555ce..e431dc6): DB-04 `Invoice::scrapBatteries()` / `technicianCommissions()` are hasMany; owner invoice detail adds `scrap_batteries` (deprecated `scrap_battery` kept). DB-03 drops `payrolls_branch_year_month_unique`; the other six audit rows never existed on either driver.
+- Phase 7: full suite 465 passed, 0 failed, 0 skipped; checks 2-8 pass; Codex read-only audit found only a pre-existing diagnostics simulation fixture (product created with opening stock), accepted.
 # Execution Summary
 - Branch `remediation/2026-10`, 43 commits since the baseline tag (176 files, +14555 / -3179) before this report.
 - Batches executed: 0 baseline, 1 test integrity, 2 shared infrastructure and security, 3 parallel modules (Phases 3, 5, 6+7), 4 Phase 8 and follow-ups, 5 Phase 4 and Phase 9. Four module phases ran as parallel agents in isolated worktrees and were merged one at a time with the full suite run after each merge.
@@ -135,12 +145,12 @@ Branch `remediation/2026-10` (from `main` 45b9ccc). The plan is in MASTER_REMEDI
 - Data risks: invoices created through the old POS screen may carry product_id 1 and generated serials; ledger repair and per-line returned quantities for past returns are D1-blocked.
 
 # Final Test Status
-- 310 passed, 1889 assertions, 0 failed, 0 skipped.
+- 465 passed, 3324 assertions, 0 failed, 0 skipped (2026-10-16, refactor roadmap Phase 7; previously 310 at the remediation report).
 - Known failures: none. The two HEAD failures (month-end payroll simulation) are fixed at the root cause.
 - Not covered by automated tests: real browser flows (scanner focus, modals, an actual checkout) and MySQL-specific migration paths. A manual test sale on a staging copy is needed before release.
 
 # Remaining Work (concrete)
 1. Owner: run `php artisan migrate`, set `MANAGER_OVERRIDE_CODE_HASH`, review and merge `remediation/2026-10`, run a manual POS test sale.
 2. Needs your approval before deletion: public/assets/js/sales-store.js, public/assets/js/hr-store.js, app/Observers/InvoiceObserver.php, app/Observers/PurchaseInvoiceObserver.php, resources/views/admin/dashboard/partials/invoice-modal.blade.php, the dead SupplierController::create method, and the five agent worktrees and branches (`batch/*`, `worktree-agent-*`, under .claude/worktrees).
-3. ARC-04 stock movement journal (stock changes from five writers); ARC-06 move DashboardController aggregation into a service and batch the 7-day trend query; DB-03 redundant indexes; DB-04 `Invoice::scrapBattery` / `technicianCommission` hasOne vs many; FE-08 hard-coded `/admin/...` URLs in JS; the unused Vite/Tailwind pipeline.
+3. Done in Batch 6: ARC-04, ARC-06, DB-03, DB-04, FE-08. Left: the unused Vite/Tailwind pipeline. Owner: run `php artisan migrate` on dev MySQL (2026_10_16_000001 stock_movements, 2026_10_16_000002 payroll index); move the Flutter app to `scrap_batteries`; decide whether `resources/views/admin/scrap/index.blade.php` gets the same script-section fix as the warranty page (its page JS never renders); `ImportLegacyDataCommand` resets stock of existing products to 0 without a journal row if re-run.
 4. Owner decisions listed above, each unblocking its dependent task.

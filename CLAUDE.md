@@ -16,7 +16,7 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 
 ## Architecture and business rules
 - Flow: route (`can:` middleware) -> FormRequest/inline validation -> thin controller -> service (interface bound in `*ServiceProvider`) -> Eloquent. No Policies/Events/Jobs/Actions. Money/stock writes: `DB::transaction` + `lockForUpdate`.
-- Shared mutable balances written directly by several services, with no journal: `Product.current_stock`, `Supplier.current_balance`, `Customer.current_credit_balance`. Find every writer before changing one.
+- Stock: only `StockLedgerInterface` (`StockLedgerService::move/setTo`, inside a transaction) writes `products.current_stock`; each change appends a `stock_movements` row. `tests/Architecture/StockWriterTest.php` enforces it. `Supplier.current_balance` and `Customer.current_credit_balance` are still written directly by several services, with no journal: find every writer before changing one.
 - Money: 2-decimal values, compared in piasters (POS payments exactly == amount due; `finance.epsilon` for the rest). Invoice statuses live in `App\Enums\InvoiceStatus` (+ countable scope); `partially_refunded` counts net of `refunded_amount`.
 - Numbers come from `DocumentNumberService` (invoices `INV-Ymd-000001`, claims `CLM-YYYYMM-n`, scrap batches). POS sales are idempotent via `idempotency_key` (scoped to the cashier).
 - Returns are tracked per invoice line (`returned_quantity`). Supplier ledger is a running-balance chain (purchase posts full amount, then payment). Payroll consistency: `PayrollService::evaluateConsistency()` (includes overtime).
@@ -30,7 +30,7 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Env: `MANAGER_OVERRIDE_CODE_HASH` (required for overrides), `SEED_DEFAULT_PASSWORD`, `LOGIN_ACCOUNT_SWITCHER`, `LOGIN_SWITCHER_PASSWORD` (non-production only), `BRANCH_ISOLATION`, `FINANCE_EPSILON`.
 
 ## Commands
-- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 411 passed, 0 failed, 0 skipped (2026-10-16, `4de75b5`, refactor Phase 0 baseline `N0`).
+- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 465 passed, 0 failed, 0 skipped (2026-10-16, end of the refactor roadmap). `tests/Architecture` is its own testsuite.
 - Dev: `php artisan migrate`, `php artisan db:seed` (includes `ProductCategoriesSeeder`), `php artisan serve`; `npm run build` only for the unused Vite pipeline.
 - Diagnostics: `php artisan system:diagnose [--audit|--simulate|--keep]` (`--keep` writes real data). `php artisan suppliers:rebuild-ledger-balances` is dry-run by default (`--apply` writes a JSON backup first; do not run on real data without owner approval).
 - Style: Pint is configured but the codebase was never Pint-formatted; do not mass-reformat.
@@ -39,9 +39,9 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Work happens on `main`. `remediation/2026-10` (from 45b9ccc, tag `baseline-finance-2026-09-30`) was merged via PR #1 (`5d78433`). Phases 0, 1, 3, 4, 5, 6+7, 8, 9 (branch isolation, derivable settings) are DONE; security items SEC-01..14 resolved; navigation-engine fix and sidebar/dashboard authorization done; login account switcher restored.
 - POS payment section (modes full/partial/remaining, live remaining, server validation: 2-decimal, exact piaster over/under-payment checks, settlement `decimal:0,2`, `tests/Feature/Sales/PosPaymentValidationTest.php`) is committed (`da2603a`, in the merge).
 - Post-merge commits on `main`: CI cache-clear tweak; Flutter production API config + `ProductCategoriesSeeder`; HR `national_id` optional + department/title text inputs; client-side supplier/product live search on purchase create.
-- Known issue: purchase create live search (`resources/views/admin/purchases/create.blade.php`) embeds supplier/product names via `json_encode` without `JSON_HEX_*` and renders them with `innerHTML` (stored-XSS risk); no test covers optional `national_id`.
-- Pending on dev MySQL (owner action): `php artisan migrate` (2026_10_01_* migrations).
-- Remaining work: Phase 10 cleanup (stock movement journal, DashboardController refactor, redundant indexes, `Invoice::scrapBattery` hasOne vs many, hard-coded `/admin/...` URLs in JS).
+- Refactor roadmap (`REFACTOR_PLAN.md`, `docs/refactor/`) done on `main` (`0fa6996`..): owner API `owner.valid` middleware; XSS fixes (purchase create, warranty verify); push job `afterCommit`; stock ledger + `stock_movements`; `DashboardMetricsService` for both dashboards; `SalesReturnService` and `CreditCollectionService::settleCustomerDebt`; JS URLs from `route()`/layout meta tags; `Invoice::scrapBatteries()` / `technicianCommissions()` hasMany (owner API keeps deprecated `scrap_battery`). Manual browser checks per phase are still pending.
+- Pending on dev MySQL (owner action): `php artisan migrate` (2026_10_01_* and 2026_10_16_* migrations).
+- Remaining work: unused Vite pipeline; `admin/scrap/index.blade.php` page script never renders (nested `@section('scripts')`, owner decision); Flutter app should read `scrap_batteries`.
 
 ## Critical known issues / owner decisions (do not invent rules)
 Blocked: refund proration of discount/scrap/tax; technician commissions are never created in production (payroll reads them); automatic end of `on_leave`; scrap sale has no cash/treasury record; locale switch only flips RTL/LTR; purchase-return route permission; supplier catalog sync merge vs replace; replacement-warranty period; supplier credit-limit enforcement; resale of a returned battery serial; role grants for `purchases.create`/`suppliers.*` (super-admin only); production data repair (`product_id 1` sales from the old POS). `/admin` and `/admin/warranties/verify` answer JSON to the nav engine's AJAX header (fall back to a full reload).

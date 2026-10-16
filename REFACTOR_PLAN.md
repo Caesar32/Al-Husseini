@@ -16,7 +16,7 @@ Each phase file is self-contained: rules, context, contracts, Codex prompts and 
 | 4 | [04_phase_split_pos_order_service.md](docs/refactor/04_phase_split_pos_order_service.md) | Extract returns and debt collection; DI instead of `app()` | `PosOrderService.php`, `SalesReturnService.php` (new), `CreditCollectionService.php`, `StorePosInvoiceRequest.php`, `CreditCustomerController.php` | 2 | [x] `f3644e2`..`d8179d3`; manual browser check pending |
 | 5 | [05_phase_hardcoded_urls.md](docs/refactor/05_phase_hardcoded_urls.md) | JS `/admin/...` URLs to `route()` | `admin-notifications.js`, `global-spotlight-search.js`, HR `scripts.blade.php` partials, `warranties/index.blade.php` | 1 | [x] `260a4c9`..`f3b545b`; manual browser check pending |
 | 6 | [06_phase_data_model_fixes.md](docs/refactor/06_phase_data_model_fixes.md) | `scrapBatteries` / `technicianCommissions` become `hasMany`; drop 7 redundant indexes | `app/Models/Invoice.php`, 5 readers, new migration | 2, 4 | [x] `be555ce`..`e431dc6`; dev MySQL `php artisan migrate` pending (owner); Flutter should read `scrap_batteries` |
-| 7 | [07_phase_final_verification.md](docs/refactor/07_phase_final_verification.md) | Suite, Pint, routes, diagnostics, smoke test, docs | none (verification only) | 0-6 | [ ] |
+| 7 | [07_phase_final_verification.md](docs/refactor/07_phase_final_verification.md) | Suite, Pint, routes, diagnostics, smoke test, docs | none (verification only) | 0-6 | [x] automated checks 1-8 + Codex audit pass (465 passed); manual smoke test pending (owner) |
 
 Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2 and 4.
 
