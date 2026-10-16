@@ -32,7 +32,7 @@ export function createBrowser({ fetchResponses = {} } = {}) {
     };
 
     const window = {
-        location: { search: '' },
+        location: { search: '', reloads: 0, reload() { this.reloads++; } },
         console,
     };
 

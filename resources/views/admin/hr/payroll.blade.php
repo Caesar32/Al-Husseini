@@ -3,6 +3,17 @@
 @section('title', 'مسير الرواتب والخصومات | مجموعة الحسيني')
 
 @section('content')
+@php
+    $pageConfig = ['routes' => [
+        'generate' => route('admin.hr.payroll.generate'),
+        'deductions' => route('admin.hr.deductions.store'),
+        'payroll' => route('admin.hr.payroll.show', ['payroll' => '__ID__']),
+        'approve' => route('admin.hr.payroll.approve', ['payroll' => '__ID__']),
+        'disburse' => route('admin.hr.payroll.disburse', ['payroll' => '__ID__']),
+        'deductionStatus' => route('admin.hr.deductions.status', ['deduction' => '__ID__']),
+    ]];
+@endphp
+<div data-page="hr.payroll" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية', 'title' => 'مسير الرواتب والخصومات الإدارية'])
 
     @php
@@ -35,6 +46,7 @@
 
     {{-- 8. نافذة قسيمة الراتب الرقمية القابلة للطباعة (Payslip) --}}
     @include('admin.hr.partials.payroll.modal-payslip')
+</div>
 @endsection
 
 @section('script')
