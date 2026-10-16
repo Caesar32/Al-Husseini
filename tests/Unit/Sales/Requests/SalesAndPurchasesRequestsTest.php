@@ -80,7 +80,7 @@ test('store purchase invoice request verifies paid amount does not exceed final 
 test('store pos invoice request enforces battery serial for battery products and rejects duplicates', function () {
     $battery = Product::where('is_battery', true)->first();
 
-    $request = new StorePosInvoiceRequest();
+    $request = (new StorePosInvoiceRequest())->setContainer(app());
     $request->merge([
         'branch_id' => Branch::first()->id,
         'technician_id' => \App\Models\Employee::first()->id,
@@ -106,7 +106,7 @@ test('store pos invoice request enforces battery serial for battery products and
 test('store pos invoice request rejects payments sum mismatch with invoice total', function () {
     $battery = Product::where('is_battery', true)->first();
 
-    $request = new StorePosInvoiceRequest();
+    $request = (new StorePosInvoiceRequest())->setContainer(app());
     $request->merge([
         'branch_id' => Branch::first()->id,
         'technician_id' => \App\Models\Employee::first()->id,
@@ -147,7 +147,7 @@ test('store pos invoice request calculates scrap deduction and accepts split pay
     $cashPart = round($netExpected / 2, 2);
     $cardPart = $netExpected - $cashPart;
 
-    $request = new StorePosInvoiceRequest();
+    $request = (new StorePosInvoiceRequest())->setContainer(app());
     $request->merge([
         'branch_id' => Branch::first()->id,
         'items' => [
@@ -176,7 +176,7 @@ test('store pos invoice request calculates scrap deduction and accepts split pay
 
 test('store pos invoice request rejects invoice when technician is missing', function () {
     $battery = Product::where('is_battery', true)->first();
-    $request = new StorePosInvoiceRequest();
+    $request = (new StorePosInvoiceRequest())->setContainer(app());
     $request->merge([
         'branch_id' => Branch::first()->id,
         'items' => [
@@ -212,7 +212,7 @@ test('store pos invoice request requires manager override code when credit limit
     ]);
 
     // Transaction of 1500 on credit will push balance to 800 + 1500 = 2300 > 1000 limit
-    $request = new StorePosInvoiceRequest();
+    $request = (new StorePosInvoiceRequest())->setContainer(app());
     $request->merge([
         'branch_id' => Branch::first()->id,
         'technician_id' => \App\Models\Employee::first()->id,

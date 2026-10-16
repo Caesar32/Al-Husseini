@@ -12,6 +12,10 @@ use Illuminate\Support\Facades\DB;
 
 class ScrapBatteryService implements ScrapBatteryServiceInterface
 {
+    public function __construct(
+        private DocumentNumberService $documentNumbers,
+    ) {}
+
     public function getPaginatedInventory(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $query = ScrapBatteriesInventory::query()
@@ -98,7 +102,7 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
                 }
             }
 
-            $batchNumber = app(DocumentNumberService::class)->nextFormatted('SCRAP-BATCH-' . now()->format('Ymd'), 4);
+            $batchNumber = $this->documentNumbers->nextFormatted('SCRAP-BATCH-' . now()->format('Ymd'), 4);
             $totalCostValue = round((float) $batteries->sum('scrap_value'), 2);
             $totalSalePrice = round((float) ($data['total_amount'] ?? 0), 2);
             $grossProfit = round($totalSalePrice - $totalCostValue, 2);

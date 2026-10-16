@@ -34,6 +34,8 @@ class PosOrderService implements PosOrderServiceInterface
         private StockLedgerInterface $stock,
         private SalesReturnServiceInterface $salesReturns,
         private CustomerDebtServiceInterface $customerDebts,
+        private ManagerOverrideService $override,
+        private DocumentNumberService $documentNumbers,
     ) {}
 
     private function epsilon(): float
@@ -271,7 +273,7 @@ class PosOrderService implements PosOrderServiceInterface
 
                 if ($newCreditBalance > $creditLimit) {
                     $overrideCode = $data['manager_override_code'] ?? null;
-                    if (empty($overrideCode) || !$this->isManagerOverrideValid($overrideCode)) {
+                    if (empty($overrideCode) || !$this->override->isValid($overrideCode)) {
                         throw new \DomainException('تم تجاوز سقف الائتمان للعميل، ويلزم إدخال كود موافقة المدير الصحيح للاعتماد.');
                     }
                 }
@@ -293,7 +295,7 @@ class PosOrderService implements PosOrderServiceInterface
             if (!preg_match('/^[A-Za-z0-9-]{1,10}$/', $invoicePrefix)) {
                 $invoicePrefix = 'INV-';
             }
-            $invoiceNumber = app(DocumentNumberService::class)->nextFormatted($invoicePrefix . now()->format('Ymd'));
+            $invoiceNumber = $this->documentNumbers->nextFormatted($invoicePrefix . now()->format('Ymd'));
 
             $invoice = Invoice::withoutEvents(function () use ($invoiceNumber, $branchId, $customerId, $data, $cashierUserId, $subtotal, $discountAmount, $scrapDeduction, $taxAmount, $finalAmount, $totalPaid, $creditAmount, $invoicePaymentMethod, $idempotencyKey) {
                 return Invoice::create([
@@ -517,11 +519,6 @@ class PosOrderService implements PosOrderServiceInterface
         ?string $notes = null
     ): CreditLedgerEntry {
         return $this->customerDebts->settleCustomerDebt($customerId, $amount, $paymentMethod, $collectedBy, $receiptNumber, $notes);
-    }
-
-    protected function isManagerOverrideValid(?string $code): bool
-    {
-        return app(ManagerOverrideService::class)->isValid($code);
     }
 }
 

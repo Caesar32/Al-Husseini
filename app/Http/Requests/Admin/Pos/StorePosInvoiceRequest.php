@@ -62,6 +62,8 @@ class StorePosInvoiceRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
+            $override = $this->container->make(\App\Services\Finance\ManagerOverrideService::class);
+
             // A retry of an already-committed checkout (same idempotency key) must not be re-validated:
             // its serials and stock were consumed by the original sale. The service returns that invoice.
             $idempotencyKey = trim((string) $this->input('idempotency_key', ''));
@@ -186,7 +188,7 @@ class StorePosInvoiceRequest extends FormRequest
             $discount = (float) $this->input('discount_amount', 0);
             if ($discount > 0 && !$canDiscount) {
                 $overrideCode = (string) $this->input('manager_override_code');
-                if (!$this->isManagerOverrideValid($overrideCode)) {
+                if (!$override->isValid($overrideCode)) {
                     $validator->errors()->add(
                         'discount_amount',
                         'ليس لديك صلاحية تطبيق خصومات على الفاتورة. يلزم إدخال كود موافقة المشرف/المدير للمتابعة.'
@@ -201,7 +203,7 @@ class StorePosInvoiceRequest extends FormRequest
                     $inputPrice = (float) $item['unit_price'];
                     if ($inputPrice < (float) $product->retail_price && !$canDiscount) {
                         $overrideCode = (string) $this->input('manager_override_code');
-                        if (!$this->isManagerOverrideValid($overrideCode)) {
+                        if (!$override->isValid($overrideCode)) {
                             $validator->errors()->add(
                                 "items.{$index}.unit_price",
                                 "ليس لديك صلاحية تخفيض سعر بيع الصنف ({$product->name}) عن السعر الرسمي ({$product->retail_price} ج.م). يلزم إدخال كود موافقة المشرف."
@@ -277,7 +279,7 @@ class StorePosInvoiceRequest extends FormRequest
                     if ($newBalance > $creditLimit) {
                         // Manager override code is mandatory
                         $overrideCode = (string) $this->input('manager_override_code');
-                        if (!$this->isManagerOverrideValid($overrideCode)) {
+                        if (!$override->isValid($overrideCode)) {
                             $validator->errors()->add(
                                 'manager_override_code',
                                 sprintf(
@@ -292,11 +294,6 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
         });
-    }
-
-    protected function isManagerOverrideValid(?string $code): bool
-    {
-        return app(\App\Services\Finance\ManagerOverrideService::class)->isValid($code);
     }
 
     public function messages(): array
