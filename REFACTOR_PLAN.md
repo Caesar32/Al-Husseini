@@ -15,7 +15,7 @@ Each phase file is self-contained: rules, context, contracts, Codex prompts and 
 | 3 | [03_phase_shared_dashboard_metrics.md](docs/refactor/03_phase_shared_dashboard_metrics.md) | One metrics service; 7-day trend from 21 queries to 1 | `Admin/DashboardController.php`, `Api/V1/Owner/DashboardController.php`, `app/Services/Dashboard/DashboardMetricsService.php` (new) | 1 | [x] `782c1e4`..`2321670`; manual screenshot check pending |
 | 4 | [04_phase_split_pos_order_service.md](docs/refactor/04_phase_split_pos_order_service.md) | Extract returns and debt collection; DI instead of `app()` | `PosOrderService.php`, `SalesReturnService.php` (new), `CreditCollectionService.php`, `StorePosInvoiceRequest.php`, `CreditCustomerController.php` | 2 | [x] `f3644e2`..`d8179d3`; manual browser check pending |
 | 5 | [05_phase_hardcoded_urls.md](docs/refactor/05_phase_hardcoded_urls.md) | JS `/admin/...` URLs to `route()` | `admin-notifications.js`, `global-spotlight-search.js`, HR `scripts.blade.php` partials, `warranties/index.blade.php` | 1 | [x] `260a4c9`..`f3b545b`; manual browser check pending |
-| 6 | [06_phase_data_model_fixes.md](docs/refactor/06_phase_data_model_fixes.md) | `scrapBatteries` / `technicianCommissions` become `hasMany`; drop 7 redundant indexes | `app/Models/Invoice.php`, 5 readers, new migration | 2, 4 | [ ] |
+| 6 | [06_phase_data_model_fixes.md](docs/refactor/06_phase_data_model_fixes.md) | `scrapBatteries` / `technicianCommissions` become `hasMany`; drop 7 redundant indexes | `app/Models/Invoice.php`, 5 readers, new migration | 2, 4 | [x] `be555ce`..`e431dc6`; dev MySQL `php artisan migrate` pending (owner); Flutter should read `scrap_batteries` |
 | 7 | [07_phase_final_verification.md](docs/refactor/07_phase_final_verification.md) | Suite, Pint, routes, diagnostics, smoke test, docs | none (verification only) | 0-6 | [ ] |
 
 Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2 and 4.
@@ -31,9 +31,9 @@ Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2
 | `N3` | Targeted only. Phase 3 added 5 tests (characterization 4, query count 1); Admin + Owner API suites 154 passed |
 | `N4` | Targeted only. No new tests (pure moves); Sales, Warranty, Unit, ManagerOverride, Diagnostics green (176 + 11 passed) |
 | `N5` | Targeted only. Phase 5 added 7 tests (ServerGeneratedUrls: 4 pages, layout meta, 2 static files); Admin 133, HR + Warranty 37 passed |
-| `N6` | |
+| `N6` | Targeted only. Phase 6 added 10 tests (InvoiceRelationCardinality 3, RedundantIndexMigration 7); Sales + Owner API 116 passed |
 | Admin dashboard query count before / after (Phase 3) | 71 / 48 total; `invoice_items` 26 / 3 (characterization fixture) |
-| Phase 6 index names confirmed (SQLite / MySQL) | |
+| Phase 6 index names confirmed (SQLite / MySQL) | Both drivers: only `payrolls_branch_year_month_unique` exists as a duplicate. The six `*_index` rows were never created (`->unique()->index()` builds only the unique index), so they were dropped from the plan. |
 
 ## Findings during execution
 - Phase 1 (B3): `resources/views/admin/warranties/index.blade.php` put its script in `@section('scripts')` nested inside `content`. The layout yields only `script` and `@stack('scripts')`, so the verify box and claim modal never ran. Fixed in `7af4719`.
