@@ -209,6 +209,15 @@
 @endsection
 
 @section('content')
+@php
+    $pageConfig = [
+        'salesPeriods' => $salesPeriods ?? [],
+        'selectedPeriodKey' => $selectedPeriodKey ?? 'all',
+        'trend' => ['categories' => $trendCategories, 'batteries' => $trendBatteries, 'oils' => $trendOils, 'services' => $trendServices],
+        'categories' => ['batteries' => (float) $catStatBatteries, 'oils' => (float) $catStatOils, 'greases' => (float) $catStatGreases, 'services' => (float) $catStatServices],
+    ];
+@endphp
+<div data-page="dashboard" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'لوحات تحكم الحسيني', 'title' => 'لوحة القيادة والمبيعات - مركز الحسيني'])
 
     {{-- 1. شريط الترحيب والعمليات السريعة --}}
@@ -242,6 +251,7 @@
 
     {{-- 6. نافذة معاينة وطباعة الفاتورة والضمان --}}
     @include('admin.dashboard.partials.invoice-modal')
+</div>
 @endsection
 
 @section('script')

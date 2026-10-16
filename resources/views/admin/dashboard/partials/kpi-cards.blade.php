@@ -74,7 +74,7 @@
                             <button type="button" 
                                     class="segmented-btn sales-period-pill {{ ($selectedPeriodKey ?? 'all') === $key ? 'active' : '' }}" 
                                     data-period="{{ $key }}"
-                                    onclick="changeSalesPeriod('{{ $key }}', this)"
+                                    data-action="dashboard.period" data-period="{{ $key }}"
                                     title="{{ $p['badge'] }}">
                                 {{ $p['label'] }}
                             </button>

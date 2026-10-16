@@ -39,7 +39,7 @@
                                         <button type="button" 
                                                 class="btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold welcome-period-btn {{ ($selectedPeriodKey ?? 'all') === $key ? 'btn-success text-white shadow-xs active' : 'btn-ghost-secondary text-muted' }}"
                                                 data-period="{{ $key }}"
-                                                onclick="changeSalesPeriod('{{ $key }}', this)">
+                                                data-action="dashboard.period" data-period="{{ $key }}">
                                             {{ $p['label'] }}
                                         </button>
                                     @endforeach
