@@ -35,10 +35,10 @@
                             قيمة الخصم بالجنية المصري (اختر مبلغ سريع أو اكتبه):
                         </label>
                         <div class="d-flex flex-wrap gap-2 mb-2">
-                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" onclick="setPresetAmount(150)">150 ج.م</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" onclick="setPresetAmount(250)">250 ج.م</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" onclick="setPresetAmount(350)">350 ج.م</button>
-                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" onclick="setPresetAmount(500)">500 ج.م</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" data-action="hr.attendance.preset" data-amount="150">150 ج.م</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" data-action="hr.attendance.preset" data-amount="250">250 ج.م</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" data-action="hr.attendance.preset" data-amount="350">350 ج.م</button>
+                            <button type="button" class="btn btn-outline-danger btn-sm quick-amount-preset" data-action="hr.attendance.preset" data-amount="500">500 ج.م</button>
                         </div>
                         <div class="input-group">
                             <input type="number" class="form-control form-control-lg fw-bold fs-16 border-danger text-center" id="quickDedAmount" required min="50" step="50" value="250">

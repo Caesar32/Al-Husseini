@@ -2,7 +2,7 @@
 <div class="row mb-3">
     <!-- 1. Present On Time -->
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card stat-filter-card border-start border-success border-4 shadow-sm mb-0 active-filter" id="card-filter-present" onclick="setQuickTabFilter('present')">
+        <div class="card stat-filter-card border-start border-success border-4 shadow-sm mb-0 active-filter" id="card-filter-present" data-action="hr.attendance.tab" data-tab="present">
             <div class="card-body p-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
@@ -22,7 +22,7 @@
 
     <!-- 2. Late Staff -->
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card stat-filter-card border-start border-warning border-4 shadow-sm mb-0" id="card-filter-late" onclick="setQuickTabFilter('late')">
+        <div class="card stat-filter-card border-start border-warning border-4 shadow-sm mb-0" id="card-filter-late" data-action="hr.attendance.tab" data-tab="late">
             <div class="card-body p-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
@@ -42,7 +42,7 @@
 
     <!-- 3. Absent / Not Arrived -->
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card stat-filter-card border-start border-danger border-4 shadow-sm mb-0" id="card-filter-absent" onclick="setQuickTabFilter('absent')">
+        <div class="card stat-filter-card border-start border-danger border-4 shadow-sm mb-0" id="card-filter-absent" data-action="hr.attendance.tab" data-tab="absent">
             <div class="card-body p-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>
@@ -62,7 +62,7 @@
 
     <!-- 4. Total Staff & Discipline Rate -->
     <div class="col-xl-3 col-md-6 mb-3">
-        <div class="card stat-filter-card border-start border-primary border-4 shadow-sm mb-0" id="card-filter-all" onclick="setQuickTabFilter('all')">
+        <div class="card stat-filter-card border-start border-primary border-4 shadow-sm mb-0" id="card-filter-all" data-action="hr.attendance.tab" data-tab="all">
             <div class="card-body p-3">
                 <div class="d-flex align-items-center justify-content-between">
                     <div>

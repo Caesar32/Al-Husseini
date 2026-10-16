@@ -5,16 +5,16 @@
         <div class="col-lg-7 col-12">
             <div class="d-flex flex-wrap gap-2 align-items-center">
                 <span class="fw-bold fs-13 text-muted me-1">عرض السجلات:</span>
-                <button type="button" class="filter-tab-pill active" id="tab-all" onclick="setQuickTabFilter('all')">
+                <button type="button" class="filter-tab-pill active" id="tab-all" data-action="hr.attendance.tab" data-tab="all">
                     الكل (<span id="pillCountAll">{{ count($employees) }}</span>)
                 </button>
-                <button type="button" class="filter-tab-pill" id="tab-present" onclick="setQuickTabFilter('present')">
+                <button type="button" class="filter-tab-pill" id="tab-present" data-action="hr.attendance.tab" data-tab="present">
                     🟢 في الموعد (<span id="pillCountOnTime">{{ $stats['present'] ?? 0 }}</span>)
                 </button>
-                <button type="button" class="filter-tab-pill" id="tab-late" onclick="setQuickTabFilter('late')">
+                <button type="button" class="filter-tab-pill" id="tab-late" data-action="hr.attendance.tab" data-tab="late">
                     🟡 متأخرين (<span id="pillCountLate">{{ $stats['late'] ?? 0 }}</span>)
                 </button>
-                <button type="button" class="filter-tab-pill" id="tab-absent" onclick="setQuickTabFilter('absent')">
+                <button type="button" class="filter-tab-pill" id="tab-absent" data-action="hr.attendance.tab" data-tab="absent">
                     🔴 غياب / لم يسجل (<span id="pillCountAbsent">{{ $stats['absent'] ?? 0 }}</span>)
                 </button>
             </div>
@@ -26,7 +26,7 @@
             <div class="input-group">
                 <span class="input-group-text bg-light border-end-0"><i class="ri-search-line text-muted"></i></span>
                 <input type="text" class="form-control border-start-0" id="searchEmployeeInput" placeholder="ابحث بالاسم، كود الموظف، الوظيفة، أو الهاتف..." value="{{ request('search', '') }}">
-                <button class="btn btn-light border" type="button" onclick="clearSearch()" title="مسح البحث">
+                <button class="btn btn-light border" type="button" data-action="hr.attendance.clear-search" aria-label="مسح البحث" title="مسح البحث">
                     <i class="ri-close-line"></i>
                 </button>
             </div>

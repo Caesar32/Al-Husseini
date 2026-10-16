@@ -103,6 +103,18 @@
 @endsection
 
 @section('content')
+@php
+    $pageConfig = [
+        'routes' => [
+            'attendance' => route('admin.hr.attendance'),
+            'punch' => route('admin.hr.attendance.punch'),
+            'markAbsent' => route('admin.hr.attendance.mark_absent'),
+            'deductions' => route('admin.hr.deductions.store'),
+        ],
+        'employees' => $employees,
+    ];
+@endphp
+<div data-page="hr.attendance" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية والورشة', 'title' => 'شاشة متابعة حضور وبصمة العمال والفنيين اليومية'])
 
     {{-- 1. محطة الساعة وجهاز البصمة السريع بضغطة واحدة --}}
@@ -116,6 +128,7 @@
 
     {{-- 4. نافذة توقيع الجزاءات والخصومات الإدارية الفورية --}}
     @include('admin.hr.partials.attendance.modal-deduction')
+</div>
 @endsection
 
 @section('script')

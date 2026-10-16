@@ -46,7 +46,10 @@ test('page scripts are inside #page-scripts and layout scripts are outside it', 
 test('the page controller scripts of a page are inside the container', function () {
     $html = $this->get(route('admin.hr.attendance'))->assertOk()->getContent();
 
-    expect(pageScriptsBlock($html))->toContain('punchDirect');
+    // F4: the page controller is the attendance module, loaded from inside the container;
+    // its root carries the data-page marker the engine boots after each swap.
+    expect(pageScriptsBlock($html))->toContain(asset('assets/js/admin/hr/attendance.js'))
+        ->and($html)->toContain('data-page="hr.attendance"');
 });
 
 test('the engine only re-runs page-owned scripts and waits for libraries', function () {
@@ -54,7 +57,7 @@ test('the engine only re-runs page-owned scripts and waits for libraries', funct
 
     expect($html)
         ->toContain("doc.querySelectorAll('#page-scripts script')")
-        ->not->toContain("body > script")                      // old selector that also matched layout scripts
+        ->not->toContain('body > script')                      // old selector that also matched layout scripts
         ->not->toContain("document.dispatchEvent(new Event('DOMContentLoaded'))") // re-fired every handler of every visited page
         ->toContain('await loadExternalScript(s.src)')         // inline code must wait for the library it needs
         ->toContain('isCurrent()');                            // last click wins; superseded navigations never swap
