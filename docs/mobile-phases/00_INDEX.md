@@ -83,3 +83,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | Card | Result | Tests after |
 |---|---|---|
 | M1-01 | Done: scrap `capacity_ah` read as string; `scrap_batteries` list (legacy fallback); sheet renders each | 5 |
+| M0-01, M0-04 | Done: sealed `ApiFailure` hierarchy (Arabic messages); `requireDataMap/List`, `requireBodyMap`, `readPagination` + `PaginationMeta` | 22 |
