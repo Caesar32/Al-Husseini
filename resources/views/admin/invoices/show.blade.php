@@ -78,20 +78,7 @@
                         <small class="text-muted">تاريخ الإصدار: {{ $invoice->created_at?->format('Y-m-d h:i A') }}</small>
                     </div>
                     <div>
-                        @php
-                            $statusBadge = match($invoice->status) {
-                                'paid' => ['bg' => 'bg-success', 'label' => 'مدفوعة بالكامل'],
-                                'partially_paid' => ['bg' => 'bg-warning text-dark', 'label' => 'مدفوعة جزئياً (آجل)'],
-                                'unpaid' => ['bg' => 'bg-danger', 'label' => 'آجل غير مسدد'],
-                                'refunded' => ['bg' => 'bg-secondary', 'label' => 'مرتجع'],
-                                'partially_refunded' => ['bg' => 'bg-warning text-dark', 'label' => 'مرتجع جزئي'],
-                                'cancelled' => ['bg' => 'bg-dark', 'label' => 'ملغاة'],
-                                default => ['bg' => 'bg-info', 'label' => $invoice->status],
-                            };
-                        @endphp
-                        <span class="badge {{ $statusBadge['bg'] }} fs-12 px-3 py-2">
-                            {{ $statusBadge['label'] }}
-                        </span>
+                        <x-status-badge type="invoice" :status="$invoice->status" class="fs-12 px-3 py-2" />
                     </div>
                 </div>
                 <div class="card-body">
