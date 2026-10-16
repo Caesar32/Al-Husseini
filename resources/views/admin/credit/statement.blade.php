@@ -42,9 +42,7 @@
                         </button>
                     @endif
                 @endcan
-                <button type="button" class="btn btn-primary" onclick="window.print()">
-                    <i class="ri-printer-line me-1 align-bottom"></i> طباعة كشف الحساب
-                </button>
+                <x-button icon="printer-line" icon-class="me-1 align-bottom" onclick="window.print()">طباعة كشف الحساب</x-button>
             </div>
         </div>
     </div>

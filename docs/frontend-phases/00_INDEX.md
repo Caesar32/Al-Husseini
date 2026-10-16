@@ -22,7 +22,7 @@ This roadmap follows the backend refactor (`REFACTOR_PLAN.md`). Its goal is a co
 ## Progress
 | Phase | File | Theme | Depends on | Status |
 |---|---|---|---|---|
-| F0 | [F0_BASELINE_AND_DESIGN_TOKENS.md](F0_BASELINE_AND_DESIGN_TOKENS.md) | Pipeline decision, tokens file, hygiene ratchet test, screenshots | none | [ ] |
+| F0 | [F0_BASELINE_AND_DESIGN_TOKENS.md](F0_BASELINE_AND_DESIGN_TOKENS.md) | Pipeline decision, tokens file, hygiene ratchet test, screenshots | none | [x] `287306e`, `7f38539`; 478 passed; screenshots (Step 4) pending owner |
 | F1 | [F1_ATOMIC_COMPONENTS.md](F1_ATOMIC_COMPONENTS.md) | Button, badge, status badge, alert, spinner, icon, money, empty state | F0 | [ ] |
 | F2 | [F2_FORM_AND_INPUT_CONTROLS.md](F2_FORM_AND_INPUT_CONTROLS.md) | Field wrapper, input, select, date, switch, error states | F1 | [ ] |
 | F3 | [F3_COMPLEX_BLADE_COMPONENTS.md](F3_COMPLEX_BLADE_COMPONENTS.md) | Modal, data table, filter bar, stat card, page header | F2 | [ ] |
