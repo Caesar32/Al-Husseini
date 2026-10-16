@@ -19,16 +19,28 @@ Bring the key screens onto the component system: POS, dashboard, products (inven
 | Invoices | `sales/invoices.blade.php` (515), `invoices/show.blade.php` (414) | status badges, filters, print |
 
 ## Codex Frontend Cards
+Step 1 (dashboard) runs as five sub-steps, one commit each. Shared rules for 1a-1e: Arabic copy byte-identical; every `@can` kept; every id read by `public/assets/js/admin/dashboard.js` or a test kept; layout classes unchanged; removed inline styles become classes in `public/assets/css/components.css` with the same computed values; lower the hygiene `styles` budget by the number removed. Owner decision (2026-10-17): no F0 screenshots; the guard is byte-identical copy, unchanged layout classes, view compilation and the test suites.
+Verification for every sub-step: `php artisan view:cache && php artisan view:clear ; node --test tests/js/*.mjs ; php artisan test --compact tests/Feature/Admin tests/Architecture`.
+
 ```text
-[PHASE: F5 - Step 1 | TARGET: resources/views/admin/dashboard.blade.php, resources/views/admin/dashboard/partials/*.blade.php]
-ROLE: Precision Frontend Implementer.
-STANDARDS: Component-driven, zero inline JS, clean semantic HTML.
-TASK:
-1. Replace stat cards with <x-stat-card>, money with <x-money>/<x-compact-money>, badges with <x-status-badge>, tables with <x-data-table>, empty states with <x-empty-state>, header with <x-page-header>.
-2. Keep every @can block and the period switcher behaviour (sales_period AJAX).
-3. Move remaining inline styles to components.css.
-OUTPUT CONSTRAINT: Unified diff or component file only. Zero conversational text.
-VERIFICATION: Visual check: dashboard vs F0 screenshots (light/dark, desktop/mobile), period switch. php artisan view:cache && php artisan view:clear ; php artisan test --compact tests/Feature/Admin tests/Architecture
+[PHASE: F5 - Step 1a | TARGET: resources/views/admin/dashboard.blade.php, resources/views/admin/dashboard/partials/welcome-bar.blade.php]
+TASK: page title include -> <x-page-header> (same title, breadcrumbs, bg-galaxy-transparent); welcome-bar quick links -> <x-button href icon>; 3 inline styles -> components.css; drop the duplicated data-period attribute on the period buttons.
+```
+```text
+[PHASE: F5 - Step 1b | TARGET: resources/views/admin/dashboard/partials/kpi-cards.blade.php, public/assets/js/admin/dashboard.js]
+TASK: <x-stat-card> / <x-compact-money> where the markup matches; keep the 7 @can blocks and every dash* id. The Blade-computed display:none on #dashCreditCollectedWrap becomes the d-none class and dashboard.js toggles the class (update tests/js/dashboard.test.mjs). Other inline styles -> components.css.
+```
+```text
+[PHASE: F5 - Step 1c | TARGET: resources/views/admin/dashboard/partials/recent-invoices.blade.php, app/Support/StatusBadges.php, app/View/Models/*]
+TASK: <x-data-table>, <x-money>; payment-method badges from a new StatusBadges type `payment_method` with today's labels and classes byte-identical; the item-summary @php moves to a View Model; column widths -> components.css.
+```
+```text
+[PHASE: F5 - Step 1d | TARGET: resources/views/admin/dashboard/partials/low-stock.blade.php, workshop-attendance.blade.php, app/View/Models/*]
+TASK: <x-data-table>, <x-badge>, <x-empty-state>; stock-level and attendance-status @php logic moves to a View Model (labels and classes byte-identical); inline styles -> components.css.
+```
+```text
+[PHASE: F5 - Step 1e | TARGET: resources/views/admin/dashboard/partials/charts.blade.php, credit-dues.blade.php]
+TASK: chart container heights and remaining styles -> components.css (chart ids unchanged); credit-dues on <x-money>/<x-empty-state> where the markup matches; final hygiene budget recorded in 00_INDEX.md.
 ```
 ```text
 [PHASE: F5 - Step 2 | TARGET: resources/views/admin/sales/invoices.blade.php, resources/views/admin/invoices/show.blade.php]
