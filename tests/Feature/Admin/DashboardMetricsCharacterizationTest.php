@@ -16,6 +16,7 @@ use Carbon\Carbon;
 use Database\Seeders\InitialDataSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -195,9 +196,9 @@ test('the admin dashboard reads invoice lines in at most 6 queries instead of 26
     // 21 for the 7-day x 3-category trend, 1 eager load of recent invoice items).
     $before = 26;
 
-    \Illuminate\Support\Facades\DB::enableQueryLog();
+    DB::enableQueryLog();
     $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk();
-    $after = collect(\Illuminate\Support\Facades\DB::getQueryLog())
+    $after = collect(DB::getQueryLog())
         ->filter(fn ($q) => str_contains($q['query'], 'invoice_items'))
         ->count();
 

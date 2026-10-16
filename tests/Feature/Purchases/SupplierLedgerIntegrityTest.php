@@ -4,6 +4,7 @@ use App\Contracts\Purchases\PurchaseServiceInterface;
 use App\Models\Branch;
 use App\Models\Product;
 use App\Models\PurchaseInvoice;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\SupplierProduct;
@@ -223,7 +224,7 @@ test('purchase lines and returns are journaled, and repeated lines of a product 
 
     $this->service->processPurchaseReturn($invoice->id, [['product_id' => $this->product->id, 'quantity' => 5]], 'تالف', $this->user->id);
 
-    $moves = \App\Models\StockMovement::where('product_id', $this->product->id)->orderBy('id')->get();
+    $moves = StockMovement::where('product_id', $this->product->id)->orderBy('id')->get();
     expect($moves->pluck('type')->map->value->all())->toBe(['purchase', 'purchase', 'purchase_return', 'purchase_return'])
         ->and($moves->pluck('quantity_delta')->all())->toBe([4, 6, -4, -1])
         ->and($moves->pluck('stock_after')->all())->toBe([14, 20, 16, 15])

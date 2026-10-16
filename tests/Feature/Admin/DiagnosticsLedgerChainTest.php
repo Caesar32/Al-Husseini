@@ -2,6 +2,7 @@
 
 use App\Models\CreditLedgerEntry;
 use App\Models\Customer;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\User;
@@ -10,6 +11,7 @@ use Database\Seeders\InitialDataSeeder;
 use Database\Seeders\RolesAndPermissionsSeeder;
 use Database\Seeders\SalesAndPosDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -62,11 +64,11 @@ test('a broken running balance inside the ledger is reported even when the final
 });
 
 test('stock journal check passes on stock written by real flows and reports a stock changed outside the ledger (Phase 2)', function () {
-    $movement = \App\Models\StockMovement::latest('id')->firstOrFail();
+    $movement = StockMovement::latest('id')->firstOrFail();
     expect(ledgerCheck($this->diagnostics->runFullAudit(), 'stock_journal_consistency')['status'])->toBe('passed');
 
     // A write that bypasses StockLedgerService leaves the journal behind.
-    \Illuminate\Support\Facades\DB::table('products')->where('id', $movement->product_id)->update(['current_stock' => $movement->stock_after + 3]);
+    DB::table('products')->where('id', $movement->product_id)->update(['current_stock' => $movement->stock_after + 3]);
 
     $check = ledgerCheck($this->diagnostics->runFullAudit(), 'stock_journal_consistency');
     expect($check['status'])->toBe('failed')

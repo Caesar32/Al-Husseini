@@ -41,23 +41,23 @@ class DashboardController extends Controller
             $salesPeriods[$key] = [
                 'key' => $key, 'label' => $label, 'badge' => $badge, 'sublabel' => $sublabel,
                 'total' => $total,
-                'total_formatted' => number_format($total, 2) . ' ج.م',
+                'total_formatted' => number_format($total, 2).' ج.م',
                 'total_compact' => MoneyHelper::formatCompactCurrency($total)['compact'],
                 'count' => $this->metrics->invoiceCount($start),
                 'invoices_url' => $start
                     ? route('admin.sales.invoices', ['date_from' => $start->toDateString(), 'date_to' => $today->toDateString()])
                     : route('admin.sales.invoices'),
                 'revenue' => $revenue,
-                'revenue_formatted' => number_format($revenue, 2) . ' ج.م',
+                'revenue_formatted' => number_format($revenue, 2).' ج.م',
                 'revenue_compact' => MoneyHelper::formatCompactCurrency($revenue)['compact'],
                 'credit_collected' => $credit,
-                'credit_collected_fmt' => number_format($credit, 2) . ' ج.م',
+                'credit_collected_fmt' => number_format($credit, 2).' ج.م',
                 'credit_collected_compact' => MoneyHelper::formatCompactCurrency($credit)['compact'],
             ];
         }
 
         $selectedPeriodKey = $request->query('sales_period', 'all');
-        if (!array_key_exists($selectedPeriodKey, $salesPeriods)) {
+        if (! array_key_exists($selectedPeriodKey, $salesPeriods)) {
             $selectedPeriodKey = 'all';
         }
         $selectedPeriod = $salesPeriods[$selectedPeriodKey];
