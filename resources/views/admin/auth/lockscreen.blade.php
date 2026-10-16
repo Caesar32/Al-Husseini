@@ -3,7 +3,7 @@
 @section('title', 'قفل الشاشة | نظام الحسيني Al-Husseini')
 
 @section('content')
-<div class="auth-page-wrapper pt-5">
+<div class="auth-page-wrapper pt-5" data-page="auth.lockscreen" data-config='@json(['lockoutUntil' => $lockoutUntil])'>
     <!-- auth page bg -->
     <div class="auth-one-bg-position auth-one-bg" id="auth-particles">
         <div class="bg-overlay"></div>
@@ -132,66 +132,5 @@
 @endsection
 
 @section('script')
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const passwordInput = document.getElementById('userpassword');
-        const passwordAddon = document.getElementById('password-addon');
-        const unlockButton = document.getElementById('unlock-button');
-        const lockoutAlert = document.getElementById('lockout-alert');
-        const countdownElement = document.getElementById('lockout-countdown');
-
-        passwordAddon?.addEventListener('click', function () {
-            if (passwordInput.disabled) {
-                return;
-            }
-
-            passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password';
-        });
-
-        const lockoutUntil = @json($lockoutUntil);
-
-        if (!lockoutUntil || !countdownElement || !lockoutAlert) {
-            return;
-        }
-
-        let timerId = null;
-
-        const setLockedState = (locked) => {
-            passwordInput.disabled = locked;
-            passwordAddon.disabled = locked;
-            unlockButton.disabled = locked;
-        };
-
-        const finishLockout = () => {
-            if (timerId !== null) {
-                clearInterval(timerId);
-                timerId = null;
-            }
-
-            lockoutAlert.remove();
-            passwordInput.disabled = false;
-            passwordAddon.disabled = false;
-            unlockButton.disabled = false;
-            passwordInput.value = '';
-            passwordInput.focus();
-        };
-
-        const updateCountdown = () => {
-            const remaining = Math.max(
-                0,
-                Math.ceil((lockoutUntil * 1000 - Date.now()) / 1000)
-            );
-
-            countdownElement.textContent = remaining;
-
-            if (remaining <= 0) {
-                finishLockout();
-            }
-        };
-
-        setLockedState(true);
-        updateCountdown();
-        timerId = window.setInterval(updateCountdown, 1000);
-    });
-</script>
+<script src="{{ asset('assets/js/admin/auth/lockscreen.js') }}"></script>
 @endsection
