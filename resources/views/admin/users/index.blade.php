@@ -321,47 +321,25 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">الاسم الكامل <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control" value="{{ $u->name }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">البريد الإلكتروني <span class="text-danger">*</span></label>
-                            <input type="email" name="email" class="form-control" value="{{ $u->email }}" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">رقم الهاتف</label>
-                            <input type="text" name="phone" class="form-control" value="{{ $u->phone }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">الفرع المخصص</label>
-                            <select name="branch_id" class="form-select">
-                                <option value="">بدون فرع محدد (عام)</option>
-                                @foreach($branches as $b)
-                                    <option value="{{ $b->id }}" {{ $u->branch_id == $b->id ? 'selected' : '' }}>{{ $b->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">الدور والصلاحيات <span class="text-danger">*</span></label>
-                            <select name="role" class="form-select" required>
-                                @foreach($roles as $r)
-                                    <option value="{{ $r->name }}" {{ ($userRole && $userRole->id == $r->id) ? 'selected' : '' }}>
-                                        {{ $r->display_label }} ({{ $r->name }})
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label fw-semibold">كلمة المرور الجديدة (اختياري)</label>
-                            <div class="input-group">
-                                <input type="password" name="password" id="edit_password_{{ $u->id }}" class="form-control" placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية" minlength="6" autocomplete="new-password">
-                                <button type="button" class="btn btn-outline-secondary" onclick="togglePassVisibility('edit_password_{{ $u->id }}', this)">
-                                    <i class="ri-eye-line"></i>
+                        {{-- Per-user modal in a loop: stateless (no shared old()/errors), unique ids. --}}
+                        <x-form.input name="name" id="edit_name_{{ $u->id }}" label="الاسم الكامل" :value="$u->name" required :stateful="false" />
+                        <x-form.input name="email" type="email" id="edit_email_{{ $u->id }}" label="البريد الإلكتروني" :value="$u->email" required :stateful="false" />
+                        <x-form.input name="phone" id="edit_phone_{{ $u->id }}" label="رقم الهاتف" :value="$u->phone" :stateful="false" />
+                        <x-form.select name="branch_id" id="edit_branch_{{ $u->id }}" label="الفرع المخصص" :options="$branches->pluck('name', 'id')" :selected="$u->branch_id" placeholder="بدون فرع محدد (عام)" :stateful="false" />
+                        <x-form.select name="role" id="edit_role_{{ $u->id }}" label="الدور والصلاحيات" required :stateful="false">
+                            @foreach($roles as $r)
+                                <option value="{{ $r->name }}" {{ ($userRole && $userRole->id == $r->id) ? 'selected' : '' }}>
+                                    {{ $r->display_label }} ({{ $r->name }})
+                                </option>
+                            @endforeach
+                        </x-form.select>
+                        <x-form.input name="password" type="password" id="edit_password_{{ $u->id }}" label="كلمة المرور الجديدة (اختياري)" help="اتركه فارغاً إذا كنت لا ترغب في تغيير كلمة المرور." placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية" minlength="6" autocomplete="new-password" :stateful="false">
+                            <x-slot:append>
+                                <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('edit_password_{{ $u->id }}', this)">
+                                    <i class="ri-eye-line" aria-hidden="true"></i>
                                 </button>
-                            </div>
-                            <small class="text-muted">اتركه فارغاً إذا كنت لا ترغب في تغيير كلمة المرور.</small>
-                        </div>
+                            </x-slot:append>
+                        </x-form.input>
                     </div>
                     <div class="modal-footer bg-light">
                         <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
@@ -384,46 +362,18 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">الاسم الكامل <span class="text-danger">*</span></label>
-                        <input type="text" name="name" class="form-control" placeholder="مثال: أحمد عبد الله" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">البريد الإلكتروني <span class="text-danger">*</span></label>
-                        <input type="email" name="email" class="form-control" placeholder="user@alhusseini.com" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">رقم الهاتف</label>
-                        <input type="text" name="phone" class="form-control" placeholder="01xxxxxxxxx">
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">الفرع المخصص</label>
-                        <select name="branch_id" class="form-select">
-                            <option value="">بدون فرع محدد (عام)</option>
-                            @foreach($branches as $b)
-                                <option value="{{ $b->id }}">{{ $b->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">الدور والصلاحيات <span class="text-danger">*</span></label>
-                        <select name="role" class="form-select" required>
-                            <option value="">-- اختر الدور --</option>
-                            @foreach($roles as $r)
-                                <option value="{{ $r->name }}">{{ $r->display_label }} ({{ $r->name }})</option>
-                            @endforeach
-                        </select>
-                        <small class="text-muted">عند اختيار دور <strong>كاشير مبيعات</strong> سيتم توجيهه تلقائياً لشاشة الـ POS.</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold">كلمة المرور الأولية <span class="text-danger">*</span></label>
-                        <div class="input-group">
-                            <input type="password" name="password" id="add_user_password" class="form-control" placeholder="6 أحرف على الأقل" required minlength="6" autocomplete="new-password">
-                            <button type="button" class="btn btn-outline-secondary" onclick="togglePassVisibility('add_user_password', this)">
-                                <i class="ri-eye-line"></i>
+                    <x-form.input name="name" id="add_user_name" label="الاسم الكامل" required placeholder="مثال: أحمد عبد الله" />
+                    <x-form.input name="email" type="email" id="add_user_email" label="البريد الإلكتروني" required placeholder="user@alhusseini.com" />
+                    <x-form.input name="phone" id="add_user_phone" label="رقم الهاتف" placeholder="01xxxxxxxxx" />
+                    <x-form.select name="branch_id" id="add_user_branch" label="الفرع المخصص" :options="$branches->pluck('name', 'id')" placeholder="بدون فرع محدد (عام)" />
+                    <x-form.select name="role" id="add_user_role" label="الدور والصلاحيات" required help="عند اختيار دور كاشير مبيعات سيتم توجيهه تلقائياً لشاشة الـ POS." :options="$roles->mapWithKeys(fn ($r) => [$r->name => $r->display_label.' ('.$r->name.')'])" placeholder="-- اختر الدور --" />
+                    <x-form.input name="password" type="password" id="add_user_password" label="كلمة المرور الأولية" required placeholder="6 أحرف على الأقل" minlength="6" autocomplete="new-password">
+                        <x-slot:append>
+                            <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('add_user_password', this)">
+                                <i class="ri-eye-line" aria-hidden="true"></i>
                             </button>
-                        </div>
-                    </div>
+                        </x-slot:append>
+                    </x-form.input>
                 </div>
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
