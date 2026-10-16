@@ -189,3 +189,17 @@ test('owner periods show the pinned values for month and week', function () {
         ->and($week['total_sales_count'])->toBe(2)
         ->and($week['credit_collected']['raw'])->toEqual(100);
 });
+
+test('the admin dashboard reads invoice lines in at most 6 queries instead of 26 (Phase 3)', function () {
+    // Measured before the refactor: 26 queries touched invoice_items (4 category stats,
+    // 21 for the 7-day x 3-category trend, 1 eager load of recent invoice items).
+    $before = 26;
+
+    \Illuminate\Support\Facades\DB::enableQueryLog();
+    $this->actingAs($this->admin)->get(route('admin.dashboard'))->assertOk();
+    $after = collect(\Illuminate\Support\Facades\DB::getQueryLog())
+        ->filter(fn ($q) => str_contains($q['query'], 'invoice_items'))
+        ->count();
+
+    expect($after)->toBeLessThanOrEqual($before - 20, "invoice_items queries: before {$before}, after {$after}");
+});
