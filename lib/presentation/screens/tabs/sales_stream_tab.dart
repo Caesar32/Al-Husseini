@@ -167,7 +167,7 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
                                   ),
                                   const SizedBox(width: 8),
                                   ArabicTabularText(
-                                    text: inv.formattedNetAmount,
+                                    text: inv.netAmount.display,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
                                     textColor: AppColors.goldAccent,
@@ -232,3 +232,4 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
     );
   }
 }
+

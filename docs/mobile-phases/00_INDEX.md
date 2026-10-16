@@ -86,3 +86,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M0-01, M0-04 | Done: sealed `ApiFailure` hierarchy (Arabic messages); `requireDataMap/List`, `requireBodyMap`, `readPagination` + `PaginationMeta` | 22 |
 | M0-02, M0-03 | Done: `ApiService._send` maps 401/403/404/422/429/5xx/non-JSON/socket/TLS to `ApiFailure`; awaited `clearAll` + `onUnauthorized` stream on 401 | 35 |
 | M1-02 | Done: `json_read.dart` tolerant readers + `Money` value class | 93 |
+| M1-03, M1-04 | Done: sales models on readers; amounts are `Money` (server display strings); detail adds scrap deduction, refunded, item returned qty; new `ReturnSummary` | 98 |

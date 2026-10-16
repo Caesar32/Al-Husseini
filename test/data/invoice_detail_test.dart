@@ -79,6 +79,86 @@ void main() {
       expect(invoice.scrapBatteries, isEmpty);
     });
   });
+
+  test('parses all invoice financials, nested staff, returned items, and payments', () {
+    final invoice = InvoiceDetail.fromJson({
+      'id': '42',
+      'invoice_number': 'INV-42',
+      'created_at': '2026-01-02T10:00:00Z',
+      'status': 'partially_refunded',
+      'payment_method': 'cash',
+      'notes': 'ملاحظة',
+      'customer': {
+        'id': '7',
+        'name': 'أحمد',
+        'phone': '01000000000',
+        'current_credit_balance': '12.5',
+      },
+      'cashier': {'id': 3, 'name': 'محمد'},
+      'technician': {'id': 4, 'name': 'علي'},
+      'vehicle': {
+        'id': 9,
+        'plate_number': 'س ب 123',
+        'make': 'تويوتا',
+        'model': 'يارس',
+      },
+      'financials': {
+        'subtotal': {'raw': '1000', 'formatted': '1,000.00 ج.م'},
+        'discount_amount': {'raw': '50', 'formatted': '50.00 ج.م'},
+        'scrap_deduction_amount': {
+          'raw': '25',
+          'formatted': '25.00 ج.م',
+        },
+        'tax_amount': {'raw': '150', 'formatted': '150.00 ج.م'},
+        'final_amount': {'raw': '1075', 'formatted': '1,075.00 ج.م'},
+        'paid_amount': {'raw': '800', 'formatted': '800.00 ج.م'},
+        'remaining_amount': {'raw': '275', 'formatted': '275.00 ج.م'},
+        'refunded_amount': {'raw': '100', 'formatted': '100.00 ج.م'},
+      },
+      'items': [
+        {
+          'id': '11',
+          'product_name': 'بطارية',
+          'sku': 'BAT-1',
+          'quantity': '2',
+          'returned_quantity': '1',
+          'is_battery': true,
+          'battery_serial_number': 'SER-1',
+          'warranty_duration_months': '12',
+          'unit_price': {'raw': '500', 'formatted': '500.00 ج.م'},
+          'total_price': {'raw': '1000', 'formatted': '1,000.00 ج.م'},
+        },
+      ],
+      'payments': [
+        {
+          'id': 1,
+          'payment_method': 'cash',
+          'amount': '800',
+          'formatted': '800.00 ج.م',
+          'created_at': '2026-01-02T10:30:00Z',
+        },
+      ],
+    });
+
+    expect(invoice.id, 42);
+    expect(invoice.statusLabel, 'مسترجعة جزئياً');
+    expect(invoice.subtotal.raw, 1000);
+    expect(invoice.taxAmount.raw, 150);
+    expect(invoice.discountAmount.raw, 50);
+    expect(invoice.scrapDeductionAmount.raw, 25);
+    expect(invoice.netAmount.display, '1,075.00 ج.م');
+    expect(invoice.paidAmount.raw, 800);
+    expect(invoice.remainingAmount.raw, 275);
+    expect(invoice.refundedAmount.raw, 100);
+    expect(invoice.cashierName, 'محمد');
+    expect(invoice.technicianName, 'علي');
+    expect(invoice.customer?.name, 'أحمد');
+    expect(invoice.vehicle?.plateNumber, 'س ب 123');
+    expect(invoice.items.single.returnedQuantity, 1);
+    expect(invoice.items.single.unitPrice.raw, 500);
+    expect(invoice.payments.single.amount.raw, 800);
+    expect(invoice.payments.single.date, '2026-01-02T10:30:00Z');
+  });
 }
 
 Map<String, dynamic> _financials() {
@@ -86,8 +166,11 @@ Map<String, dynamic> _financials() {
     'subtotal': {'raw': 100.0},
     'tax_amount': {'raw': 15.0},
     'discount_amount': {'raw': 0.0},
+    'scrap_deduction_amount': {'raw': 0.0},
     'final_amount': {'raw': 115.0},
     'paid_amount': {'raw': 115.0},
     'remaining_amount': {'raw': 0.0},
+    'refunded_amount': {'raw': 0.0},
   };
 }
+

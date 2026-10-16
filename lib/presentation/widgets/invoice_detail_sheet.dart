@@ -187,7 +187,7 @@ class InvoiceDetailSheet extends StatelessWidget {
                   // Items List
                   const SizedBox(height: 16),
                   Text(
-                    'اصناف الفاتورة (${invoice.items.length})',
+                    'أصناف الفاتورة (${invoice.items.length})',
                     style: GoogleFonts.cairo(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -220,7 +220,7 @@ class InvoiceDetailSheet extends StatelessWidget {
                                   ),
                                 ),
                                 ArabicTabularText(
-                                  text: '${item.totalPrice} ج.م',
+                                  text: item.totalPrice.display,
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -231,7 +231,8 @@ class InvoiceDetailSheet extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'الكمية: ${item.quantity} × ${item.unitPrice} ج.م',
+                                  'الكمية: ${item.quantity} × ${item.unitPrice.display}'
+                                  '${item.returnedQuantity > 0 ? ' (مرتجع: ${item.returnedQuantity})' : ''}',
                                   style: GoogleFonts.almarai(fontSize: 12, color: AppColors.textSecondary),
                                 ),
                                 if (item.productSku.isNotEmpty)
@@ -318,16 +319,36 @@ class InvoiceDetailSheet extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('المجموع الفرعي:', style: GoogleFonts.almarai(color: AppColors.textSecondary)),
-                            ArabicTabularText(text: '${invoice.subtotal} ج.م', fontSize: 14),
+                            ArabicTabularText(text: invoice.subtotal.display, fontSize: 14),
                           ],
                         ),
-                        if (invoice.discountAmount > 0) ...[
+                        if (invoice.discountAmount.raw > 0) ...[
                           const SizedBox(height: 6),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text('الخصم المباشر:', style: GoogleFonts.almarai(color: AppColors.stockDepletedDanger)),
-                              ArabicTabularText(text: '- ${invoice.discountAmount} ج.م', fontSize: 14, textColor: AppColors.stockDepletedDanger),
+                              ArabicTabularText(text: '- ${invoice.discountAmount.display}', fontSize: 14, textColor: AppColors.stockDepletedDanger),
+                            ],
+                          ),
+                        ],
+                        if (invoice.scrapDeductionAmount.raw > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('خصم الخردة', style: GoogleFonts.almarai(color: AppColors.stockDepletedDanger)),
+                              ArabicTabularText(text: '- ${invoice.scrapDeductionAmount.display}', fontSize: 14, textColor: AppColors.stockDepletedDanger),
+                            ],
+                          ),
+                        ],
+                        if (invoice.refundedAmount.raw > 0) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('المسترد', style: GoogleFonts.almarai(color: AppColors.stockDepletedDanger)),
+                              ArabicTabularText(text: '- ${invoice.refundedAmount.display}', fontSize: 14, textColor: AppColors.stockDepletedDanger),
                             ],
                           ),
                         ],
@@ -336,7 +357,7 @@ class InvoiceDetailSheet extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text('الصافي النهائي:', style: GoogleFonts.cairo(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.goldAccent)),
-                            ArabicTabularText(text: '${invoice.netAmount} ج.م', fontSize: 20, fontWeight: FontWeight.bold, textColor: AppColors.goldAccent),
+                            ArabicTabularText(text: invoice.netAmount.display, fontSize: 20, fontWeight: FontWeight.bold, textColor: AppColors.goldAccent),
                           ],
                         ),
                       ],
@@ -352,3 +373,4 @@ class InvoiceDetailSheet extends StatelessWidget {
     );
   }
 }
+

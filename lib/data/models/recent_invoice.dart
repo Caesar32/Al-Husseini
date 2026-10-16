@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 String _invoiceStatusLabel(String status) {
   const labels = {
     'paid': 'مدفوعة',
@@ -25,8 +27,7 @@ class InvoiceSummary {
   final String invoiceNumber;
   final String createdAt;
   final String timeAgo;
-  final double netAmount;
-  final String formattedNetAmount;
+  final Money netAmount;
   final String paymentStatus;
   final String paymentStatusLabel;
   final String paymentMethod;
@@ -37,13 +38,12 @@ class InvoiceSummary {
   final bool hasWarrantyBattery;
   final String cashierName;
 
-  InvoiceSummary({
+  const InvoiceSummary({
     required this.id,
     required this.invoiceNumber,
     required this.createdAt,
     required this.timeAgo,
     required this.netAmount,
-    required this.formattedNetAmount,
     required this.paymentStatus,
     required this.paymentStatusLabel,
     required this.paymentMethod,
@@ -56,26 +56,24 @@ class InvoiceSummary {
   });
 
   factory InvoiceSummary.fromJson(Map<String, dynamic> json) {
-    final finalAmount = json['final_amount'] as Map<String, dynamic>? ?? {};
-    final status = json['status'] ?? 'paid';
-    final paymentMethod = json['payment_method'] ?? 'cash';
+    final status = readString(json['status'], fallback: 'paid');
+    final paymentMethod = readString(json['payment_method'], fallback: 'cash');
 
     return InvoiceSummary(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      invoiceNumber: json['invoice_number'] ?? '#--',
-      createdAt: json['created_at'] ?? '',
-      timeAgo: json['time'] ?? '',
-      netAmount: (finalAmount['raw'] ?? 0.0).toDouble(),
-      formattedNetAmount: finalAmount['formatted'] ?? '${finalAmount['raw'] ?? 0} ج.م',
+      id: readInt(json['id']),
+      invoiceNumber: readString(json['invoice_number'], fallback: '#--'),
+      createdAt: readString(json['created_at']),
+      timeAgo: readString(json['time']),
+      netAmount: Money.fromJson(json['final_amount']),
       paymentStatus: status,
       paymentStatusLabel: _invoiceStatusLabel(status),
       paymentMethod: paymentMethod,
       paymentMethodLabel: _paymentMethodLabel(paymentMethod),
-      customerName: json['customer_name'] ?? 'عميل نقدي',
-      customerPhone: json['customer_phone'] ?? '',
-      itemsCount: json['items_count'] ?? 0,
-      hasWarrantyBattery: json['has_warranty'] ?? false,
-      cashierName: json['cashier_name'] ?? '',
+      customerName: readString(json['customer_name'], fallback: 'عميل نقدي'),
+      customerPhone: readString(json['customer_phone']),
+      itemsCount: readInt(json['items_count']),
+      hasWarrantyBattery: readBool(json['has_warranty']),
+      cashierName: readString(json['cashier_name']),
     );
   }
 }
@@ -86,12 +84,14 @@ class InvoiceDetail {
   final String createdAt;
   final String status;
   final String statusLabel;
-  final double subtotal;
-  final double taxAmount;
-  final double discountAmount;
-  final double netAmount;
-  final double paidAmount;
-  final double remainingAmount;
+  final Money subtotal;
+  final Money taxAmount;
+  final Money discountAmount;
+  final Money scrapDeductionAmount;
+  final Money netAmount;
+  final Money paidAmount;
+  final Money remainingAmount;
+  final Money refundedAmount;
   final String paymentMethod;
   final String paymentMethodLabel;
   final String? notes;
@@ -103,7 +103,7 @@ class InvoiceDetail {
   final List<ScrapBatteryDetail> scrapBatteries;
   final List<InvoicePaymentDetail> payments;
 
-  InvoiceDetail({
+  const InvoiceDetail({
     required this.id,
     required this.invoiceNumber,
     required this.createdAt,
@@ -112,9 +112,11 @@ class InvoiceDetail {
     required this.subtotal,
     required this.taxAmount,
     required this.discountAmount,
+    required this.scrapDeductionAmount,
     required this.netAmount,
     required this.paidAmount,
     required this.remainingAmount,
+    required this.refundedAmount,
     required this.paymentMethod,
     required this.paymentMethodLabel,
     this.notes,
@@ -128,45 +130,47 @@ class InvoiceDetail {
   });
 
   factory InvoiceDetail.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'] as List? ?? [];
-    final rawPayments = json['payments'] as List? ?? [];
-    final rawScrapBatteries = json['scrap_batteries'];
-    final scrapBatteries = rawScrapBatteries is List
-        ? rawScrapBatteries
-        : json['scrap_battery'] is Map
-            ? [json['scrap_battery']]
-            : <dynamic>[];
-    final financials = json['financials'] as Map<String, dynamic>? ?? {};
-    final status = json['status'] ?? 'paid';
-    final paymentMethod = json['payment_method'] ?? 'cash';
+    final financials = readMap(json['financials']);
+    final scrapBatteries = readList(json['scrap_batteries']);
+    final legacyScrapBattery = readMap(json['scrap_battery']);
+    final scrapSource = scrapBatteries.isNotEmpty
+        ? scrapBatteries
+        : legacyScrapBattery.isNotEmpty
+            ? [legacyScrapBattery]
+            : const <dynamic>[];
+    final status = readString(json['status'], fallback: 'paid');
+    final paymentMethod = readString(json['payment_method'], fallback: 'cash');
+    final customer = json['customer'] is Map ? readMap(json['customer']) : null;
+    final vehicle = json['vehicle'] is Map ? readMap(json['vehicle']) : null;
 
-    double financial(String key) =>
-        ((financials[key] as Map<String, dynamic>?)?['raw'] as num? ?? 0.0).toDouble();
+    Money financial(String key) => Money.fromJson(financials[key]);
 
     return InvoiceDetail(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      invoiceNumber: json['invoice_number'] ?? '#--',
-      createdAt: json['created_at'] ?? '',
+      id: readInt(json['id']),
+      invoiceNumber: readString(json['invoice_number'], fallback: '#--'),
+      createdAt: readString(json['created_at']),
       status: status,
       statusLabel: _invoiceStatusLabel(status),
       subtotal: financial('subtotal'),
       taxAmount: financial('tax_amount'),
       discountAmount: financial('discount_amount'),
+      scrapDeductionAmount: financial('scrap_deduction_amount'),
       netAmount: financial('final_amount'),
       paidAmount: financial('paid_amount'),
       remainingAmount: financial('remaining_amount'),
+      refundedAmount: financial('refunded_amount'),
       paymentMethod: paymentMethod,
       paymentMethodLabel: _paymentMethodLabel(paymentMethod),
-      notes: json['notes'],
-      customer: json['customer'] != null ? InvoiceCustomerInfo.fromJson(json['customer']) : null,
-      cashierName: json['cashier_name'] ?? json['cashier']?['name'],
-      technicianName: json['technician_name'] ?? json['technician']?['name'],
-      vehicle: json['vehicle'] != null ? InvoiceVehicleInfo.fromJson(json['vehicle']) : null,
-      items: rawItems.map((e) => InvoiceItemDetail.fromJson(e)).toList(),
-      scrapBatteries: scrapBatteries
-          .map((e) => ScrapBatteryDetail.fromJson(e as Map<String, dynamic>))
-          .toList(),
-      payments: rawPayments.map((e) => InvoicePaymentDetail.fromJson(e)).toList(),
+      notes: readStringOrNull(json['notes']),
+      customer: customer == null ? null : InvoiceCustomerInfo.fromJson(customer),
+      cashierName: readStringOrNull(json['cashier_name']) ??
+          readStringOrNull(readMap(json['cashier'])['name']),
+      technicianName: readStringOrNull(json['technician_name']) ??
+          readStringOrNull(readMap(json['technician'])['name']),
+      vehicle: vehicle == null ? null : InvoiceVehicleInfo.fromJson(vehicle),
+      items: readModelList(json['items'], InvoiceItemDetail.fromJson),
+      scrapBatteries: readModelList(scrapSource, ScrapBatteryDetail.fromJson),
+      payments: readModelList(json['payments'], InvoicePaymentDetail.fromJson),
     );
   }
 }
@@ -177,7 +181,7 @@ class InvoiceCustomerInfo {
   final String phone;
   final double currentCreditBalance;
 
-  InvoiceCustomerInfo({
+  const InvoiceCustomerInfo({
     required this.id,
     required this.name,
     required this.phone,
@@ -186,10 +190,10 @@ class InvoiceCustomerInfo {
 
   factory InvoiceCustomerInfo.fromJson(Map<String, dynamic> json) {
     return InvoiceCustomerInfo(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] ?? '',
-      phone: json['phone'] ?? '',
-      currentCreditBalance: (json['current_credit_balance'] ?? 0.0).toDouble(),
+      id: readInt(json['id']),
+      name: readString(json['name']),
+      phone: readString(json['phone']),
+      currentCreditBalance: readDouble(json['current_credit_balance']),
     );
   }
 }
@@ -199,7 +203,7 @@ class InvoiceVehicleInfo {
   final String make;
   final String model;
 
-  InvoiceVehicleInfo({
+  const InvoiceVehicleInfo({
     required this.plateNumber,
     required this.make,
     required this.model,
@@ -207,9 +211,9 @@ class InvoiceVehicleInfo {
 
   factory InvoiceVehicleInfo.fromJson(Map<String, dynamic> json) {
     return InvoiceVehicleInfo(
-      plateNumber: json['plate_number'] ?? '',
-      make: json['make'] ?? '',
-      model: json['model'] ?? '',
+      plateNumber: readString(json['plate_number']),
+      make: readString(json['make']),
+      model: readString(json['model']),
     );
   }
 }
@@ -219,38 +223,38 @@ class InvoiceItemDetail {
   final String productName;
   final String productSku;
   final int quantity;
-  final double unitPrice;
-  final double totalPrice;
+  final Money unitPrice;
+  final Money totalPrice;
+  final int returnedQuantity;
   final bool isBattery;
   final String? batterySerialNumber;
   final int? warrantyDurationMonths;
 
-  InvoiceItemDetail({
+  const InvoiceItemDetail({
     required this.id,
     required this.productName,
     required this.productSku,
     required this.quantity,
     required this.unitPrice,
     required this.totalPrice,
+    required this.returnedQuantity,
     required this.isBattery,
     this.batterySerialNumber,
     this.warrantyDurationMonths,
   });
 
   factory InvoiceItemDetail.fromJson(Map<String, dynamic> json) {
-    final unitPrice = json['unit_price'] as Map<String, dynamic>? ?? {};
-    final totalPrice = json['total_price'] as Map<String, dynamic>? ?? {};
-
     return InvoiceItemDetail(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      productName: json['product_name'] ?? 'منتج',
-      productSku: json['sku'] ?? '',
-      quantity: json['quantity'] ?? 1,
-      unitPrice: (unitPrice['raw'] as num? ?? 0.0).toDouble(),
-      totalPrice: (totalPrice['raw'] as num? ?? 0.0).toDouble(),
-      isBattery: json['is_battery'] ?? false,
-      batterySerialNumber: json['battery_serial_number'],
-      warrantyDurationMonths: json['warranty_duration_months'],
+      id: readInt(json['id']),
+      productName: readString(json['product_name'], fallback: 'منتج'),
+      productSku: readString(json['sku']),
+      quantity: readInt(json['quantity'], fallback: 1),
+      unitPrice: Money.fromJson(json['unit_price']),
+      totalPrice: Money.fromJson(json['total_price']),
+      returnedQuantity: readInt(json['returned_quantity']),
+      isBattery: readBool(json['is_battery']),
+      batterySerialNumber: readStringOrNull(json['battery_serial_number']),
+      warrantyDurationMonths: readIntOrNull(json['warranty_duration_months']),
     );
   }
 }
@@ -261,7 +265,7 @@ class ScrapBatteryDetail {
   final double leadWeightKg;
   final String? status;
 
-  ScrapBatteryDetail({
+  const ScrapBatteryDetail({
     required this.capacityAh,
     required this.scrapValue,
     required this.leadWeightKg,
@@ -270,29 +274,21 @@ class ScrapBatteryDetail {
 
   factory ScrapBatteryDetail.fromJson(Map<String, dynamic> json) {
     return ScrapBatteryDetail(
-      capacityAh: json['capacity_ah']?.toString() ?? '',
-      scrapValue: _parseDouble(json['scrap_value']),
-      leadWeightKg: _parseDouble(json['lead_weight_kg']),
-      status: json['status']?.toString(),
+      capacityAh: readString(json['capacity_ah']),
+      scrapValue: readDouble(json['scrap_value']),
+      leadWeightKg: readDouble(json['lead_weight_kg']),
+      status: readStringOrNull(json['status']),
     );
-  }
-
-  static double _parseDouble(dynamic value) {
-    if (value is num) {
-      return value.toDouble();
-    }
-
-    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 }
 
 class InvoicePaymentDetail {
   final String method;
   final String methodLabel;
-  final double amount;
+  final Money amount;
   final String date;
 
-  InvoicePaymentDetail({
+  const InvoicePaymentDetail({
     required this.method,
     required this.methodLabel,
     required this.amount,
@@ -300,13 +296,23 @@ class InvoicePaymentDetail {
   });
 
   factory InvoicePaymentDetail.fromJson(Map<String, dynamic> json) {
-    final method = json['method'] ?? json['payment_method'] ?? 'cash';
+    final method = readStringOrNull(json['payment_method']) ??
+        readStringOrNull(json['method']) ??
+        'cash';
+    final raw = readDouble(json['amount']);
 
     return InvoicePaymentDetail(
       method: method,
       methodLabel: _paymentMethodLabel(method),
-      amount: (json['amount'] as num? ?? 0.0).toDouble(),
-      date: json['date'] ?? json['created_at'] ?? '',
+      amount: Money(
+        raw: raw,
+        display: readStringOrNull(json['formatted']) ??
+            '${raw.toStringAsFixed(2)} ج.م',
+      ),
+      date: readStringOrNull(json['created_at']) ??
+          readStringOrNull(json['date']) ??
+          '',
     );
   }
 }
+
