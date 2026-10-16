@@ -37,10 +37,10 @@
             </a>
         </div>
         <div class="col-sm-6 text-sm-end mt-2 mt-sm-0">
-            <form method="GET" action="{{ route('admin.suppliers.index') }}" class="d-inline-flex gap-2">
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="بحث باسم المورد أو الشركة..." value="{{ request('search') }}">
+            <x-filter-bar :action="route('admin.suppliers.index')" label="بحث في الموردين" class="d-inline-flex gap-2">
+                <input type="text" name="search" class="form-control form-control-sm" placeholder="بحث باسم المورد أو الشركة..." aria-label="بحث باسم المورد أو الشركة" value="{{ request('search') }}">
                 <button type="submit" class="btn btn-sm btn-soft-secondary">بحث</button>
-            </form>
+            </x-filter-bar>
         </div>
     </div>
 
@@ -50,23 +50,9 @@
             <h5 class="card-title mb-0">قائمة الموردين المعتمدين ({{ $suppliers->total() }})</h5>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle table-nowrap mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th scope="col">#</th>
-                            <th scope="col">اسم الشركة / المورد</th>
-                            <th scope="col">المسؤول وجهة الاتصال</th>
-                            <th scope="col">رقم الهاتف</th>
-                            <th scope="col">الرصيد المستحق (الدائن)</th>
-                            <th scope="col">سقف الائتمان</th>
-                            <th scope="col">عدد الأصناف</th>
-                            <th scope="col">الحالة</th>
-                            <th scope="col" class="text-center">الإجراءات</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($suppliers as $supplier)
+            <x-data-table caption="قائمة الموردين المعتمدين" :paginator="$suppliers" :is-empty="$suppliers->isEmpty()" empty-message="لا يوجد موردون مسجلون حالياً."
+                :columns="['#', 'اسم الشركة / المورد', 'المسؤول وجهة الاتصال', 'رقم الهاتف', 'الرصيد المستحق (الدائن)', 'سقف الائتمان', 'عدد الأصناف', 'الحالة', ['label' => 'الإجراءات', 'class' => 'text-center']]">
+                        @foreach($suppliers as $supplier)
                         <tr>
                             <td>{{ $loop->iteration }}</td>
                             <td>
@@ -77,24 +63,22 @@
                             <td>{{ $supplier->name }}</td>
                             <td>{{ $supplier->phone }}</td>
                             <td>
-                                <span class="badge {{ $supplier->current_balance > 0 ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success' }} fs-12 fw-bold">
-                                    {{ number_format($supplier->current_balance, 2) }} ج.م
-                                </span>
+                                <x-badge :variant="$supplier->current_balance > 0 ? 'danger' : 'success'" soft class="fs-12 fw-bold"><x-money :amount="$supplier->current_balance" /></x-badge>
                             </td>
-                            <td>{{ number_format($supplier->credit_limit, 2) }} ج.م</td>
+                            <td><x-money :amount="$supplier->credit_limit" /></td>
                             <td>
-                                <span class="badge bg-info-subtle text-info">{{ $supplier->products->count() }} صنف</span>
+                                <x-badge variant="info" soft>{{ $supplier->products->count() }} صنف</x-badge>
                             </td>
                             <td>
                                 @if($supplier->is_active)
-                                <span class="badge bg-success">نشط</span>
+                                <x-badge variant="success">نشط</x-badge>
                                 @else
-                                <span class="badge bg-danger">معطل</span>
+                                <x-badge variant="danger">معطل</x-badge>
                                 @endif
                             </td>
                             <td class="text-center">
                                 <div class="dropdown d-inline-block">
-                                    <button class="btn btn-soft-secondary btn-sm dropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button class="btn btn-soft-secondary btn-sm dropdown" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="إجراءات المورد {{ $supplier->company_name }}">
                                         <i class="ri-more-fill align-middle"></i>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end">
@@ -105,19 +89,8 @@
                                 </div>
                             </td>
                         </tr>
-                        @empty
-                        <tr>
-                            <td colspan="9" class="text-center py-4 text-muted">لا يوجد موردون مسجلون حالياً.</td>
-                        </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <div class="mt-3 d-flex justify-content-end">
-                {{ $suppliers->links() }}
-            </div>
+                        @endforeach
+            </x-data-table>
         </div>
     </div>
 </div>
