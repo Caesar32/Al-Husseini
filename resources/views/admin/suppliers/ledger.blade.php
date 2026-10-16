@@ -63,7 +63,7 @@
             <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
                 <i class="ri-hand-coin-line align-bottom me-1"></i> تسجيل سند صرف / سداد دفعة
             </button>
-            <x-button variant="soft-secondary" icon="printer-line" icon-class="align-bottom me-1" class="ms-2" onclick="window.print()">طباعة كشف الحساب</x-button>
+            <x-button variant="soft-secondary" icon="printer-line" icon-class="align-bottom me-1" class="ms-2" data-action="print">طباعة كشف الحساب</x-button>
         </div>
         <div class="col-sm-6 text-sm-end mt-2 mt-sm-0">
             <form method="GET" action="{{ route('admin.suppliers.ledger', $supplier) }}" class="d-inline-flex gap-2">

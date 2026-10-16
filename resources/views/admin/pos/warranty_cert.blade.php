@@ -321,9 +321,10 @@
 
     <!-- Print Action Buttons -->
     <div class="print-btn-bar">
-        <button onclick="window.print()" class="btn-print">طباعة شهادة الضمان (A4 / A5)</button>
+        <button data-action="print" class="btn-print">طباعة شهادة الضمان (A4 / A5)</button>
         <a href="{{ route('admin.pos.index') }}" class="btn-back">العودة لشاشة البيع</a>
     </div>
 
+<script src="{{ asset('assets/js/print.js') }}"></script>
 </body>
 </html>

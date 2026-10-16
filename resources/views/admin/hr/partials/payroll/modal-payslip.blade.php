@@ -11,7 +11,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
-                <button type="button" class="btn btn-primary" onclick="window.print();">
+                <button type="button" class="btn btn-primary" data-action="print">
                     <i class="ri-printer-line me-1"></i> طباعة القسيمة
                 </button>
             </div>

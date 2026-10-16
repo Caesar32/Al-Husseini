@@ -31,7 +31,7 @@
                             <button type="button" class="btn btn-danger" id="btnOpenManagerDeduction">
                                 <i class="ri-hand-coin-fill align-bottom me-1"></i> تطبيق خصم إداري
                             </button>
-                            <x-button variant="soft-secondary" icon="printer-line" icon-class="align-bottom me-1" onclick="window.print();">طباعة</x-button>
+                            <x-button variant="soft-secondary" icon="printer-line" icon-class="align-bottom me-1" data-action="print">طباعة</x-button>
                         </div>
                     </div>
                 </div>

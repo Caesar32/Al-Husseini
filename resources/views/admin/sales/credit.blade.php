@@ -122,7 +122,7 @@
                     <button type="button" class="btn btn-outline-warning text-dark fw-bold btn-sm me-1" onclick="exportCreditCSV()">
                         <i class="ri-file-excel-2-line me-1"></i> تصدير إكسيل (CSV)
                     </button>
-                    <button type="button" class="btn btn-warning text-dark fw-bold btn-sm" onclick="window.print()">
+                    <button type="button" class="btn btn-warning text-dark fw-bold btn-sm" data-action="print">
                         <i class="ri-printer-line me-1"></i> طباعة كشف الآجل
                     </button>
                 </div>
@@ -402,7 +402,7 @@
                 </div>
                 <div class="modal-footer bg-light p-3">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
-                    <button type="button" class="btn btn-primary" onclick="window.print()">
+                    <button type="button" class="btn btn-primary" data-action="print">
                         <i class="ri-printer-line me-1"></i> طباعة كشف الحساب
                     </button>
                 </div>

@@ -14,7 +14,7 @@
             </div>
             <div class="modal-footer bg-light p-3 no-print d-flex justify-content-between">
                 <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">إغلاق</button>
-                <button type="button" class="btn btn-primary fw-bold px-4" onclick="window.print()">
+                <button type="button" class="btn btn-primary fw-bold px-4" data-action="print">
                     <i class="ri-printer-fill me-1"></i> طباعة الإيصال (A4 / حراري)
                 </button>
             </div>

@@ -78,9 +78,10 @@
     </div>
 
     <div class="btn-bar" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);">
-        <button onclick="window.print()" style="background: #0d2238; color: #fff; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer;">
+        <button data-action="print" style="background: #0d2238; color: #fff; border: none; padding: 8px 20px; border-radius: 20px; font-weight: 700; cursor: pointer;">
             طباعة إذن الاستلام
         </button>
     </div>
+<script src="{{ asset('assets/js/print.js') }}"></script>
 </body>
 </html>
