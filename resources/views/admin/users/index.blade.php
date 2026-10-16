@@ -352,15 +352,9 @@
 @endforeach
 
 <!-- Modal: Add New User -->
-<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
+<x-modal id="addUserModal" title="إضافة حساب مستخدم جديد" icon="user-add-line" icon-class="text-success me-1" header-class="bg-light">
             <form action="{{ route('admin.users.store') }}" method="POST">
                 @csrf
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold" id="addUserLabel"><i class="ri-user-add-line text-success me-1"></i> إضافة حساب مستخدم جديد</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
                 <div class="modal-body">
                     <x-form.input name="name" id="add_user_name" label="الاسم الكامل" required placeholder="مثال: أحمد عبد الله" />
                     <x-form.input name="email" type="email" id="add_user_email" label="البريد الإلكتروني" required placeholder="user@alhusseini.com" />
@@ -380,9 +374,7 @@
                     <button type="submit" class="btn btn-success fw-semibold">حفظ وإنشاء الحساب</button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
+</x-modal>
 @endsection
 
 @push('scripts')

@@ -1,21 +1,18 @@
 <!-- Modal: Fast 1-Click Deduction for Late Arrival or Negligence -->
-<div class="modal fade" id="quickDeductionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-danger text-white p-3">
+<x-modal id="quickDeductionModal" header-class="bg-danger text-white p-3" close-white>
+            <x-slot:header>
                 <div class="d-flex align-items-center">
                     <div class="avatar-xs me-2">
                         <span class="avatar-title bg-white text-danger rounded-circle fs-16">
-                            <i class="ri-scissors-cut-line"></i>
+                            <i class="ri-scissors-cut-line" aria-hidden="true"></i>
                         </span>
                     </div>
                     <div>
-                        <h5 class="modal-title fw-bold text-white fs-15 mb-0">تطبيق خصم وجزاء إداري فوري</h5>
+                        <h5 class="modal-title fw-bold text-white fs-15 mb-0" id="quickDeductionModal-title">تطبيق خصم وجزاء إداري فوري</h5>
                         <small class="text-white-50 fs-11">إدارة مركز الحسيني لبطاريات السيارات</small>
                     </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
+            </x-slot:header>
 
             <form id="quickDeductionForm">
                 <input type="hidden" id="quickDedEmployeeId">
@@ -77,6 +74,4 @@
                     </button>
                 </div>
             </form>
-        </div>
-    </div>
-</div>
+</x-modal>
