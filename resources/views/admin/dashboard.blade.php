@@ -218,7 +218,7 @@
     ];
 @endphp
 <div data-page="dashboard" data-config='@json($pageConfig)'>
-    @include('admin.layouts.partials.page-title', ['pagetitle' => 'لوحات تحكم الحسيني', 'title' => 'لوحة القيادة والمبيعات - مركز الحسيني'])
+    <x-page-header title="لوحة القيادة والمبيعات - مركز الحسيني" :breadcrumbs="['لوحات تحكم الحسيني' => route('admin.dashboard'), 'لوحة القيادة والمبيعات - مركز الحسيني' => null]" box-class="bg-galaxy-transparent" />
 
     {{-- 1. شريط الترحيب والعمليات السريعة --}}
     @include('admin.dashboard.partials.welcome-bar')

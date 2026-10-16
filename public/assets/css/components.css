@@ -19,3 +19,11 @@
 .ah-panel--success-outline {
     border: 1px solid rgba(16, 185, 129, 0.2) !important;
 }
+
+/* Dashboard welcome bar (F5 1a). */
+.ah-welcome-title {
+    letter-spacing: -0.2px;
+}
+.ah-welcome-period {
+    gap: 8px;
+}

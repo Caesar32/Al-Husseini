@@ -15,7 +15,7 @@
                                 </span>
                             </div>
                             <div>
-                                <h4 class="fs-15 fw-bold mb-1" style="letter-spacing: -0.2px;">
+                                <h4 class="fs-15 fw-bold mb-1 ah-welcome-title">
                                     مركز الحسيني لبطاريات وزيوت وصيانة السيارات
                                 </h4>
                                 <p class="text-muted mb-0 fs-12">
@@ -29,8 +29,8 @@
                     <div class="col-xxl-7 col-xl-7 col-lg-12">
                         <div class="d-flex flex-wrap gap-2 justify-content-xl-end align-items-center">
                             <!-- Quick Sales Period Selector in Page Header -->
-                            <div class="d-none d-lg-flex align-items-center bg-body border rounded-pill px-2.5 py-1 shadow-xs" style="gap: 8px;">
-                                <span class="fs-11 fw-bold text-muted d-inline-flex align-items-center gap-1" style="white-space: nowrap;">
+                            <div class="d-none d-lg-flex align-items-center bg-body border rounded-pill px-2.5 py-1 shadow-xs ah-welcome-period">
+                                <span class="fs-11 fw-bold text-muted d-inline-flex align-items-center gap-1 text-nowrap">
                                     <i class="ri-filter-3-line text-success"></i>
                                     <span>فترة المبيعات:</span>
                                 </span>
@@ -38,7 +38,6 @@
                                     @foreach($salesPeriods ?? [] as $key => $p)
                                         <button type="button" 
                                                 class="btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold welcome-period-btn {{ ($selectedPeriodKey ?? 'all') === $key ? 'btn-success text-white shadow-xs active' : 'btn-ghost-secondary text-muted' }}"
-                                                data-period="{{ $key }}"
                                                 data-action="dashboard.period" data-period="{{ $key }}">
                                             {{ $p['label'] }}
                                         </button>
@@ -47,24 +46,16 @@
                             </div>
 
                             @can('pos.access')
-                            <a href="{{ route('admin.sales.pos') }}" class="btn btn-primary btn-sm quick-action-btn shadow-sm fs-12 px-3 py-2">
-                                <i class="ri-barcode-box-line align-middle me-1"></i> نقطة البيع (POS)
-                            </a>
+                            <x-button href="{{ route('admin.sales.pos') }}" variant="primary" size="sm" icon="barcode-box-line" icon-class="align-middle me-1" class="quick-action-btn shadow-sm fs-12 px-3 py-2">نقطة البيع (POS)</x-button>
                             @endcan
                             @can('credit.view')
-                            <a href="{{ route('admin.sales.credit') }}" class="btn btn-soft-warning btn-sm quick-action-btn fs-12 px-3 py-2">
-                                <i class="ri-hand-coin-line align-middle me-1"></i> تحصيل الآجل
-                            </a>
+                            <x-button href="{{ route('admin.sales.credit') }}" variant="soft-warning" size="sm" icon="hand-coin-line" icon-class="align-middle me-1" class="quick-action-btn fs-12 px-3 py-2">تحصيل الآجل</x-button>
                             @endcan
                             @can('products.view')
-                            <a href="{{ route('admin.sales.products') }}" class="btn btn-soft-info btn-sm quick-action-btn fs-12 px-3 py-2">
-                                <i class="ri-box-3-line align-middle me-1"></i> المخزون والباركود
-                            </a>
+                            <x-button href="{{ route('admin.sales.products') }}" variant="soft-info" size="sm" icon="box-3-line" icon-class="align-middle me-1" class="quick-action-btn fs-12 px-3 py-2">المخزون والباركود</x-button>
                             @endcan
                             @can('attendance.view')
-                            <a href="{{ route('admin.hr.attendance') }}" class="btn btn-soft-success btn-sm quick-action-btn fs-12 px-3 py-2">
-                                <i class="ri-user-follow-line align-middle me-1"></i> حضور الورشة
-                            </a>
+                            <x-button href="{{ route('admin.hr.attendance') }}" variant="soft-success" size="sm" icon="user-follow-line" icon-class="align-middle me-1" class="quick-action-btn fs-12 px-3 py-2">حضور الورشة</x-button>
                             @endcan
                         </div>
                     </div>
