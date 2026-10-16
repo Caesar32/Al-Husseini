@@ -92,3 +92,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M2-01 | Done: sealed `AsyncState<T>` (idle/loading/data/failure, keeps previous value) + `toApiFailure`; `fake_async` dev dependency | 123 |
 | M2-02 | Done: `AuthProvider` listens to `onUnauthorized` → unauthenticated + session-expired flag; app-level guard stops polling and routes to login with a SnackBar; splash validates the token through `auth/me` (offline keeps the cached user); `ApiService` decodes UTF-8 bytes (Laravel sends no charset) | 129 |
 | M2-03 | Done: `DashboardProvider` on `AsyncState` (legacy getters kept as shims); poll pauses in background, resumes on foreground; background failures keep data + `lastPollFailure`; 401 stops polling; `isStale` | 137 |
+| M2-04 | Done: `Paged<T>`; sales repository returns pages (returns use `ReturnSummary`, F-03 data side); `SalesProvider` load-more for invoices and returns with dedupe and `loadMoreError`; legacy getters kept | 148 |
