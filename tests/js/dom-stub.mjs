@@ -62,7 +62,7 @@ export function createBrowser({ fetchResponses = {} } = {}) {
     context.Admin = window.Admin;
 
     function click(dataset) {
-        const target = { tagName: 'BUTTON', dataset, getAttribute: () => null, closest() { return this; } };
+        const target = { tagName: 'BUTTON', dataset, getAttribute: () => null, closest(sel) { return sel === '[data-action]' ? this : null; } };
         (listeners.click || []).forEach((fn) => fn({ type: 'click', target, preventDefault() {} }));
     }
 

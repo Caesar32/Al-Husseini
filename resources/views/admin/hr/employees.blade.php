@@ -3,6 +3,13 @@
 @section('title', 'دليل الموظفين | نظام الحسيني الإداري')
 
 @section('content')
+@php
+    $pageConfig = ['routes' => [
+        'employees' => route('admin.hr.employees'),
+        'employee' => route('admin.hr.employees.show', ['employee' => '__ID__']),
+    ]];
+@endphp
+<div data-page="hr.employees" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية', 'title' => 'دليل وشؤون الموظفين'])
 
     {{-- 1. بطاقات الإحصائيات العلوية --}}
@@ -22,6 +29,7 @@
 
     {{-- 6. نافذة الملف التعريفي التفصيلي للموظف --}}
     @include('admin.hr.partials.employees.modal-profile')
+</div>
 @endsection
 
 @section('script')
