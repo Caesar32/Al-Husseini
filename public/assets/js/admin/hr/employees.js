@@ -186,7 +186,7 @@
         }
 
         function pageLink(page, label) {
-            return `<a class="page-link" href="#" data-action="hr.employees.page" data-page="${page}">${label}</a>`;
+            return `<a class="page-link" href="#" data-action="hr.employees.page" data-page-number="${page}">${label}</a>`;
         }
 
         function renderPagination(paginator) {
@@ -411,7 +411,7 @@
 
         Admin.actions.registerAll({
             'hr.employees.page': (el) => {
-                const page = Number(el.dataset.page);
+                const page = Number(el.dataset.pageNumber);
                 if (!el.closest('.page-item')?.classList.contains('disabled') && page >= 1) fetchEmployees(page);
             },
             'hr.employees.profile': (el) => viewProfile(el.dataset.id),

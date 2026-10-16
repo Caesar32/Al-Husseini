@@ -34,9 +34,9 @@ test('table and grid escape server values and use data-action buttons', async ()
 test('pagination links call the page action and fetch that page', async () => {
     const b = boot(3);
     await b.flush();
-    assert.ok(b.element('paginationContainer').innerHTML.includes('data-action="hr.employees.page" data-page="2"'));
+    assert.ok(b.element('paginationContainer').innerHTML.includes('data-action="hr.employees.page" data-page-number="2"'));
 
-    b.click({ action: 'hr.employees.page', page: '2' });
+    b.click({ action: 'hr.employees.page', pageNumber: '2' });
     await b.flush();
     assert.match(b.calls.fetch.at(-1).url, /^\/admin\/hr\/employees\?page=2/);
 });
