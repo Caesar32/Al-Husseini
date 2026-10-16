@@ -60,3 +60,15 @@ test('a broken running balance inside the ledger is reported even when the final
 
     expect(ledgerCheck($this->diagnostics->runFullAudit(), 'supplier_ledger')['count'])->toBe(1);
 });
+
+test('stock journal check passes on stock written by real flows and reports a stock changed outside the ledger (Phase 2)', function () {
+    $movement = \App\Models\StockMovement::latest('id')->firstOrFail();
+    expect(ledgerCheck($this->diagnostics->runFullAudit(), 'stock_journal_consistency')['status'])->toBe('passed');
+
+    // A write that bypasses StockLedgerService leaves the journal behind.
+    \Illuminate\Support\Facades\DB::table('products')->where('id', $movement->product_id)->update(['current_stock' => $movement->stock_after + 3]);
+
+    $check = ledgerCheck($this->diagnostics->runFullAudit(), 'stock_journal_consistency');
+    expect($check['status'])->toBe('failed')
+        ->and($check['count'])->toBe(1);
+});

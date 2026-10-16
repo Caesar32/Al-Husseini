@@ -22,6 +22,7 @@ use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceItem;
 use App\Models\SalaryStructure;
 use App\Models\ScrapBatteriesInventory;
+use App\Models\StockMovement;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\TechnicianCommission;
@@ -38,6 +39,7 @@ use App\Services\SearchService;
 use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class SystemDiagnosticService
@@ -45,6 +47,48 @@ class SystemDiagnosticService
     /**
      * تنفيذ فحص تدقيق سلامة قاعدة البيانات والاتساق المحاسبي والمخزني
      */
+    /**
+     * Read-only. Warns (instead of failing) while the stock_movements migration has not run.
+     *
+     * @param array<int, string> $issues
+     */
+    private function stockJournalConsistencyCheck(array &$issues): array
+    {
+        $check = [
+            'key'      => 'stock_journal_consistency',
+            'name'     => 'اتساق دفتر حركات المخزون (Stock Journal)',
+            'severity' => 'high',
+        ];
+
+        if (!Schema::hasTable('stock_movements')) {
+            $issues[] = 'المخزون: جدول حركات المخزون غير موجود؛ يلزم تشغيل php artisan migrate.';
+
+            return $check + [
+                'status'  => 'warning',
+                'details' => 'جدول حركات المخزون (stock_movements) غير موجود بعد.',
+                'count'   => 0,
+            ];
+        }
+
+        $mismatchCount = StockMovement::query()
+            ->join('products', 'products.id', '=', 'stock_movements.product_id')
+            ->whereIn('stock_movements.id', StockMovement::query()->selectRaw('MAX(id)')->groupBy('product_id'))
+            ->whereColumn('stock_movements.stock_after', '!=', 'products.current_stock')
+            ->count();
+
+        if ($mismatchCount > 0) {
+            $issues[] = "المخزون: يوجد {$mismatchCount} صنف رصيده الحالي لا يطابق آخر حركة في دفتر المخزون.";
+        }
+
+        return $check + [
+            'status'  => $mismatchCount === 0 ? 'passed' : 'failed',
+            'details' => $mismatchCount === 0
+                ? 'أرصدة الأصناف مطابقة لآخر حركة مسجلة في دفتر حركات المخزون.'
+                : "يوجد ({$mismatchCount}) صنف رصيده لا يطابق آخر حركة مسجلة.",
+            'count'   => $mismatchCount,
+        ];
+    }
+
     public function runFullAudit(): array
     {
         $startTime = microtime(true);
@@ -210,6 +254,10 @@ class SystemDiagnosticService
                 : "يوجد ({$invoicesWithoutPayments}) فاتورة تم سدادها بدون تجزئة دفع موثقة.",
             'count'       => $invoicesWithoutPayments,
         ];
+
+        // 9. Stock journal: the latest stock_movements row of each product must match its
+        // current stock. Products without movements (stock from before the journal) are skipped.
+        $checks[] = $this->stockJournalConsistencyCheck($issues);
 
         $passedCount = count(array_filter($checks, fn($c) => $c['status'] === 'passed'));
         $totalChecks = count($checks);
