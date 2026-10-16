@@ -3,108 +3,45 @@
 @section('title', 'فحص وتشخيص النظام الحي | مجموعة الحسيني')
 
 @section('content')
-<div class="row">
-    <div class="col-12">
-        <div class="page-title-box d-sm-flex align-items-center justify-content-between">
-            <h4 class="mb-sm-0 d-flex align-items-center gap-2">
-                <i class="ri-pulse-line text-success fs-20"></i>
-                <span>منظومة الفحص والتشخيص والمحاكاة الذاتية (Live Diagnostic Suite)</span>
-            </h4>
-            <div class="page-title-right">
-                <ol class="breadcrumb m-0">
-                    <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">الرئيسية</a></li>
-                    <li class="breadcrumb-item active">فحص النظام الحي</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
+<x-page-header title="منظومة الفحص والتشخيص والمحاكاة الذاتية (Live Diagnostic Suite)" icon="pulse-line" icon-class="text-success fs-20"
+    :breadcrumbs="['الرئيسية' => route('admin.dashboard'), 'فحص النظام الحي' => null]" />
 
 <!-- بطاقات المؤشرات العامة لسلامة النظام -->
 <div class="row g-3 mb-4">
     <div class="col-xl-3 col-md-6">
-        <div class="card card-animate border-0 shadow-sm overflow-hidden h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(255, 255, 255, 1) 100%);">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-uppercase fw-semibold text-muted fs-12 mb-1">مؤشر سلامة البيانات</p>
-                        <h3 class="mb-0 fw-bold text-success" id="statHealthScore">{{ $auditData['health_score'] }}%</h3>
-                    </div>
-                    <div class="avatar-sm shrink-0">
-                        <span class="avatar-title bg-success-subtle text-success rounded-circle fs-24">
-                            <i class="ri-shield-check-line"></i>
-                        </span>
-                    </div>
-                </div>
+        <x-stat-card label="مؤشر سلامة البيانات" :value="$auditData['health_score'].'%'" value-id="statHealthScore" icon="shield-check-line" variant="success" tint="success">
+            <x-slot:footer>
                 <div class="mt-3">
                     <div class="progress progress-sm">
                         <div class="progress-bar bg-success" role="progressbar" style="width: {{ $auditData['health_score'] }}%;" aria-valuenow="{{ $auditData['health_score'] }}" aria-valuemin="0" aria-valuemax="100"></div>
                     </div>
                 </div>
-            </div>
-        </div>
+            </x-slot:footer>
+        </x-stat-card>
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card card-animate border-0 shadow-sm overflow-hidden h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(255, 255, 255, 1) 100%);">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-uppercase fw-semibold text-muted fs-12 mb-1">معايير التدقيق المنجزة</p>
-                        <h3 class="mb-0 fw-bold text-primary" id="statPassedChecks">{{ $auditData['passed_count'] }} / {{ $auditData['total_checks'] }}</h3>
-                    </div>
-                    <div class="avatar-sm shrink-0">
-                        <span class="avatar-title bg-primary-subtle text-primary rounded-circle fs-24">
-                            <i class="ri-checkbox-multiple-line"></i>
-                        </span>
-                    </div>
-                </div>
-                <p class="text-muted fs-11 mt-3 mb-0">جميع المحاور المحاسبية والمخزنية مفحوصة</p>
-            </div>
-        </div>
+        <x-stat-card label="معايير التدقيق المنجزة" :value="$auditData['passed_count'].' / '.$auditData['total_checks']" value-id="statPassedChecks" icon="checkbox-multiple-line" variant="primary" tint="primary">
+            <x-slot:footer><p class="text-muted fs-11 mt-3 mb-0">جميع المحاور المحاسبية والمخزنية مفحوصة</p></x-slot:footer>
+        </x-stat-card>
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card card-animate border-0 shadow-sm overflow-hidden h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(255, 255, 255, 1) 100%);">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-uppercase fw-semibold text-muted fs-12 mb-1">زمن الفحص اللحظي</p>
-                        <h3 class="mb-0 fw-bold text-warning" id="statDuration">{{ $auditData['duration_ms'] }} <span class="fs-12 text-muted fw-normal">ms</span></h3>
-                    </div>
-                    <div class="avatar-sm shrink-0">
-                        <span class="avatar-title bg-warning-subtle text-warning rounded-circle fs-24">
-                            <i class="ri-speed-up-line"></i>
-                        </span>
-                    </div>
-                </div>
-                <p class="text-muted fs-11 mt-3 mb-0">استجابة فائقة السرعة بدون N+1</p>
-            </div>
-        </div>
+        <x-stat-card label="زمن الفحص اللحظي" value-id="statDuration" icon="speed-up-line" variant="warning" tint="warning">
+            <x-slot:value-slot>{{ $auditData['duration_ms'] }} <span class="fs-12 text-muted fw-normal">ms</span></x-slot:value-slot>
+            <x-slot:footer><p class="text-muted fs-11 mt-3 mb-0">استجابة فائقة السرعة بدون N+1</p></x-slot:footer>
+        </x-stat-card>
     </div>
 
     <div class="col-xl-3 col-md-6">
-        <div class="card card-animate border-0 shadow-sm overflow-hidden h-100" style="border-radius: 12px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 1) 100%);">
-            <div class="card-body">
-                <div class="d-flex align-items-center justify-content-between">
-                    <div>
-                        <p class="text-uppercase fw-semibold text-muted fs-12 mb-1">جاهزية المحاكاة</p>
-                        <h3 class="mb-0 fw-bold text-indigo">8 قطاعات</h3>
-                    </div>
-                    <div class="avatar-sm shrink-0">
-                        <span class="avatar-title bg-info-subtle text-info rounded-circle fs-24">
-                            <i class="ri-cpu-line"></i>
-                        </span>
-                    </div>
-                </div>
-                <p class="text-muted fs-11 mt-3 mb-0">WAC، POS، كود المدير، الضمان، الكهنة، الرواتب</p>
-            </div>
-        </div>
+        <x-stat-card label="جاهزية المحاكاة" value="8 قطاعات" icon="cpu-line" variant="info" value-class="text-indigo" tint="indigo">
+            <x-slot:footer><p class="text-muted fs-11 mt-3 mb-0">WAC، POS، كود المدير، الضمان، الكهنة، الرواتب</p></x-slot:footer>
+        </x-stat-card>
     </div>
 </div>
 
 <!-- شريط الإجراءات والتحكم بالمحاكاة -->
-<div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+<div class="card border-0 shadow-sm mb-4 ah-panel">
     <div class="card-body p-3">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div class="d-flex align-items-center gap-2">
@@ -132,7 +69,7 @@
 </div>
 
 <!-- منطقة نتائج المحاكاة التفاعلية (Interactive Simulation Terminal) -->
-<div class="card border-0 shadow-sm mb-4 d-none" id="simulationCard" style="border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2) !important;">
+<div class="card border-0 shadow-sm mb-4 d-none ah-panel ah-panel--success-outline" id="simulationCard">
     <div class="card-header bg-success-subtle d-flex align-items-center justify-content-between py-2 px-3">
         <h5 class="card-title mb-0 fs-14 fw-bold text-success d-flex align-items-center gap-2">
             <x-spinner class="text-success d-none" id="simSpinner" label="جاري تشغيل المحاكاة..." />
@@ -163,7 +100,7 @@
 </div>
 
 <!-- جدول فحوصات سلامة قاعدة البيانات والاتساق المحاسبي -->
-<div class="card border-0 shadow-sm" style="border-radius: 12px;">
+<div class="card border-0 shadow-sm ah-panel">
     <div class="card-header bg-transparent border-bottom py-3 d-flex align-items-center justify-content-between">
         <h5 class="card-title mb-0 fs-15 fw-bold d-flex align-items-center gap-2">
             <i class="ri-shield-keyhole-line text-primary fs-18"></i>

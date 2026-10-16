@@ -44,6 +44,8 @@
 <link href="{{ asset('assets/libs/sweetalert2/sweetalert2.min.css') }}" rel="stylesheet" type="text/css" />
 <!-- Design tokens (frontend F0): --ah-* variables used below and by components -->
 <link href="{{ asset('assets/css/tokens.css') }}" rel="stylesheet" type="text/css" />
+<!-- Component styles (frontend F3) -->
+<link href="{{ asset('assets/css/components.css') }}" rel="stylesheet" type="text/css" />
 
 <style>
     /* =======================================================

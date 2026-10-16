@@ -1,0 +1,21 @@
+/*
+ * Styles for Blade components in resources/views/components (frontend roadmap F3+).
+ * Built on tokens.css; replaces inline style="" attributes moved out of views.
+ */
+
+/* <x-stat-card>: soft diagonal tint, 12px corners (values copied from the diagnostics cards). */
+.ah-stat {
+    border-radius: 12px;
+}
+.ah-stat--success { background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(255, 255, 255, 1) 100%); }
+.ah-stat--primary { background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(255, 255, 255, 1) 100%); }
+.ah-stat--warning { background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(255, 255, 255, 1) 100%); }
+.ah-stat--indigo { background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(255, 255, 255, 1) 100%); }
+
+/* Rounded panel used next to stat cards. */
+.ah-panel {
+    border-radius: 12px;
+}
+.ah-panel--success-outline {
+    border: 1px solid rgba(16, 185, 129, 0.2) !important;
+}
