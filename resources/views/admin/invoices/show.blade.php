@@ -21,23 +21,17 @@
 
     <!-- Alert Messages -->
     @if(session('success') || session('status'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="ri-checkbox-circle-line me-1 align-middle"></i>
-            {{ session('success') ?? session('status') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        <x-alert variant="success" dismissible icon="checkbox-circle-line">{{ session('success') ?? session('status') }}</x-alert>
     @endif
 
     @if($errors->any())
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="ri-error-warning-line me-1 align-middle"></i>
+        <x-alert variant="danger" dismissible icon="error-warning-line">
             <ul class="mb-0">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
+        </x-alert>
     @endif
 
     <!-- Header Actions -->
@@ -154,9 +148,9 @@
                                             @endif
                                         </td>
                                         <td class="text-center fw-bold">{{ $item->quantity }}</td>
-                                        <td class="text-end font-monospace">{{ number_format($item->unit_price, 2) }} ج.م</td>
-                                        <td class="text-end font-monospace text-danger">{{ number_format($item->discount_amount ?? 0, 2) }} ج.م</td>
-                                        <td class="text-end fw-bold font-monospace text-primary">{{ number_format($item->total_price, 2) }} ج.م</td>
+                                        <td class="text-end font-monospace"><x-money :amount="$item->unit_price" /></td>
+                                        <td class="text-end font-monospace text-danger"><x-money :amount="$item->discount_amount ?? 0" /></td>
+                                        <td class="text-end fw-bold font-monospace text-primary"><x-money :amount="$item->total_price" /></td>
                                     </tr>
                                 @empty
                                     <tr>
@@ -212,7 +206,7 @@
                                             </span>
                                         </td>
                                         <td class="font-monospace text-muted">{{ $payment->transaction_reference ?? '-' }}</td>
-                                        <td class="text-end fw-bold font-monospace text-success">{{ number_format($payment->amount, 2) }} ج.م</td>
+                                        <td class="text-end fw-bold font-monospace text-success"><x-money :amount="$payment->amount" /></td>
                                     </tr>
                                 @empty
                                     <tr>

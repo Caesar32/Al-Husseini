@@ -135,7 +135,7 @@
 <div class="card border-0 shadow-sm mb-4 d-none" id="simulationCard" style="border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2) !important;">
     <div class="card-header bg-success-subtle d-flex align-items-center justify-content-between py-2 px-3">
         <h5 class="card-title mb-0 fs-14 fw-bold text-success d-flex align-items-center gap-2">
-            <span class="spinner-border spinner-border-sm text-success d-none" id="simSpinner" role="status"></span>
+            <x-spinner class="text-success d-none" id="simSpinner" label="جاري تشغيل المحاكاة..." />
             <i class="ri-terminal-box-line fs-16" id="simIcon"></i>
             <span>نتائج محاكاة العمليات التشغيلية (End-to-End Simulation Results)</span>
         </h5>

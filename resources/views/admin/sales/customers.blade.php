@@ -207,7 +207,7 @@
                                         </td>
                                     </tr>
                                 @empty
-                                    <tr><td colspan="8" class="text-center py-5 text-muted fs-13">لا يوجد عملاء مطابقين لبحثك.</td></tr>
+                                    <tr><td colspan="8" class="py-5 fs-13"><x-empty-state message="لا يوجد عملاء مطابقين لبحثك." /></td></tr>
                                 @endforelse
                             </tbody>
                         </table>
