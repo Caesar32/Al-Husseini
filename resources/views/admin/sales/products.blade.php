@@ -3,6 +3,13 @@
 @section('title', 'المنتجات والزيوت وخدمات الصيانة | مركز الحسيني لبطاريات وزيوت السيارات')
 
 @section('content')
+@php
+    $pageConfig = [
+        'storeUrl' => route('admin.products.store'),
+        'updateUrl' => route('admin.products.update', ['product' => '__ID__']),
+    ];
+@endphp
+<div data-page="sales.products" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'المخزون والورشة', 'title' => 'كتالوج المنتجات والزيوت والشحوم وخدمات الصيانة'])
 
     @if(session('status'))
@@ -126,7 +133,7 @@
                                     <button type="submit" class="btn btn-light border">بحث</button>
                                 </div>
                                 @can('products.create')
-                                    <button type="button" class="btn btn-sm btn-primary fw-bold" onclick="openProductModal(null)">
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold" data-action="products.new">
                                         <i class="ri-add-line me-1"></i> إضافة صنف / خدمة جديدة
                                     </button>
                                 @endcan
@@ -196,7 +203,7 @@
                                         <td class="text-center">
                                             <div class="d-inline-flex gap-1">
                                                 @can('products.edit')
-                                                    <button type="button" class="btn btn-sm btn-soft-secondary js-edit-product"
+                                                    <button type="button" class="btn btn-sm btn-soft-secondary js-edit-product" data-action="products.edit"
                                                             data-product="{{ json_encode($product->only(['id', 'category_id', 'sku', 'barcode', 'name', 'brand', 'capacity_ah', 'voltage', 'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price', 'reorder_threshold', 'is_battery', 'is_active'])) }}">
                                                         <i class="ri-edit-line"></i> تعديل
                                                     </button>
@@ -338,88 +345,9 @@
         </div>
     </div>
     @endcanany
+</div>
 @endsection
 
 @section('script')
-<script>
-'use strict';
-
-(function () {
-    const form = document.getElementById('productForm');
-    if (!form) return;
-
-    const storeUrl = @json(route('admin.products.store'));
-    const updateUrlTemplate = @json(route('admin.products.update', ['product' => '__ID__']));
-    const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-    const modalEl = document.getElementById('productModal');
-    const errorsEl = document.getElementById('productFormErrors');
-
-    window.openProductModal = function (product) {
-        form.reset();
-        errorsEl.classList.add('d-none');
-        errorsEl.textContent = '';
-        document.getElementById('prodFormId').value = product ? product.id : '';
-        document.getElementById('productModalTitle').textContent = product ? 'تعديل بيانات الصنف / الخدمة' : 'إضافة صنف أو خدمة جديدة';
-        document.getElementById('prodCostGroup').classList.toggle('d-none', !!product);
-        document.getElementById('prodActiveGroup').classList.toggle('d-none', !product);
-
-        if (product) {
-            Object.keys(product).forEach(function (key) {
-                const field = form.elements[key];
-                if (!field) return;
-                let value = product[key];
-                if (typeof value === 'boolean') value = value ? '1' : '0';
-                field.value = value === null || value === undefined ? '' : value;
-            });
-        }
-
-        bootstrap.Modal.getOrCreateInstance(modalEl).show();
-    };
-
-    document.querySelectorAll('.js-edit-product').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-            window.openProductModal(JSON.parse(btn.dataset.product));
-        });
-    });
-
-    form.addEventListener('submit', async function (e) {
-        e.preventDefault();
-        const id = document.getElementById('prodFormId').value;
-        const payload = {};
-        new FormData(form).forEach(function (value, key) {
-            payload[key] = value === '' ? null : value;
-        });
-        if (id) {
-            delete payload.cost_price;
-        } else {
-            delete payload.is_active;
-        }
-
-        const submitBtn = document.getElementById('productFormSubmit');
-        submitBtn.disabled = true;
-        try {
-            const res = await fetch(id ? updateUrlTemplate.replace('__ID__', encodeURIComponent(id)) : storeUrl, {
-                method: id ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
-                body: JSON.stringify(payload),
-            });
-            const data = await res.json().catch(function () { return {}; });
-
-            if (!res.ok) {
-                const messages = data.errors ? Object.values(data.errors).flat() : [data.message || 'تعذر حفظ الصنف.'];
-                errorsEl.textContent = messages.join(' | ');
-                errorsEl.classList.remove('d-none');
-                return;
-            }
-
-            window.location.reload();
-        } catch (err) {
-            errorsEl.textContent = 'تعذر الاتصال بالخادم. حاول مرة أخرى.';
-            errorsEl.classList.remove('d-none');
-        } finally {
-            submitBtn.disabled = false;
-        }
-    });
-})();
-</script>
+<script src="{{ asset('assets/js/admin/sales/products.js') }}"></script>
 @endsection
