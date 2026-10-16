@@ -7,11 +7,12 @@ Read this first. Then read ONLY the `docs/ai/` files relevant to the task (index
 
 ## Stack
 - PHP ^8.2 (8.2.12), Laravel 12.69, spatie/laravel-permission ^6.25, Pest 3.8. Dev DB MySQL, tests SQLite `:memory:` (FK + CHECK enforcement asserted in `tests/TestCase.php`; never disable it).
-- UI: Blade + static Bootstrap 5 RTL admin theme in `public/assets` (Arabic, EGP). Vite/Tailwind exists but is unused. No SPA, no API, no queued jobs (cache/session/queue drivers = database).
+- UI: Blade + static Bootstrap 5 RTL admin theme in `public/assets` (Arabic, EGP). Vite/Tailwind exists but is unused. No web SPA, no queued jobs (cache/session/queue drivers = database).
+- Mobile: Flutter owner app lives at the repo root (`lib/`, `android/`, `ios/`, `test/`); it reads the owner-only API in `routes/api.php` (`App\Http\Controllers\Api\V1\Owner\*`, read-heavy monitoring) at production `https://alhusseini.shop/api` (`lib/core/constants/api_constants.dart`).
 - Domain: car batteries/oils/services, workshop, multi-branch ready (one branch today: MAIN).
 
 ## Modules (details in docs/ai)
-Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, Warranty & Claims, Scrap batteries, HR (employees, attendance, leaves, deductions, payroll), Admin core (auth, users, roles, settings, dashboard, search, diagnostics).
+Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, Warranty & Claims, Scrap batteries, HR (employees, attendance, leaves, deductions, payroll; employee `national_id` optional, department/title are free-text inputs resolved/created by `EmployeeService`), Admin core (auth, users, roles, settings, dashboard, search, diagnostics).
 
 ## Architecture and business rules
 - Flow: route (`can:` middleware) -> FormRequest/inline validation -> thin controller -> service (interface bound in `*ServiceProvider`) -> Eloquent. No Policies/Events/Jobs/Actions. Money/stock writes: `DB::transaction` + `lockForUpdate`.
@@ -29,14 +30,16 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Env: `MANAGER_OVERRIDE_CODE_HASH` (required for overrides), `SEED_DEFAULT_PASSWORD`, `LOGIN_ACCOUNT_SWITCHER`, `LOGIN_SWITCHER_PASSWORD` (non-production only), `BRANCH_ISOLATION`, `FINANCE_EPSILON`.
 
 ## Commands
-- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 363 passed, 0 failed, 0 skipped (before the uncommitted POS payment work below).
-- Dev: `php artisan migrate`, `php artisan db:seed`, `php artisan serve`; `npm run build` only for the unused Vite pipeline.
+- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 411 passed, 0 failed, 0 skipped (2026-10-16, `4de75b5`, refactor Phase 0 baseline `N0`).
+- Dev: `php artisan migrate`, `php artisan db:seed` (includes `ProductCategoriesSeeder`), `php artisan serve`; `npm run build` only for the unused Vite pipeline.
 - Diagnostics: `php artisan system:diagnose [--audit|--simulate|--keep]` (`--keep` writes real data). `php artisan suppliers:rebuild-ledger-balances` is dry-run by default (`--apply` writes a JSON backup first; do not run on real data without owner approval).
 - Style: Pint is configured but the codebase was never Pint-formatted; do not mass-reformat.
 
 ## Current remediation status
-- Branch `remediation/2026-10` (from `main` 45b9ccc, tag `baseline-finance-2026-09-30`), tracks `origin/remediation/2026-10`; ~48 commits. Phases 0, 1, 3, 4, 5, 6+7, 8, 9 (branch isolation, derivable settings) are DONE and merged; security items SEC-01..14 resolved; navigation-engine fix and sidebar/dashboard authorization done; login account switcher restored.
-- UNCOMMITTED (working tree): POS payment section: modes full/partial/remaining, live remaining, server validation (2-decimal, exact piaster over/under-payment checks, settlement `decimal:0,2`), `tests/Feature/Sales/PosPaymentValidationTest.php`. Browser-verified; 212 sales/admin tests passed; full suite not yet rerun; not committed.
+- Work happens on `main`. `remediation/2026-10` (from 45b9ccc, tag `baseline-finance-2026-09-30`) was merged via PR #1 (`5d78433`). Phases 0, 1, 3, 4, 5, 6+7, 8, 9 (branch isolation, derivable settings) are DONE; security items SEC-01..14 resolved; navigation-engine fix and sidebar/dashboard authorization done; login account switcher restored.
+- POS payment section (modes full/partial/remaining, live remaining, server validation: 2-decimal, exact piaster over/under-payment checks, settlement `decimal:0,2`, `tests/Feature/Sales/PosPaymentValidationTest.php`) is committed (`da2603a`, in the merge).
+- Post-merge commits on `main`: CI cache-clear tweak; Flutter production API config + `ProductCategoriesSeeder`; HR `national_id` optional + department/title text inputs; client-side supplier/product live search on purchase create.
+- Known issue: purchase create live search (`resources/views/admin/purchases/create.blade.php`) embeds supplier/product names via `json_encode` without `JSON_HEX_*` and renders them with `innerHTML` (stored-XSS risk); no test covers optional `national_id`.
 - Pending on dev MySQL (owner action): `php artisan migrate` (2026_10_01_* migrations).
 - Remaining work: Phase 10 cleanup (stock movement journal, DashboardController refactor, redundant indexes, `Invoice::scrapBattery` hasOne vs many, hard-coded `/admin/...` URLs in JS).
 
