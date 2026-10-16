@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 class StaffAttendanceSummary {
   final int totalEmployees;
   final int presentCount;
@@ -6,7 +8,7 @@ class StaffAttendanceSummary {
   final String attendanceRate;
   final List<StaffMemberAttendance> staffList;
 
-  StaffAttendanceSummary({
+  const StaffAttendanceSummary({
     required this.totalEmployees,
     required this.presentCount,
     required this.lateCount,
@@ -16,16 +18,21 @@ class StaffAttendanceSummary {
   });
 
   factory StaffAttendanceSummary.fromJson(Map<String, dynamic> json) {
-    final summary = json['summary'] ?? {};
-    final list = json['data'] as List? ?? [];
+    final summary = readMap(json['summary']);
 
     return StaffAttendanceSummary(
-      totalEmployees: summary['total_employees'] ?? 0,
-      presentCount: summary['present_count'] ?? 0,
-      lateCount: summary['late_count'] ?? 0,
-      absentCount: summary['absent_count'] ?? 0,
-      attendanceRate: summary['attendance_rate'] ?? '0%',
-      staffList: list.map((e) => StaffMemberAttendance.fromJson(e)).toList(),
+      totalEmployees: readInt(summary['total_employees']),
+      presentCount: readInt(summary['present_count']),
+      lateCount: readInt(summary['late_count']),
+      absentCount: readInt(summary['absent_count']),
+      attendanceRate: readString(
+        summary['attendance_rate'],
+        fallback: '0%',
+      ),
+      staffList: readModelList(
+        json['data'],
+        StaffMemberAttendance.fromJson,
+      ),
     );
   }
 }
@@ -42,7 +49,7 @@ class StaffMemberAttendance {
   final String? checkOutTime;
   final int lateMinutes;
 
-  StaffMemberAttendance({
+  const StaffMemberAttendance({
     required this.employeeId,
     required this.employeeCode,
     required this.name,
@@ -57,16 +64,16 @@ class StaffMemberAttendance {
 
   factory StaffMemberAttendance.fromJson(Map<String, dynamic> json) {
     return StaffMemberAttendance(
-      employeeId: json['employee_id'] is int ? json['employee_id'] : int.parse(json['employee_id'].toString()),
-      employeeCode: json['employee_code'] ?? '',
-      name: json['name'] ?? '',
-      role: json['role'] ?? 'فني / موظف',
-      phone: json['phone'],
-      status: json['status'] ?? 'absent',
-      statusLabel: json['status_label'] ?? 'غائب',
-      checkInTime: json['check_in_time'],
-      checkOutTime: json['check_out_time'],
-      lateMinutes: json['late_minutes'] ?? 0,
+      employeeId: readInt(json['employee_id']),
+      employeeCode: readString(json['employee_code']),
+      name: readString(json['name']),
+      role: readString(json['role'], fallback: 'فني / موظف'),
+      phone: readStringOrNull(json['phone']),
+      status: readString(json['status'], fallback: 'absent'),
+      statusLabel: readString(json['status_label'], fallback: 'غائب'),
+      checkInTime: readStringOrNull(json['check_in_time']),
+      checkOutTime: readStringOrNull(json['check_out_time']),
+      lateMinutes: readInt(json['late_minutes']),
     );
   }
 }

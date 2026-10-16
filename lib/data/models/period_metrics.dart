@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 class PeriodMetrics {
   final String period;
   final String periodLabel;
@@ -5,7 +7,7 @@ class PeriodMetrics {
   final int totalSalesCount;
   final MoneyValue creditCollected;
 
-  PeriodMetrics({
+  const PeriodMetrics({
     required this.period,
     required this.periodLabel,
     required this.revenue,
@@ -15,11 +17,13 @@ class PeriodMetrics {
 
   factory PeriodMetrics.fromJson(Map<String, dynamic> json) {
     return PeriodMetrics(
-      period: json['period'] ?? 'today',
-      periodLabel: json['period_label'] ?? 'اليوم',
-      revenue: MoneyValue.fromJson(json['revenue'] ?? {}),
-      totalSalesCount: json['total_sales_count'] ?? 0,
-      creditCollected: MoneyValue.fromJson(json['credit_collected'] ?? {}),
+      period: readString(json['period'], fallback: 'today'),
+      periodLabel: readString(json['period_label'], fallback: 'اليوم'),
+      revenue: MoneyValue.fromJson(readMap(json['revenue'])),
+      totalSalesCount: readInt(json['total_sales_count']),
+      creditCollected: MoneyValue.fromJson(
+        readMap(json['credit_collected']),
+      ),
     );
   }
 }
@@ -29,7 +33,7 @@ class MoneyValue {
   final String compact;
   final String exact;
 
-  MoneyValue({
+  const MoneyValue({
     required this.raw,
     required this.compact,
     required this.exact,
@@ -37,9 +41,9 @@ class MoneyValue {
 
   factory MoneyValue.fromJson(Map<String, dynamic> json) {
     return MoneyValue(
-      raw: (json['raw'] ?? 0.0).toDouble(),
-      compact: json['compact'] ?? '0 ج.م',
-      exact: json['exact'] ?? '0.00 ج.م',
+      raw: readDouble(json['raw']),
+      compact: readString(json['compact'], fallback: '0 ج.م'),
+      exact: readString(json['exact'], fallback: '0.00 ج.م'),
     );
   }
 }

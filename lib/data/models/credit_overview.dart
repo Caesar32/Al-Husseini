@@ -1,3 +1,4 @@
+import 'json_read.dart';
 import 'period_metrics.dart';
 
 class CreditOverviewData {
@@ -6,7 +7,7 @@ class CreditOverviewData {
   final int debtorsCount;
   final List<DebtorItem> topDebtors;
 
-  CreditOverviewData({
+  const CreditOverviewData({
     required this.totalOutstanding,
     required this.collectedToday,
     required this.debtorsCount,
@@ -14,13 +15,18 @@ class CreditOverviewData {
   });
 
   factory CreditOverviewData.fromJson(Map<String, dynamic> json) {
-    final rawList = json['top_debtors'] as List? ?? [];
-
     return CreditOverviewData(
-      totalOutstanding: MoneyValue.fromJson(json['total_outstanding'] ?? {}),
-      collectedToday: MoneyValue.fromJson(json['collected_today'] ?? {}),
-      debtorsCount: json['debtors_count'] ?? 0,
-      topDebtors: rawList.map((e) => DebtorItem.fromJson(e)).toList(),
+      totalOutstanding: MoneyValue.fromJson(
+        readMap(json['total_outstanding']),
+      ),
+      collectedToday: MoneyValue.fromJson(
+        readMap(json['collected_today']),
+      ),
+      debtorsCount: readInt(json['debtors_count']),
+      topDebtors: readModelList(
+        json['top_debtors'],
+        DebtorItem.fromJson,
+      ),
     );
   }
 }
@@ -33,8 +39,9 @@ class DebtorItem {
   final String formattedCreditBalance;
   final double? creditLimit;
   final String? formattedCreditLimit;
+  final String? utilizationRate;
 
-  DebtorItem({
+  const DebtorItem({
     required this.id,
     required this.name,
     required this.phone,
@@ -42,20 +49,27 @@ class DebtorItem {
     required this.formattedCreditBalance,
     this.creditLimit,
     this.formattedCreditLimit,
+    this.utilizationRate,
   });
 
   factory DebtorItem.fromJson(Map<String, dynamic> json) {
-    final balance = json['current_credit_balance'] as Map<String, dynamic>? ?? {};
-    final limit = json['credit_limit'] as Map<String, dynamic>?;
+    final balance = readMap(json['current_credit_balance']);
+    final limit = readMap(json['credit_limit']);
+    final limitRaw = readDouble(limit['raw']);
+    final hasCreditLimit = limit.isNotEmpty && limitRaw > 0;
 
     return DebtorItem(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] ?? '',
-      phone: json['phone'] ?? '',
-      currentCreditBalance: (balance['raw'] ?? 0.0).toDouble(),
-      formattedCreditBalance: balance['exact'] ?? balance['compact'] ?? '${balance['raw'] ?? 0} ج.م',
-      creditLimit: limit != null ? (limit['raw'] ?? 0.0).toDouble() : null,
-      formattedCreditLimit: limit?['formatted'],
+      id: readInt(json['id']),
+      name: readString(json['name']),
+      phone: readString(json['phone']),
+      currentCreditBalance: readDouble(balance['raw']),
+      formattedCreditBalance: readStringOrNull(balance['exact']) ??
+          readStringOrNull(balance['compact']) ??
+          '${readString(balance['raw'], fallback: '0')} ج.م',
+      creditLimit: hasCreditLimit ? limitRaw : null,
+      formattedCreditLimit:
+          hasCreditLimit ? readStringOrNull(limit['formatted']) : null,
+      utilizationRate: readStringOrNull(json['utilization_rate']),
     );
   }
 }

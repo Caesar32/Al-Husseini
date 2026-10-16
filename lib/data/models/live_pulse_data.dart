@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 class LivePulseData {
   final SafeCashData safeCashNow;
   final SalesTodayData salesToday;
@@ -5,7 +7,7 @@ class LivePulseData {
   final WorkshopAttendanceData workshopAttendance;
   final CriticalAlertsData criticalAlerts;
 
-  LivePulseData({
+  const LivePulseData({
     required this.safeCashNow,
     required this.salesToday,
     required this.activeShift,
@@ -15,11 +17,21 @@ class LivePulseData {
 
   factory LivePulseData.fromJson(Map<String, dynamic> json) {
     return LivePulseData(
-      safeCashNow: SafeCashData.fromJson(json['safe_cash_now'] ?? {}),
-      salesToday: SalesTodayData.fromJson(json['sales_today'] ?? {}),
-      activeShift: ActiveShiftData.fromJson(json['active_shift'] ?? {}),
-      workshopAttendance: WorkshopAttendanceData.fromJson(json['workshop_attendance'] ?? {}),
-      criticalAlerts: CriticalAlertsData.fromJson(json['critical_alerts'] ?? {}),
+      safeCashNow: SafeCashData.fromJson(
+        readMap(json['safe_cash_now']),
+      ),
+      salesToday: SalesTodayData.fromJson(
+        readMap(json['sales_today']),
+      ),
+      activeShift: ActiveShiftData.fromJson(
+        readMap(json['active_shift']),
+      ),
+      workshopAttendance: WorkshopAttendanceData.fromJson(
+        readMap(json['workshop_attendance']),
+      ),
+      criticalAlerts: CriticalAlertsData.fromJson(
+        readMap(json['critical_alerts']),
+      ),
     );
   }
 }
@@ -30,7 +42,7 @@ class SafeCashData {
   final String exact;
   final String label;
 
-  SafeCashData({
+  const SafeCashData({
     required this.raw,
     required this.formatted,
     required this.exact,
@@ -39,10 +51,10 @@ class SafeCashData {
 
   factory SafeCashData.fromJson(Map<String, dynamic> json) {
     return SafeCashData(
-      raw: (json['raw'] ?? 0.0).toDouble(),
-      formatted: json['formatted'] ?? '0 ج.م',
-      exact: json['exact'] ?? '0.00 ج.م',
-      label: json['label'] ?? 'الكاش الفعلي بالخزينة',
+      raw: readDouble(json['raw']),
+      formatted: readString(json['formatted'], fallback: '0 ج.م'),
+      exact: readString(json['exact'], fallback: '0.00 ج.م'),
+      label: readString(json['label'], fallback: 'الكاش الفعلي بالخزينة'),
     );
   }
 }
@@ -54,7 +66,7 @@ class SalesTodayData {
   final int invoicesCount;
   final String comparedToYesterday;
 
-  SalesTodayData({
+  const SalesTodayData({
     required this.raw,
     required this.formatted,
     required this.exact,
@@ -64,11 +76,14 @@ class SalesTodayData {
 
   factory SalesTodayData.fromJson(Map<String, dynamic> json) {
     return SalesTodayData(
-      raw: (json['raw'] ?? 0.0).toDouble(),
-      formatted: json['formatted'] ?? '0 ج.م',
-      exact: json['exact'] ?? '0.00 ج.م',
-      invoicesCount: json['invoices_count'] ?? 0,
-      comparedToYesterday: json['compared_to_yesterday'] ?? '+0.0%',
+      raw: readDouble(json['raw']),
+      formatted: readString(json['formatted'], fallback: '0 ج.م'),
+      exact: readString(json['exact'], fallback: '0.00 ج.م'),
+      invoicesCount: readInt(json['invoices_count']),
+      comparedToYesterday: readString(
+        json['compared_to_yesterday'],
+        fallback: '+0.0%',
+      ),
     );
   }
 }
@@ -79,7 +94,7 @@ class ActiveShiftData {
   final String openedAt;
   final String durationHours;
 
-  ActiveShiftData({
+  const ActiveShiftData({
     required this.isOpen,
     required this.cashierName,
     required this.openedAt,
@@ -88,10 +103,10 @@ class ActiveShiftData {
 
   factory ActiveShiftData.fromJson(Map<String, dynamic> json) {
     return ActiveShiftData(
-      isOpen: json['is_open'] ?? false,
-      cashierName: json['cashier_name'] ?? 'لا توجد وردية',
-      openedAt: json['opened_at'] ?? '--:--',
-      durationHours: json['duration_hours'] ?? '--',
+      isOpen: readBool(json['is_open']),
+      cashierName: readString(json['cashier_name'], fallback: 'لا توجد وردية'),
+      openedAt: readString(json['opened_at'], fallback: '--:--'),
+      durationHours: readString(json['duration_hours'], fallback: '--'),
     );
   }
 }
@@ -101,7 +116,7 @@ class WorkshopAttendanceData {
   final int totalEmployees;
   final String attendanceRate;
 
-  WorkshopAttendanceData({
+  const WorkshopAttendanceData({
     required this.presentCount,
     required this.totalEmployees,
     required this.attendanceRate,
@@ -109,9 +124,9 @@ class WorkshopAttendanceData {
 
   factory WorkshopAttendanceData.fromJson(Map<String, dynamic> json) {
     return WorkshopAttendanceData(
-      presentCount: json['present_count'] ?? 0,
-      totalEmployees: json['total_employees'] ?? 0,
-      attendanceRate: json['attendance_rate'] ?? '0%',
+      presentCount: readInt(json['present_count']),
+      totalEmployees: readInt(json['total_employees']),
+      attendanceRate: readString(json['attendance_rate'], fallback: '0%'),
     );
   }
 }
@@ -121,7 +136,7 @@ class CriticalAlertsData {
   final int returnsTodayCount;
   final int unsettledCreditCount;
 
-  CriticalAlertsData({
+  const CriticalAlertsData({
     required this.lowStockCount,
     required this.returnsTodayCount,
     required this.unsettledCreditCount,
@@ -129,9 +144,9 @@ class CriticalAlertsData {
 
   factory CriticalAlertsData.fromJson(Map<String, dynamic> json) {
     return CriticalAlertsData(
-      lowStockCount: json['low_stock_count'] ?? 0,
-      returnsTodayCount: json['returns_today_count'] ?? 0,
-      unsettledCreditCount: json['unsettled_credit_count'] ?? 0,
+      lowStockCount: readInt(json['low_stock_count']),
+      returnsTodayCount: readInt(json['returns_today_count']),
+      unsettledCreditCount: readInt(json['unsettled_credit_count']),
     );
   }
 }

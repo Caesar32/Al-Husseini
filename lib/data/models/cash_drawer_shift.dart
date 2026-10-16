@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 class CashDrawerShift {
   final String cashierName;
   final String shiftStatus;
@@ -13,7 +15,7 @@ class CashDrawerShift {
   final String auditNotes;
   final Map<String, String> formatted;
 
-  CashDrawerShift({
+  const CashDrawerShift({
     required this.cashierName,
     required this.shiftStatus,
     this.openedAt,
@@ -30,23 +32,26 @@ class CashDrawerShift {
   });
 
   factory CashDrawerShift.fromJson(Map<String, dynamic> json) {
-    final rawFormatted = json['formatted'] as Map<String, dynamic>? ?? {};
-    final formattedMap = rawFormatted.map((k, v) => MapEntry(k, v.toString()));
+    final formattedMap = readMap(json['formatted']).map(
+      (key, value) => MapEntry(key, readString(value, fallback: 'null')),
+    );
 
     return CashDrawerShift(
-      cashierName: json['cashier_name'] ?? 'كاشير المحل',
-      shiftStatus: json['shift_status'] ?? 'open',
-      openedAt: json['opened_at'],
-      duration: json['duration'],
-      openingBalance: (json['opening_balance'] ?? 0.0).toDouble(),
-      cashSales: (json['cash_sales'] ?? 0.0).toDouble(),
-      cardSales: (json['card_sales'] ?? 0.0).toDouble(),
-      bankTransferSales: (json['bank_transfer_sales'] ?? 0.0).toDouble(),
-      creditCollectionsCash: (json['credit_collections_cash'] ?? 0.0).toDouble(),
-      expensesPaid: (json['expenses_paid'] ?? 0.0).toDouble(),
-      expectedDrawerCash: (json['expected_drawer_cash'] ?? 0.0).toDouble(),
-      auditNotes: json['audit_notes'] ?? '',
+      cashierName: readString(json['cashier_name'], fallback: 'كاشير المحل'),
+      shiftStatus: readString(json['shift_status'], fallback: 'open'),
+      openedAt: readStringOrNull(json['opened_at']),
+      duration: readStringOrNull(json['duration']),
+      openingBalance: readDouble(json['opening_balance']),
+      cashSales: readDouble(json['cash_sales']),
+      cardSales: readDouble(json['card_sales']),
+      bankTransferSales: readDouble(json['bank_transfer_sales']),
+      creditCollectionsCash: readDouble(json['credit_collections_cash']),
+      expensesPaid: readDouble(json['expenses_paid']),
+      expectedDrawerCash: readDouble(json['expected_drawer_cash']),
+      auditNotes: readString(json['audit_notes']),
       formatted: formattedMap,
     );
   }
+
+  bool get hasActiveShift => shiftStatus != 'no_active_shift';
 }

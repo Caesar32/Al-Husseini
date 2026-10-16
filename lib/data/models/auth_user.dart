@@ -1,3 +1,5 @@
+import 'json_read.dart';
+
 class AuthUser {
   final int id;
   final String name;
@@ -7,7 +9,7 @@ class AuthUser {
   final String? avatarUrl;
   final BranchInfo? branch;
 
-  AuthUser({
+  const AuthUser({
     required this.id,
     required this.name,
     required this.email,
@@ -18,14 +20,16 @@ class AuthUser {
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> json) {
+    final branchJson = readMap(json['branch']);
+
     return AuthUser(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      phone: json['phone'] ?? '',
-      role: json['role'] ?? 'owner',
-      avatarUrl: json['avatar_url'],
-      branch: json['branch'] != null ? BranchInfo.fromJson(json['branch']) : null,
+      id: readInt(json['id']),
+      name: readString(json['name']),
+      email: readString(json['email']),
+      phone: readString(json['phone']),
+      role: readString(json['role'], fallback: 'owner'),
+      avatarUrl: readStringOrNull(json['avatar_url']),
+      branch: branchJson.isEmpty ? null : BranchInfo.fromJson(branchJson),
     );
   }
 
@@ -47,7 +51,7 @@ class BranchInfo {
   final String name;
   final String? code;
 
-  BranchInfo({
+  const BranchInfo({
     required this.id,
     required this.name,
     this.code,
@@ -55,9 +59,9 @@ class BranchInfo {
 
   factory BranchInfo.fromJson(Map<String, dynamic> json) {
     return BranchInfo(
-      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
-      name: json['name'] ?? '',
-      code: json['code'],
+      id: readInt(json['id']),
+      name: readString(json['name']),
+      code: readStringOrNull(json['code']),
     );
   }
 
