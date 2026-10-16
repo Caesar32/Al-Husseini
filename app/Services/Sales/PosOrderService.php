@@ -2,6 +2,7 @@
 
 namespace App\Services\Sales;
 
+use App\Contracts\Catalog\StockLedgerInterface;
 use App\Contracts\Sales\PosOrderServiceInterface;
 use App\Jobs\DispatchOwnerPushNotification;
 use App\Models\CreditLedgerEntry;
@@ -15,6 +16,7 @@ use App\Models\ScrapPricingTier;
 use App\Models\TechnicianCommission;
 use App\Models\Warranty;
 use App\Enums\InvoiceStatus;
+use App\Enums\StockMovementType;
 use App\Services\Finance\ManagerOverrideService;
 use App\Services\Support\DocumentNumberService;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -25,6 +27,10 @@ use Illuminate\Validation\ValidationException;
 class PosOrderService implements PosOrderServiceInterface
 {
     private const EPSILON = 0.01;
+
+    public function __construct(
+        private StockLedgerInterface $stock,
+    ) {}
 
     private function epsilon(): float
     {
@@ -352,12 +358,12 @@ class PosOrderService implements PosOrderServiceInterface
 
                 // Decrement inventory safely
                 $product = $products->get($pItem['product_id']);
-                $stockBeforeDecrement = (int) $product->current_stock;
-                $product->decrement('current_stock', $pItem['quantity']);
+                $stockAfter = $this->stock->move($product->id, -$pItem['quantity'], StockMovementType::Sale, $invoice, $cashierUserId);
+                $stockBeforeDecrement = $stockAfter + $pItem['quantity'];
 
                 // Owner alert: fires only on the 1 -> 0 edge, not on every sale of an
                 // already-depleted item.
-                if ($stockBeforeDecrement > 0 && $stockBeforeDecrement - $pItem['quantity'] <= 0) {
+                if ($stockBeforeDecrement > 0 && $stockAfter <= 0) {
                     DispatchOwnerPushNotification::dispatch(
                         'نفاد مخزون صنف حيوي ⚠️',
                         "نفد مخزون الصنف ({$product->name}) بالكامل بعد عملية بيع.",
@@ -473,7 +479,7 @@ class PosOrderService implements PosOrderServiceInterface
                 }
 
                 $product = Product::where('id', $invItem->product_id)->lockForUpdate()->firstOrFail();
-                $product->increment('current_stock', $qty);
+                $this->stock->move($product->id, $qty, StockMovementType::SaleReturn, $invoice, $cashierUserId);
 
                 $invItem->increment('returned_quantity', $qty);
 

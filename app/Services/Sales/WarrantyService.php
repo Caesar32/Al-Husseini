@@ -2,7 +2,9 @@
 
 namespace App\Services\Sales;
 
+use App\Contracts\Catalog\StockLedgerInterface;
 use App\Contracts\Sales\WarrantyServiceInterface;
+use App\Enums\StockMovementType;
 use App\Jobs\DispatchOwnerPushNotification;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -23,6 +25,10 @@ class WarrantyService implements WarrantyServiceInterface
         'settled_credit_note' => ['pending', 'sent_to_supplier'],
         'rejected'            => ['pending', 'sent_to_supplier'],
     ];
+
+    public function __construct(
+        private StockLedgerInterface $stock,
+    ) {}
 
     public function getPaginatedClaims(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
@@ -166,17 +172,8 @@ class WarrantyService implements WarrantyServiceInterface
                     throw new \DomainException("رصيد المخزون للبطارية البديلة ({$replacementProduct->name}) غير كافٍ.");
                 }
 
-                // Decrement 1 piece for instant customer replacement
+                // The 1-piece decrement is journaled against the claim, after it is created below.
                 $replacementStockBefore = (int) $replacementProduct->current_stock;
-                $replacementProduct->decrement('current_stock', 1);
-
-                if ($replacementStockBefore > 0 && $replacementStockBefore - 1 <= 0) {
-                    DispatchOwnerPushNotification::dispatch(
-                        'نفاد مخزون صنف حيوي ⚠️',
-                        "نفد مخزون الصنف ({$replacementProduct->name}) بعد صرفه كبطارية بديلة ضمن الضمان.",
-                        ['type' => 'critical_stock_zero', 'product_id' => $replacementProduct->id, 'sku' => $replacementProduct->sku]
-                    );
-                }
 
                 // Mark defective warranty as claimed
                 $warranty->update(['status' => 'claimed']);
@@ -220,6 +217,19 @@ class WarrantyService implements WarrantyServiceInterface
                 'received_at'                => now(),
             ]);
 
+            // Decrement 1 piece for instant customer replacement
+            if ($decision === 'replaced') {
+                $replacementStockAfter = $this->stock->move($replacementProduct->id, -1, StockMovementType::WarrantyReplacement, $claim, $receivedByUserId);
+
+                if ($replacementStockBefore > 0 && $replacementStockAfter <= 0) {
+                    DispatchOwnerPushNotification::dispatch(
+                        'نفاد مخزون صنف حيوي ⚠️',
+                        "نفد مخزون الصنف ({$replacementProduct->name}) بعد صرفه كبطارية بديلة ضمن الضمان.",
+                        ['type' => 'critical_stock_zero', 'product_id' => $replacementProduct->id, 'sku' => $replacementProduct->sku]
+                    );
+                }
+            }
+
             return $claim->fresh([
                 'warranty.customer',
                 'replacementProduct',
@@ -252,7 +262,7 @@ class WarrantyService implements WarrantyServiceInterface
                 }
 
                 $product = Product::where('id', $claim->replacement_product_id)->lockForUpdate()->firstOrFail();
-                $product->increment('current_stock', 1);
+                $this->stock->move($product->id, 1, StockMovementType::SupplierReplacement, $claim, $userId);
             }
 
             // 2. If supplier settled via credit note (إشعار خصم دائن في كشف الحساب)

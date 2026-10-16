@@ -114,3 +114,33 @@ test('a repeated idempotency key returns the same invoice without a second stock
         ->and(Invoice::where('idempotency_key', 'pos-retry-key-1')->count())->toBe(1)
         ->and($this->oil->fresh()->current_stock)->toBe(0);
 });
+
+test('sale and return lines are journaled in stock_movements and add up to the stock change (Phase 2)', function () {
+    \Illuminate\Support\Facades\Queue::fake();
+    $initial = $this->battery->fresh()->current_stock;
+
+    $invoiceId = $this->actingAs($this->cashier)
+        ->postJson(route('admin.pos.store'), ($this->base)([
+            ['product_id' => $this->battery->id, 'quantity' => 1, 'unit_price' => 3000, 'battery_serial' => 'SN-JRN-A'],
+            ['product_id' => $this->battery->id, 'quantity' => 1, 'unit_price' => 3000, 'battery_serial' => 'SN-JRN-B'],
+        ], 6000))
+        ->assertStatus(201)
+        ->json('invoice_id');
+
+    // Two lines of the same product: the 1 -> 0 alert fires once, on the second line.
+    \Illuminate\Support\Facades\Queue::assertPushed(
+        \App\Jobs\DispatchOwnerPushNotification::class,
+        fn ($job) => ($job->data['type'] ?? null) === 'critical_stock_zero' && $job->data['product_id'] === $this->battery->id
+    );
+    \Illuminate\Support\Facades\Queue::assertPushedTimes(\App\Jobs\DispatchOwnerPushNotification::class, 1);
+
+    app(\App\Contracts\Sales\PosOrderServiceInterface::class)
+        ->processSalesReturn($invoiceId, [['invoice_item_id' => Invoice::findOrFail($invoiceId)->items()->value('id'), 'quantity' => 1]], 'مرتجع', $this->cashier->id);
+
+    $moves = \App\Models\StockMovement::where('product_id', $this->battery->id)->orderBy('id')->get();
+    expect($moves->pluck('type')->map->value->all())->toBe(['sale', 'sale', 'sale_return'])
+        ->and($moves->pluck('quantity_delta')->all())->toBe([-1, -1, 1])
+        ->and($moves->pluck('stock_after')->all())->toBe([1, 0, 1])
+        ->and($moves->every(fn ($m) => $m->source_type === (new Invoice)->getMorphClass() && $m->source_id === $invoiceId))->toBeTrue()
+        ->and($moves->sum('quantity_delta'))->toBe($this->battery->fresh()->current_stock - $initial);
+});

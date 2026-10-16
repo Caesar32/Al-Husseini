@@ -228,3 +228,27 @@ test('warranty serial verify escapes results and passes the serial through a dat
         ->toContain('data-serial="${esc(serial)}"')
         ->toContain('${esc(data.message)}');
 });
+
+test('instant replacement and supplier replacement are journaled against the claim (Phase 2)', function () {
+    ($this->makeWarranty)('W-JRN-1');
+
+    $claim = $this->warranties->processInstantClaim(($this->claimData)('W-JRN-1'), $this->user->id);
+    $this->warranties->settleClaimWithSupplier($claim->id, 'settled_replacement', [], $this->user->id);
+
+    $moves = \App\Models\StockMovement::where('product_id', $this->replacementProduct->id)->orderBy('id')->get();
+    expect($moves->pluck('type')->map->value->all())->toBe(['warranty_replacement', 'supplier_replacement'])
+        ->and($moves->pluck('quantity_delta')->all())->toBe([-1, 1])
+        ->and($moves->pluck('stock_after')->all())->toBe([9, 10])
+        ->and($moves->every(fn ($m) => $m->source_type === $claim->getMorphClass() && $m->source_id === $claim->id))->toBeTrue()
+        ->and($moves->first()->branch_id)->toBe($this->branch->id)
+        ->and($moves->sum('quantity_delta'))->toBe($this->replacementProduct->fresh()->current_stock - 10);
+});
+
+test('a recharged claim writes no stock movement (Phase 2)', function () {
+    ($this->makeWarranty)('W-JRN-2');
+
+    $this->warranties->processInstantClaim(($this->claimData)('W-JRN-2', 'recharged'), $this->user->id);
+
+    expect(\App\Models\StockMovement::count())->toBe(0)
+        ->and($this->replacementProduct->fresh()->current_stock)->toBe(10);
+});
