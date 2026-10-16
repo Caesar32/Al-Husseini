@@ -158,7 +158,8 @@
         handler(el, event);
     }
 
-    ['click', 'change', 'input', 'submit', 'keyup'].forEach((type) => document.addEventListener(type, dispatch));
+    // mousedown: for pickers that must act before an input's blur hides them (data-action-on="mousedown").
+    ['click', 'change', 'input', 'submit', 'keyup', 'mousedown'].forEach((type) => document.addEventListener(type, dispatch));
 
     /* Page modules. */
     const pages = {};
