@@ -15,6 +15,9 @@ import 'data/repositories/inventory_repository.dart';
 import 'data/repositories/sales_repository.dart';
 import 'data/repositories/staff_repository.dart';
 
+import 'presentation/screens/login_screen.dart';
+import 'presentation/screens/splash_screen.dart';
+
 import 'providers/auth_provider.dart';
 import 'providers/cash_drawer_provider.dart';
 import 'providers/credit_provider.dart';
@@ -23,7 +26,8 @@ import 'providers/inventory_provider.dart';
 import 'providers/sales_provider.dart';
 import 'providers/staff_provider.dart';
 
-import 'presentation/screens/splash_screen.dart';
+final navigatorKey = GlobalKey<NavigatorState>();
+final scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,10 +55,16 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider(authRepository)),
-        ChangeNotifierProvider(create: (_) => DashboardProvider(dashboardRepository)),
+        ChangeNotifierProvider(
+          create: (_) => DashboardProvider(dashboardRepository),
+        ),
         ChangeNotifierProvider(create: (_) => SalesProvider(salesRepository)),
-        ChangeNotifierProvider(create: (_) => CashDrawerProvider(cashDrawerRepository)),
-        ChangeNotifierProvider(create: (_) => InventoryProvider(inventoryRepository)),
+        ChangeNotifierProvider(
+          create: (_) => CashDrawerProvider(cashDrawerRepository),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => InventoryProvider(inventoryRepository),
+        ),
         ChangeNotifierProvider(create: (_) => StaffProvider(staffRepository)),
         ChangeNotifierProvider(create: (_) => CreditProvider(creditRepository)),
       ],
@@ -63,12 +73,62 @@ void main() async {
   );
 }
 
-class AlHusseiniExecutiveApp extends StatelessWidget {
+class AlHusseiniExecutiveApp extends StatefulWidget {
   const AlHusseiniExecutiveApp({super.key});
+
+  @override
+  State<AlHusseiniExecutiveApp> createState() => _AlHusseiniExecutiveAppState();
+}
+
+class _AlHusseiniExecutiveAppState extends State<AlHusseiniExecutiveApp> {
+  AuthProvider? _authProvider;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    _authProvider ??= context.read<AuthProvider>()
+      ..addListener(_handleAuthChanged);
+  }
+
+  void _handleAuthChanged() {
+    final authProvider = _authProvider;
+    if (!mounted ||
+        authProvider == null ||
+        authProvider.status != AuthStatus.unauthenticated) {
+      return;
+    }
+
+    context.read<DashboardProvider>().stopLivePolling();
+
+    if (!authProvider.sessionExpired) return;
+
+    final message = authProvider.errorMessage;
+    authProvider.acknowledgeSessionExpired();
+
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (_) => false,
+    );
+
+    if (message != null && message.isNotEmpty) {
+      scaffoldMessengerKey.currentState?.showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _authProvider?.removeListener(_handleAuthChanged);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey,
+      scaffoldMessengerKey: scaffoldMessengerKey,
       title: 'مركز الحسيني - لوحة المالك التنفيذية',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.midnightExecutiveTheme,

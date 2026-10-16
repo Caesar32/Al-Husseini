@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../widgets/golden_particles_background.dart';
@@ -15,7 +16,8 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final Animation<double> _emblemFade;
   late final Animation<Offset> _emblemSlide;
@@ -35,16 +37,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       parent: _controller,
       curve: const Interval(0.0, 0.55, curve: Curves.easeOut),
     );
-    _emblemSlide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.0, 0.55, curve: Curves.easeOutCubic)),
+    _emblemSlide = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.55, curve: Curves.easeOutCubic),
+      ),
     );
 
     _titleFade = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.25, 0.8, curve: Curves.easeOut),
     );
-    _titleSlide = Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(
-      CurvedAnimation(parent: _controller, curve: const Interval(0.25, 0.8, curve: Curves.easeOutCubic)),
+    _titleSlide = Tween<Offset>(
+      begin: const Offset(0, 0.12),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.25, 0.8, curve: Curves.easeOutCubic),
+      ),
     );
 
     _loaderFade = CurvedAnimation(
@@ -57,10 +71,15 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _navigateToNext() async {
-    await Future.delayed(const Duration(seconds: 2));
+    final authProvider = context.read<AuthProvider>();
+
+    await Future.wait<void>([
+      Future<void>.delayed(const Duration(seconds: 2)),
+      authProvider.validateSession(),
+    ]);
+
     if (!mounted) return;
 
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (authProvider.isAuthenticated) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const MainSurveillanceLayout()),

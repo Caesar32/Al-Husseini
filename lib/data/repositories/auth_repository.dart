@@ -9,6 +9,8 @@ class AuthRepository {
 
   AuthRepository(this._api, this._storage);
 
+  Stream<void> get onSessionExpired => _api.onUnauthorized;
+
   Future<AuthUser> login(String login, String password, {String? deviceName}) async {
     final response = await _api.post(
       ApiConstants.login,

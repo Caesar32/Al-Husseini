@@ -106,13 +106,15 @@ class ApiService {
   }
 
   Future<dynamic> _processResponse(http.Response response) async {
-    final bodyIsEmpty = response.body.isEmpty;
+    // Laravel sends UTF-8 JSON without a charset; decode bytes explicitly.
+    final rawBody = utf8.decode(response.bodyBytes, allowMalformed: true);
+    final bodyIsEmpty = rawBody.isEmpty;
     dynamic body;
     var validJson = true;
 
     if (!bodyIsEmpty) {
       try {
-        body = jsonDecode(response.body);
+        body = jsonDecode(rawBody);
       } on FormatException {
         validJson = false;
       }
