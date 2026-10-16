@@ -1,6 +1,8 @@
 <!-- JAVASCRIPT -->
 <script src="{{ asset('assets/libs/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 <script src="{{ asset('assets/libs/sweetalert2/sweetalert2.min.js') }}"></script>
+<!-- Admin core (frontend F4): escaping, fetch, delegated data-action handlers, page modules -->
+<script src="{{ asset('assets/js/admin/core.js') }}"></script>
 <script src="{{ asset('assets/libs/simplebar/simplebar.min.js') }}"></script>
 <script src="{{ asset('assets/libs/node-waves/waves.min.js') }}"></script>
 <script src="{{ asset('assets/libs/feather-icons/feather.min.js') }}"></script>
@@ -349,6 +351,9 @@ window.showHrToast = function(title, message, type) {
             setTimeout(async function() {
                 if (!isCurrent()) return;
 
+                // Let the outgoing page module stop its timers/pollers (Admin core).
+                if (window.Admin) { window.Admin.page.leave(); }
+
                 currentMain.innerHTML = newMain.innerHTML;
                 currentMain.style.opacity = '1';
 
@@ -365,6 +370,9 @@ window.showHrToast = function(title, message, type) {
 
                     // Re-initialize core UI widgets, then run ONLY this page's init handlers
                     reinitWidgets(pageInitHandlers);
+
+                    // Start the swapped-in page's module ([data-page] roots registered by its scripts).
+                    if (window.Admin) { window.Admin.page.boot(currentMain); }
                 } finally {
                     finishProgress();
                 }
