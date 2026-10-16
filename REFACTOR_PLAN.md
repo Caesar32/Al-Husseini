@@ -13,7 +13,7 @@ Each phase file is self-contained: rules, context, contracts, Codex prompts and 
 | 1 | [01_phase_security_and_correctness.md](docs/refactor/01_phase_security_and_correctness.md) | B1 owner token revocation, B2/B3 XSS, B4/B5 push job, B6 tests | `routes/api.php`, `bootstrap/app.php`, `app/Http/Middleware/EnsureOwnerTokenIsValid.php` (new), `resources/views/admin/purchases/create.blade.php`, `resources/views/admin/warranties/index.blade.php`, `app/Jobs/DispatchOwnerPushNotification.php` | 0 | [ ] |
 | 2 | [02_phase_stock_movement_journal.md](docs/refactor/02_phase_stock_movement_journal.md) | Single stock writer + `stock_movements` | `app/Services/Catalog/StockLedgerService.php` (new), `PosOrderService.php`, `WarrantyService.php`, `PurchaseService.php`, `ImportStockCommand.php` | 1 | [x] `4671566`..`dc565ca`; dev MySQL `php artisan migrate` pending (owner) |
 | 3 | [03_phase_shared_dashboard_metrics.md](docs/refactor/03_phase_shared_dashboard_metrics.md) | One metrics service; 7-day trend from 21 queries to 1 | `Admin/DashboardController.php`, `Api/V1/Owner/DashboardController.php`, `app/Services/Dashboard/DashboardMetricsService.php` (new) | 1 | [x] `782c1e4`..`2321670`; manual screenshot check pending |
-| 4 | [04_phase_split_pos_order_service.md](docs/refactor/04_phase_split_pos_order_service.md) | Extract returns and debt collection; DI instead of `app()` | `PosOrderService.php`, `SalesReturnService.php` (new), `CreditCollectionService.php`, `StorePosInvoiceRequest.php`, `CreditCustomerController.php` | 2 | [ ] |
+| 4 | [04_phase_split_pos_order_service.md](docs/refactor/04_phase_split_pos_order_service.md) | Extract returns and debt collection; DI instead of `app()` | `PosOrderService.php`, `SalesReturnService.php` (new), `CreditCollectionService.php`, `StorePosInvoiceRequest.php`, `CreditCustomerController.php` | 2 | [x] `f3644e2`..`d8179d3`; manual browser check pending |
 | 5 | [05_phase_hardcoded_urls.md](docs/refactor/05_phase_hardcoded_urls.md) | JS `/admin/...` URLs to `route()` | `admin-notifications.js`, `global-spotlight-search.js`, HR `scripts.blade.php` partials, `warranties/index.blade.php` | 1 | [ ] |
 | 6 | [06_phase_data_model_fixes.md](docs/refactor/06_phase_data_model_fixes.md) | `scrapBatteries` / `technicianCommissions` become `hasMany`; drop 7 redundant indexes | `app/Models/Invoice.php`, 5 readers, new migration | 2, 4 | [ ] |
 | 7 | [07_phase_final_verification.md](docs/refactor/07_phase_final_verification.md) | Suite, Pint, routes, diagnostics, smoke test, docs | none (verification only) | 0-6 | [ ] |
@@ -29,7 +29,8 @@ Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2
 | `N1` | Targeted only (owner protocol: full suite at Phases 0 and 7). Phase 1 added 14 tests (OwnerAuth 4, PurchaseCreateXss 1, Warranty 1, OwnerPush 4, EmployeeNationalId 4); expected full count 425; all targeted suites green |
 | `N2` | Targeted only. Phase 2 added 17 tests (StockLedger 4, POS 1, Warranty 2, Purchases 1, Import 1, Diagnostics 1, Architecture 8 incl. 7 dataset cases); Sales, Warranty, Purchases, Admin, Catalog, Architecture all green |
 | `N3` | Targeted only. Phase 3 added 5 tests (characterization 4, query count 1); Admin + Owner API suites 154 passed |
-| `N4` .. `N6` | |
+| `N4` | Targeted only. No new tests (pure moves); Sales, Warranty, Unit, ManagerOverride, Diagnostics green (176 + 11 passed) |
+| `N5` .. `N6` | |
 | Admin dashboard query count before / after (Phase 3) | 71 / 48 total; `invoice_items` 26 / 3 (characterization fixture) |
 | Phase 6 index names confirmed (SQLite / MySQL) | |
 
@@ -41,6 +42,10 @@ Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2
 - Phase 2: `stock_movements` has no history before the migration; the diagnostic only compares products that have movements.
 
 - Phase 3 deviation: the owner dashboard controller is 194 lines (target 120). It has no queries left; the rest is response shaping (shift text, compact money, JSON keys). Moving that into API Resources would add a layer, so it stays. The admin controller is 121 lines.
+
+- Phase 4 deviation: `PosOrderService.php` is 525 lines (target 450). The plan's estimate was off; the sale path (`createPosSale`, ~180 lines) and the cashier summary stay by design.
+- Phase 4 addition: `ScrapBatteryService:101` also used `app(DocumentNumberService::class)` and failed the acceptance grep; it now injects it.
+- Phase 4: `tests/Unit/Sales/Requests/SalesAndPurchasesRequestsTest.php` built `StorePosInvoiceRequest` with `new` and no container; it now calls `setContainer(app())`, which is how Laravel builds form requests. No assertion changed.
 
 ## Global rules (repeated in every phase file)
 - Never weaken, skip or delete tests. Never disable SQLite FK/CHECK enforcement. Every bug fix gets a regression test.
