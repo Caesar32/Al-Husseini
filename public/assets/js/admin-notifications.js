@@ -8,9 +8,12 @@
 
     if (!listEl) return;
 
+    // Server-generated URLs from the admin layout (FE-08).
+    const meta = n => document.querySelector(`meta[name="${n}"]`)?.content;
+
     window.refreshAdminNotifications = async function () {
         try {
-            const res = await fetch('/admin/hr/notifications', {
+            const res = await fetch(meta('route-hr-notifications'), {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -80,7 +83,7 @@
     window.markSingleAsRead = async function (id, redirectUrl) {
         try {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            await fetch(`/admin/hr/notifications/${id}/read`, {
+            await fetch(meta('route-hr-notifications-read').replace('__ID__', encodeURIComponent(id)), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -102,7 +105,7 @@
     window.markAllNotificationsRead = async function () {
         try {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            await fetch('/admin/hr/notifications/read-all', {
+            await fetch(meta('route-hr-notifications-read-all'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

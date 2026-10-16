@@ -29,3 +29,16 @@ test('HR and warranty pages embed route-generated URLs for their scripts', funct
     'payroll' => ['admin.hr.payroll', fn () => [route('admin.hr.payroll.generate'), route('admin.hr.payroll.show', ['payroll' => '__ID__']), route('admin.hr.payroll.approve', ['payroll' => '__ID__']), route('admin.hr.payroll.disburse', ['payroll' => '__ID__']), route('admin.hr.deductions.status', ['deduction' => '__ID__'])]],
     'warranties' => ['admin.warranties.index', fn () => [route('admin.warranties.claims.settle', ['claim' => '__ID__'])]],
 ]);
+
+test('the admin layout publishes route URLs for the static admin scripts', function () {
+    $this->actingAs($this->admin)->get(route('admin.dashboard'))
+        ->assertOk()
+        ->assertSee('<meta name="route-hr-notifications" content="'.route('admin.hr.notifications.index').'">', false)
+        ->assertSee('<meta name="route-hr-notifications-read" content="'.route('admin.hr.notifications.read', ['id' => '__ID__']).'">', false)
+        ->assertSee('<meta name="route-hr-notifications-read-all" content="'.route('admin.hr.notifications.readAll').'">', false)
+        ->assertSee('<meta name="route-global-search" content="'.route('admin.global_search').'">', false);
+});
+
+test('the static admin scripts contain no literal /admin/ URLs', function (string $file) {
+    expect(file_get_contents(public_path($file)))->not->toMatch('#[\'"`]/admin/#');
+})->with(['assets/js/admin-notifications.js', 'assets/js/global-spotlight-search.js']);

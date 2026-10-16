@@ -5,6 +5,9 @@
 (function () {
     'use strict';
 
+    // Server-generated URL from the admin layout (FE-08).
+    const meta = n => document.querySelector(`meta[name="${n}"]`)?.content;
+
     document.addEventListener('DOMContentLoaded', function () {
         const desktopInput = document.getElementById('search-options');
         const desktopDropdown = document.getElementById('search-dropdown');
@@ -124,7 +127,7 @@
             renderLoading(dropdownEl);
             showDropdown(dropdownEl);
 
-            fetch(`/admin/global-search?q=${encodeURIComponent(query)}`, {
+            fetch(`${meta('route-global-search')}?q=${encodeURIComponent(query)}`, {
                 headers: {
                     'Accept': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'

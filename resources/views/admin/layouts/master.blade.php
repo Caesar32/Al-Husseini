@@ -17,6 +17,13 @@
     <meta content="Al-Husseini" name="author" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="asset-url" content="{{ asset('') }}">
+    @auth
+    {{-- URLs for the static admin JS (FE-08); __ID__ is replaced client-side. --}}
+    <meta name="route-hr-notifications" content="{{ route('admin.hr.notifications.index') }}">
+    <meta name="route-hr-notifications-read" content="{{ route('admin.hr.notifications.read', ['id' => '__ID__']) }}">
+    <meta name="route-hr-notifications-read-all" content="{{ route('admin.hr.notifications.readAll') }}">
+    <meta name="route-global-search" content="{{ route('admin.global_search') }}">
+    @endauth
 
     <!-- App favicon -->
     <link rel="shortcut icon" href="{{ asset('assets/images/alhusseini-icon.jpg') }}">
