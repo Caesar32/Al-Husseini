@@ -1,31 +1,34 @@
 import 'package:flutter/foundation.dart';
+
 import '../data/models/cash_drawer_shift.dart';
 import '../data/repositories/cash_drawer_repository.dart';
+import 'async_state.dart';
 
 class CashDrawerProvider extends ChangeNotifier {
   final CashDrawerRepository _repository;
 
-  CashDrawerShift? _currentShift;
-  bool _isLoading = false;
-  String? _error;
+  AsyncState<CashDrawerShift> _state =
+      const AsyncIdle<CashDrawerShift>();
 
   CashDrawerProvider(this._repository);
 
-  CashDrawerShift? get currentShift => _currentShift;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  AsyncState<CashDrawerShift> get state => _state;
+
+  CashDrawerShift? get currentShift => _state.value;
+  bool get isLoading => _state.isLoading;
+  String? get error => _state.failure?.message;
 
   Future<void> fetchCurrentShift({int? branchId}) async {
-    _isLoading = true;
-    _error = null;
+    _state = _state.toLoading();
     notifyListeners();
 
     try {
-      _currentShift = await _repository.getCurrentShift(branchId: branchId);
-    } catch (e) {
-      _error = e.toString();
+      final value = await _repository.getCurrentShift(branchId: branchId);
+      _state = AsyncData(value);
+    } catch (error) {
+      final failure = toApiFailure(error);
+      _state = _state.toFailure(failure);
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }

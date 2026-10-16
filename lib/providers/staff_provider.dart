@@ -1,31 +1,33 @@
 import 'package:flutter/foundation.dart';
+
 import '../data/models/staff_attendance.dart';
 import '../data/repositories/staff_repository.dart';
+import 'async_state.dart';
 
 class StaffProvider extends ChangeNotifier {
   final StaffRepository _repository;
 
-  StaffAttendanceSummary? _attendanceSummary;
-  bool _isLoading = false;
-  String? _error;
+  AsyncState<StaffAttendanceSummary> _state =
+      const AsyncIdle<StaffAttendanceSummary>();
 
   StaffProvider(this._repository);
 
-  StaffAttendanceSummary? get attendanceSummary => _attendanceSummary;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  AsyncState<StaffAttendanceSummary> get state => _state;
+
+  StaffAttendanceSummary? get attendanceSummary => _state.value;
+  bool get isLoading => _state.isLoading;
+  String? get error => _state.failure?.message;
 
   Future<void> fetchTodayAttendance({int? branchId}) async {
-    _isLoading = true;
-    _error = null;
+    _state = _state.toLoading();
     notifyListeners();
 
     try {
-      _attendanceSummary = await _repository.getTodayAttendance(branchId: branchId);
-    } catch (e) {
-      _error = e.toString();
+      final value = await _repository.getTodayAttendance(branchId: branchId);
+      _state = AsyncData(value);
+    } catch (error) {
+      _state = _state.toFailure(toApiFailure(error));
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }

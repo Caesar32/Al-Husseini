@@ -1,31 +1,33 @@
 import 'package:flutter/foundation.dart';
+
 import '../data/models/credit_overview.dart';
 import '../data/repositories/credit_repository.dart';
+import 'async_state.dart';
 
 class CreditProvider extends ChangeNotifier {
   final CreditRepository _repository;
 
-  CreditOverviewData? _overviewData;
-  bool _isLoading = false;
-  String? _error;
+  AsyncState<CreditOverviewData> _state =
+      const AsyncIdle<CreditOverviewData>();
 
   CreditProvider(this._repository);
 
-  CreditOverviewData? get overviewData => _overviewData;
-  bool get isLoading => _isLoading;
-  String? get error => _error;
+  AsyncState<CreditOverviewData> get state => _state;
+
+  CreditOverviewData? get overviewData => _state.value;
+  bool get isLoading => _state.isLoading;
+  String? get error => _state.failure?.message;
 
   Future<void> fetchCreditOverview() async {
-    _isLoading = true;
-    _error = null;
+    _state = _state.toLoading();
     notifyListeners();
 
     try {
-      _overviewData = await _repository.getCreditOverview();
-    } catch (e) {
-      _error = e.toString();
+      final value = await _repository.getCreditOverview();
+      _state = AsyncData(value);
+    } catch (error) {
+      _state = _state.toFailure(toApiFailure(error));
     } finally {
-      _isLoading = false;
       notifyListeners();
     }
   }
