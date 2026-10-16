@@ -104,3 +104,29 @@ test('missing file and conflicting flags fail', function () {
     $this->artisan('inventory:import-stock', ['--file' => 'nope.xlsx'])->assertExitCode(1);
     $this->artisan('inventory:import-stock', ['--file' => stockSheet([]), '--apply' => true, '--dry-run' => true])->assertExitCode(1);
 });
+
+test('apply journals each changed product as an adjustment (Phase 2)', function () {
+    $up = stockProduct('ADJ-UP', 3);
+    $down = stockProduct('ADJ-DOWN', 9);
+    $same = stockProduct('ADJ-SAME', 5);
+    $before = glob(storage_path('app/private/backups/stock_backup_*.json')) ?: [];
+
+    $this->artisan('inventory:import-stock', ['--file' => stockSheet([
+        ['ADJ-UP', '', 'x', 12],
+        ['ADJ-DOWN', '', 'x', 2],
+        ['ADJ-SAME', '', 'x', 5],
+    ]), '--apply' => true])->assertExitCode(0);
+
+    $moves = \App\Models\StockMovement::orderBy('id')->get()->keyBy('product_id');
+    expect($moves)->toHaveCount(2)
+        ->and($moves[$up->id]->type)->toBe(\App\Enums\StockMovementType::Adjustment)
+        ->and($moves[$up->id]->quantity_delta)->toBe(9)
+        ->and($moves[$up->id]->stock_after)->toBe(12)
+        ->and($moves[$down->id]->quantity_delta)->toBe(-7)
+        ->and($moves[$down->id]->stock_after)->toBe(2)
+        ->and($moves->has($same->id))->toBeFalse();
+
+    foreach (array_diff(glob(storage_path('app/private/backups/stock_backup_*.json')), $before) as $file) {
+        @unlink($file);
+    }
+});

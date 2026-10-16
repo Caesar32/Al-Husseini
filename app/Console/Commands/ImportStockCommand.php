@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Contracts\Catalog\StockLedgerInterface;
 use App\Models\Product;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -22,7 +23,7 @@ class ImportStockCommand extends Command
 
     private LoggerInterface $log;
 
-    public function handle(): int
+    public function handle(StockLedgerInterface $ledger): int
     {
         if ($this->option('dry-run') && $this->option('apply')) {
             $this->error('Use either --dry-run or --apply, not both.');
@@ -107,15 +108,14 @@ class ImportStockCommand extends Command
         $written = 0;
         try {
             foreach (array_chunk($changed, 500, true) as $chunk) {
-                DB::transaction(function () use ($chunk, &$written) {
+                DB::transaction(function () use ($chunk, &$written, $ledger) {
                     foreach ($chunk as $id => $u) {
                         $product = Product::whereKey($id)->lockForUpdate()->first();
                         if (!$product) {
                             $this->log->warning('Product vanished before write', ['id' => $id, 'sku' => $u['sku']]);
                             continue;
                         }
-                        $product->current_stock = $u['new'];
-                        $product->save();
+                        $ledger->setTo($product->id, $u['new'], $product);
                         $written++;
                     }
                 });

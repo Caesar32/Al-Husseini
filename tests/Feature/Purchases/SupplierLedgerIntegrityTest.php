@@ -208,3 +208,26 @@ test('ledger rebuild repairs legacy postings only with --apply, writes a backup 
         ->expectsOutputToContain('Dry run: 0 supplier(s) need repair.')
         ->assertSuccessful();
 });
+
+test('purchase lines and returns are journaled, and repeated lines of a product keep the WAC chain (Phase 2)', function () {
+    $this->product->update(['current_stock' => 10, 'cost_price' => 1000]);
+
+    $invoice = ($this->purchase)('PUR-JRN-1', 0, 0, 0, ['items' => [
+        ['product_id' => $this->product->id, 'quantity' => 4, 'unit_cost_price' => 1200],
+        ['product_id' => $this->product->id, 'quantity' => 6, 'unit_cost_price' => 900],
+    ]]);
+
+    $this->product->refresh();
+    expect($this->product->current_stock)->toBe(20)
+        ->and((float) $this->product->cost_price)->toBe(1010.0); // (14*1057.14 + 6*900) / 20
+
+    $this->service->processPurchaseReturn($invoice->id, [['product_id' => $this->product->id, 'quantity' => 5]], 'تالف', $this->user->id);
+
+    $moves = \App\Models\StockMovement::where('product_id', $this->product->id)->orderBy('id')->get();
+    expect($moves->pluck('type')->map->value->all())->toBe(['purchase', 'purchase', 'purchase_return', 'purchase_return'])
+        ->and($moves->pluck('quantity_delta')->all())->toBe([4, 6, -4, -1])
+        ->and($moves->pluck('stock_after')->all())->toBe([14, 20, 16, 15])
+        ->and($moves->pluck('unit_cost')->all())->toBe(['1200.00', '900.00', '1200.00', '900.00'])
+        ->and($moves->every(fn ($m) => $m->source_type === $invoice->getMorphClass() && $m->source_id === $invoice->id))->toBeTrue()
+        ->and($moves->sum('quantity_delta'))->toBe($this->product->fresh()->current_stock - 10);
+});

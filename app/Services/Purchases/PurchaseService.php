@@ -2,7 +2,9 @@
 
 namespace App\Services\Purchases;
 
+use App\Contracts\Catalog\StockLedgerInterface;
 use App\Contracts\Purchases\PurchaseServiceInterface;
+use App\Enums\StockMovementType;
 use App\Models\Product;
 use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceItem;
@@ -15,6 +17,10 @@ use Illuminate\Support\Facades\DB;
 class PurchaseService implements PurchaseServiceInterface
 {
     private const EPSILON = 0.01;
+
+    public function __construct(
+        private StockLedgerInterface $stock,
+    ) {}
 
     public function getPaginatedInvoices(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
@@ -133,6 +139,8 @@ class PurchaseService implements PurchaseServiceInterface
             });
 
             // 3. Save items and apply Weighted Average Cost (WAC) formula
+            // The ledger writes the stock, so repeated lines of a product read it from here.
+            $stockByProduct = [];
             foreach ($preparedItems as $pItem) {
                 PurchaseInvoiceItem::create([
                     'purchase_invoice_id' => $invoice->id,
@@ -145,7 +153,8 @@ class PurchaseService implements PurchaseServiceInterface
                 ]);
 
                 $product = $products->get($pItem['product_id']);
-                $currentStock = max(0, (int) $product->current_stock);
+                $stockNow = $stockByProduct[$product->id] ??= (int) $product->current_stock;
+                $currentStock = max(0, $stockNow);
                 $currentCost = (float) $product->cost_price;
                 $newQty = $pItem['quantity'];
                 $newCost = $pItem['unit_cost_price'];
@@ -155,10 +164,16 @@ class PurchaseService implements PurchaseServiceInterface
                     ? (($currentStock * $currentCost) + ($newQty * $newCost)) / $totalQty
                     : $newCost;
 
-                $product->update([
-                    'current_stock' => $currentStock + $newQty,
-                    'cost_price'    => round($newWac, 2),
-                ]);
+                // A negative stock is first clamped to 0 (unchanged rule), so the delta can exceed the quantity.
+                $stockByProduct[$product->id] = $this->stock->move(
+                    $product->id,
+                    $currentStock + $newQty - $stockNow,
+                    StockMovementType::Purchase,
+                    $invoice,
+                    $receivedByUserId,
+                    (float) $newCost
+                );
+                $product->update(['cost_price' => round($newWac, 2)]);
 
                 // Sync catalog entry in supplier_products. The supplier of the latest purchase
                 // becomes the (single) primary supplier; an empty line SKU keeps the known SKU.
@@ -329,6 +344,7 @@ class PurchaseService implements PurchaseServiceInterface
                 }
 
                 $remainingQty = $qty;
+                $stock = (int) $product->current_stock;
                 foreach ($lines as $line) {
                     $lineAvailable = (int) $line->quantity - (int) $line->returned_quantity;
                     if ($remainingQty <= 0 || $lineAvailable <= 0) {
@@ -339,8 +355,7 @@ class PurchaseService implements PurchaseServiceInterface
                     $line->update(['returned_quantity' => (int) $line->returned_quantity + $take]);
 
                     // Reverse the weighted average cost for the goods leaving stock.
-                    $stock = (int) $product->current_stock;
-                    $newStock = $stock - $take;
+                    $newStock = $this->stock->move($product->id, -$take, StockMovementType::PurchaseReturn, $invoice, $userId, (float) $line->unit_cost_price);
                     $cost = (float) $product->cost_price;
                     if ($newStock > 0) {
                         $reversed = (($stock * $cost) - ($take * (float) $line->unit_cost_price)) / $newStock;
@@ -348,8 +363,9 @@ class PurchaseService implements PurchaseServiceInterface
                             $cost = round($reversed, 2);
                         }
                     }
-                    $product->update(['current_stock' => $newStock, 'cost_price' => $cost]);
+                    $product->update(['cost_price' => $cost]);
 
+                    $stock = $newStock;
                     $remainingQty -= $take;
                 }
             }
