@@ -268,7 +268,7 @@ class InvoiceDetailSheet extends StatelessWidget {
                       )),
 
                   // Scrap Battery Trade-in if present
-                  if (invoice.scrapBattery != null) ...[
+                  for (final scrap in invoice.scrapBatteries) ...[
                     const SizedBox(height: 12),
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -288,13 +288,13 @@ class InvoiceDetailSheet extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text('استبدال بطارية مستعملة (خردة)', style: GoogleFonts.cairo(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.safeCashSuccess)),
-                                  Text('سعة / أمبير: ${invoice.scrapBattery!.capacityAh} A', style: GoogleFonts.almarai(fontSize: 11, color: AppColors.textSecondary)),
+                                  Text('سعة / أمبير: ${scrap.capacityAh}', style: GoogleFonts.almarai(fontSize: 11, color: AppColors.textSecondary)),
                                 ],
                               ),
                             ],
                           ),
                           ArabicTabularText(
-                            text: '- ${invoice.scrapBattery!.scrapValue} ج.م',
+                            text: '- ${scrap.scrapValue.toStringAsFixed(2)} ج.م',
                             fontSize: 14,
                             textColor: AppColors.safeCashSuccess,
                           ),

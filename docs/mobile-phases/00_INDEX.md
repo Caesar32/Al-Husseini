@@ -75,3 +75,11 @@ OUTPUT: unified diff or full single-file replacement, nothing else
 ```
 
 The orchestrator reviews each diff, applies it, runs the gates, and commits.
+
+## Card log
+
+Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5` is not offered for this account). The orchestrator reviews, runs the gates and commits.
+
+| Card | Result | Tests after |
+|---|---|---|
+| M1-01 | Done: scrap `capacity_ah` read as string; `scrap_batteries` list (legacy fallback); sheet renders each | 5 |

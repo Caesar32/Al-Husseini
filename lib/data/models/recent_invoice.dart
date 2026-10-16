@@ -100,7 +100,7 @@ class InvoiceDetail {
   final String? technicianName;
   final InvoiceVehicleInfo? vehicle;
   final List<InvoiceItemDetail> items;
-  final ScrapBatteryDetail? scrapBattery;
+  final List<ScrapBatteryDetail> scrapBatteries;
   final List<InvoicePaymentDetail> payments;
 
   InvoiceDetail({
@@ -123,13 +123,19 @@ class InvoiceDetail {
     this.technicianName,
     this.vehicle,
     required this.items,
-    this.scrapBattery,
+    required this.scrapBatteries,
     required this.payments,
   });
 
   factory InvoiceDetail.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'] as List? ?? [];
     final rawPayments = json['payments'] as List? ?? [];
+    final rawScrapBatteries = json['scrap_batteries'];
+    final scrapBatteries = rawScrapBatteries is List
+        ? rawScrapBatteries
+        : json['scrap_battery'] is Map
+            ? [json['scrap_battery']]
+            : <dynamic>[];
     final financials = json['financials'] as Map<String, dynamic>? ?? {};
     final status = json['status'] ?? 'paid';
     final paymentMethod = json['payment_method'] ?? 'cash';
@@ -157,7 +163,9 @@ class InvoiceDetail {
       technicianName: json['technician_name'] ?? json['technician']?['name'],
       vehicle: json['vehicle'] != null ? InvoiceVehicleInfo.fromJson(json['vehicle']) : null,
       items: rawItems.map((e) => InvoiceItemDetail.fromJson(e)).toList(),
-      scrapBattery: json['scrap_battery'] != null ? ScrapBatteryDetail.fromJson(json['scrap_battery']) : null,
+      scrapBatteries: scrapBatteries
+          .map((e) => ScrapBatteryDetail.fromJson(e as Map<String, dynamic>))
+          .toList(),
       payments: rawPayments.map((e) => InvoicePaymentDetail.fromJson(e)).toList(),
     );
   }
@@ -248,19 +256,33 @@ class InvoiceItemDetail {
 }
 
 class ScrapBatteryDetail {
-  final double capacityAh;
+  final String capacityAh;
   final double scrapValue;
+  final double leadWeightKg;
+  final String? status;
 
   ScrapBatteryDetail({
     required this.capacityAh,
     required this.scrapValue,
+    required this.leadWeightKg,
+    this.status,
   });
 
   factory ScrapBatteryDetail.fromJson(Map<String, dynamic> json) {
     return ScrapBatteryDetail(
-      capacityAh: (json['capacity_ah'] as num? ?? 0.0).toDouble(),
-      scrapValue: (json['scrap_value'] as num? ?? 0.0).toDouble(),
+      capacityAh: json['capacity_ah']?.toString() ?? '',
+      scrapValue: _parseDouble(json['scrap_value']),
+      leadWeightKg: _parseDouble(json['lead_weight_kg']),
+      status: json['status']?.toString(),
     );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+
+    return double.tryParse(value?.toString() ?? '') ?? 0.0;
   }
 }
 
