@@ -24,6 +24,10 @@ class AppServiceProvider extends ServiceProvider
             \App\Contracts\SearchServiceInterface::class,
             \App\Services\SearchService::class
         );
+        $this->app->bind(
+            \App\Contracts\Dashboard\DashboardMetricsInterface::class,
+            \App\Services\Dashboard\DashboardMetricsService::class
+        );
     }
 
     /**

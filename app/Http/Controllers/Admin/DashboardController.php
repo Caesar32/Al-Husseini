@@ -2,187 +2,64 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Contracts\Dashboard\DashboardMetricsInterface;
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Invoice;
-use App\Models\InvoicePayment;
-use App\Models\CreditLedgerEntry;
-use App\Models\Customer;
-use App\Models\CustomerVehicle;
-use App\Models\Product;
-use App\Models\InvoiceItem;
-use App\Models\Employee;
-use App\Models\Attendance;
 use App\Support\MoneyHelper;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    /**
-     * @return array{compact: string, exact: string}
-     */
-    private function formatCompactCurrency(float $amount): array
-    {
-        return MoneyHelper::formatCompactCurrency($amount);
-    }
+    private const ARABIC_DAYS = [
+        'Saturday' => 'السبت', 'Sunday' => 'الأحد', 'Monday' => 'الاثنين', 'Tuesday' => 'الثلاثاء',
+        'Wednesday' => 'الأربعاء', 'Thursday' => 'الخميس', 'Friday' => 'الجمعة',
+    ];
+
+    public function __construct(private DashboardMetricsInterface $metrics) {}
 
     /**
      * Display live management dashboard with real metrics from database.
      */
     public function index(Request $request)
     {
-        // 1. KPI Stats & Sales Periods Calculations
-        $todayStart = Carbon::today()->startOfDay();
-        $weekStart  = Carbon::today()->subDays(6)->startOfDay(); // آخر 7 أيام شاملة اليوم
-        $monthStart = Carbon::today()->startOfMonth();
-        $yearStart  = Carbon::today()->startOfYear();
-
-        // Countable invoices (cancelled / fully refunded excluded); partially refunded counted net of refunds.
-        $baseInvoices = Invoice::countable();
-
-        // ─── مبيعات الفترة (قيمة الفواتير الصادرة - دفترية، صافية بعد المرتجعات) ────────────
-        $salesToday        = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $todayStart));
-        $invoicesCountToday = (int)  (clone $baseInvoices)->where('created_at', '>=', $todayStart)->count();
-
-        $salesWeek         = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $weekStart));
-        $invoicesCountWeek  = (int)  (clone $baseInvoices)->where('created_at', '>=', $weekStart)->count();
-
-        $salesMonth         = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $monthStart));
-        $invoicesCountMonth  = (int)  (clone $baseInvoices)->where('created_at', '>=', $monthStart)->count();
-
-        $salesYear          = Invoice::sumNetAmount((clone $baseInvoices)->where('created_at', '>=', $yearStart));
-        $invoicesCountYear   = (int)  (clone $baseInvoices)->where('created_at', '>=', $yearStart)->count();
-
-        $salesAll           = Invoice::sumNetAmount(clone $baseInvoices);
-        $invoicesCountAll    = (int)  (clone $baseInvoices)->count();
-
-        // ─── الإيراد النقدي الفعلي = مجموع الدفعات المقبوضة فعلاً في الفترة ─────────────
-        // نقرأ من InvoicePayment بتاريخ الدفع الفعلي (created_at) لا بتاريخ إنشاء الفاتورة.
-        // نستثني method='credit' لأنه يمثّل الجزء الآجل غير المقبوض بعد (ليس نقدًا فعليًا).
-        // عند تحصيل الآجل لاحقًا بـ settleCustomerDebt، يُسجَّل InvoicePayment بطريقة فعلية
-        // (cash/instapay/...) وبتاريخ التحصيل، فيُحتسب تلقائياً في الإيراد.
-        $basePayments = InvoicePayment::active()->cash();
-
-        $cashToday  = (float) (clone $basePayments)->where('created_at', '>=', $todayStart)->sum('amount');
-        $cashWeek   = (float) (clone $basePayments)->where('created_at', '>=', $weekStart)->sum('amount');
-        $cashMonth  = (float) (clone $basePayments)->where('created_at', '>=', $monthStart)->sum('amount');
-        $cashYear   = (float) (clone $basePayments)->where('created_at', '>=', $yearStart)->sum('amount');
-        $cashAll    = (float) (clone $basePayments)->sum('amount');
-
-        // تحصيلات الآجل من دفتر الأستاذ (payment_collection entries غير مرتبطة بفاتورة محددة)
-        // هذه احتياطية فقط — settleCustomerDebt يُسجّل InvoicePayment مباشرة على الفواتير
-        $baseLedger = CreditLedgerEntry::where('entry_type', 'payment_collection');
-        $creditCollectedToday = (float) (clone $baseLedger)->where('created_at', '>=', $todayStart)->sum('amount');
-        $creditCollectedWeek  = (float) (clone $baseLedger)->where('created_at', '>=', $weekStart)->sum('amount');
-        $creditCollectedMonth = (float) (clone $baseLedger)->where('created_at', '>=', $monthStart)->sum('amount');
-        $creditCollectedYear  = (float) (clone $baseLedger)->where('created_at', '>=', $yearStart)->sum('amount');
-        $creditCollectedAll   = (float) (clone $baseLedger)->sum('amount');
-
-        // الإيراد الإجمالي = دفعات InvoicePayment + تحصيلات دفتر الأستاذ (إن وُجد فارق)
-        // ملاحظة: settleCustomerDebt الآن يُسجّل InvoicePayment على الفواتير المفتوحة،
-        // لذا cashXxx تشمله بالفعل، و creditCollectedXxx احتياط للقيود غير المرتبطة بفاتورة.
-        $revenueToday = round($cashToday, 2);
-        $revenueWeek  = round($cashWeek, 2);
-        $revenueMonth = round($cashMonth, 2);
-        $revenueYear  = round($cashYear, 2);
-        $revenueAll   = round($cashAll, 2);
-        // ────────────────────────────────────────────────────────────────────────────────
-
-
-        $salesPeriods = [
-            'today' => [
-                'key'                      => 'today',
-                'label'                    => 'اليوم',
-                'badge'                    => 'مبيعات اليوم',
-                'sublabel'                 => 'اليوم',
-                'total'                    => round($salesToday, 2),
-                'total_formatted'          => number_format(round($salesToday, 2), 2) . ' ج.م',
-                'total_compact'            => $this->formatCompactCurrency(round($salesToday, 2))['compact'],
-                'count'                    => $invoicesCountToday,
-                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $todayStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                  => $revenueToday,
-                'revenue_formatted'        => number_format($revenueToday, 2) . ' ج.م',
-                'revenue_compact'          => $this->formatCompactCurrency($revenueToday)['compact'],
-                'credit_collected'         => round($creditCollectedToday, 2),
-                'credit_collected_fmt'     => number_format(round($creditCollectedToday, 2), 2) . ' ج.م',
-                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedToday, 2))['compact'],
-            ],
-            'week' => [
-                'key'                      => 'week',
-                'label'                    => 'أسبوع',
-                'badge'                    => 'آخر 7 أيام',
-                'sublabel'                 => 'هذا الأسبوع',
-                'total'                    => round($salesWeek, 2),
-                'total_formatted'          => number_format(round($salesWeek, 2), 2) . ' ج.م',
-                'total_compact'            => $this->formatCompactCurrency(round($salesWeek, 2))['compact'],
-                'count'                    => $invoicesCountWeek,
-                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $weekStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                  => $revenueWeek,
-                'revenue_formatted'        => number_format($revenueWeek, 2) . ' ج.م',
-                'revenue_compact'          => $this->formatCompactCurrency($revenueWeek)['compact'],
-                'credit_collected'         => round($creditCollectedWeek, 2),
-                'credit_collected_fmt'     => number_format(round($creditCollectedWeek, 2), 2) . ' ج.م',
-                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedWeek, 2))['compact'],
-            ],
-            'month' => [
-                'key'                      => 'month',
-                'label'                    => 'شهر',
-                'badge'                    => 'الشهر الحالي',
-                'sublabel'                 => 'هذا الشهر',
-                'total'                    => round($salesMonth, 2),
-                'total_formatted'          => number_format(round($salesMonth, 2), 2) . ' ج.م',
-                'total_compact'            => $this->formatCompactCurrency(round($salesMonth, 2))['compact'],
-                'count'                    => $invoicesCountMonth,
-                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $monthStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                  => $revenueMonth,
-                'revenue_formatted'        => number_format($revenueMonth, 2) . ' ج.م',
-                'revenue_compact'          => $this->formatCompactCurrency($revenueMonth)['compact'],
-                'credit_collected'         => round($creditCollectedMonth, 2),
-                'credit_collected_fmt'     => number_format(round($creditCollectedMonth, 2), 2) . ' ج.م',
-                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedMonth, 2))['compact'],
-            ],
-            'year' => [
-                'key'                      => 'year',
-                'label'                    => 'سنة',
-                'badge'                    => 'السنة الحالية',
-                'sublabel'                 => 'هذا العام',
-                'total'                    => round($salesYear, 2),
-                'total_formatted'          => number_format(round($salesYear, 2), 2) . ' ج.م',
-                'total_compact'            => $this->formatCompactCurrency(round($salesYear, 2))['compact'],
-                'count'                    => $invoicesCountYear,
-                'invoices_url'             => route('admin.sales.invoices', ['date_from' => $yearStart->toDateString(), 'date_to' => Carbon::today()->toDateString()]),
-                'revenue'                  => $revenueYear,
-                'revenue_formatted'        => number_format($revenueYear, 2) . ' ج.م',
-                'revenue_compact'          => $this->formatCompactCurrency($revenueYear)['compact'],
-                'credit_collected'         => round($creditCollectedYear, 2),
-                'credit_collected_fmt'     => number_format(round($creditCollectedYear, 2), 2) . ' ج.م',
-                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedYear, 2))['compact'],
-            ],
-            'all' => [
-                'key'                      => 'all',
-                'label'                    => 'الكل',
-                'badge'                    => 'الإجمالي العام',
-                'sublabel'                 => 'منذ البداية',
-                'total'                    => round($salesAll, 2),
-                'total_formatted'          => number_format(round($salesAll, 2), 2) . ' ج.م',
-                'total_compact'            => $this->formatCompactCurrency(round($salesAll, 2))['compact'],
-                'count'                    => $invoicesCountAll,
-                'invoices_url'             => route('admin.sales.invoices'),
-                'revenue'                  => $revenueAll,
-                'revenue_formatted'        => number_format($revenueAll, 2) . ' ج.م',
-                'revenue_compact'          => $this->formatCompactCurrency($revenueAll)['compact'],
-                'credit_collected'         => round($creditCollectedAll, 2),
-                'credit_collected_fmt'     => number_format(round($creditCollectedAll, 2), 2) . ' ج.م',
-                'credit_collected_compact' => $this->formatCompactCurrency(round($creditCollectedAll, 2))['compact'],
-            ],
+        $today = Carbon::today();
+        // key => [start (null = all time), label, badge, sublabel]. "week" = last 7 days including today.
+        $periods = [
+            'today' => [$today->copy()->startOfDay(), 'اليوم', 'مبيعات اليوم', 'اليوم'],
+            'week' => [$today->copy()->subDays(6)->startOfDay(), 'أسبوع', 'آخر 7 أيام', 'هذا الأسبوع'],
+            'month' => [$today->copy()->startOfMonth(), 'شهر', 'الشهر الحالي', 'هذا الشهر'],
+            'year' => [$today->copy()->startOfYear(), 'سنة', 'السنة الحالية', 'هذا العام'],
+            'all' => [null, 'الكل', 'الإجمالي العام', 'منذ البداية'],
         ];
+
+        $salesPeriods = [];
+        foreach ($periods as $key => [$start, $label, $badge, $sublabel]) {
+            $total = round($this->metrics->netSales($start), 2);
+            // Revenue = payments actually received in the period (credit method excluded).
+            $revenue = round($this->metrics->cashCollected($start), 2);
+            $credit = round($this->metrics->creditCollected($start), 2);
+            $salesPeriods[$key] = [
+                'key' => $key, 'label' => $label, 'badge' => $badge, 'sublabel' => $sublabel,
+                'total' => $total,
+                'total_formatted' => number_format($total, 2) . ' ج.م',
+                'total_compact' => MoneyHelper::formatCompactCurrency($total)['compact'],
+                'count' => $this->metrics->invoiceCount($start),
+                'invoices_url' => $start
+                    ? route('admin.sales.invoices', ['date_from' => $start->toDateString(), 'date_to' => $today->toDateString()])
+                    : route('admin.sales.invoices'),
+                'revenue' => $revenue,
+                'revenue_formatted' => number_format($revenue, 2) . ' ج.م',
+                'revenue_compact' => MoneyHelper::formatCompactCurrency($revenue)['compact'],
+                'credit_collected' => $credit,
+                'credit_collected_fmt' => number_format($credit, 2) . ' ج.م',
+                'credit_collected_compact' => MoneyHelper::formatCompactCurrency($credit)['compact'],
+            ];
+        }
 
         $selectedPeriodKey = $request->query('sales_period', 'all');
         if (!array_key_exists($selectedPeriodKey, $salesPeriods)) {
             $selectedPeriodKey = 'all';
         }
-
         $selectedPeriod = $salesPeriods[$selectedPeriodKey];
         $totalSales = $selectedPeriod['total'];
         $invoicesCount = $selectedPeriod['count'];
@@ -196,30 +73,18 @@ class DashboardController extends Controller
             ]);
         }
 
+        $totalCredit = $this->metrics->totalCreditBalance();
+        ['compact' => $totalCreditCompact, 'exact' => $totalCreditExact] = MoneyHelper::formatCompactCurrency($totalCredit);
+        $creditCustomersCount = $this->metrics->creditCustomersCount(false);
+        $customersCount = $this->metrics->customersCount();
+        $vehiclesCount = $this->metrics->vehiclesCount();
+        $productsCount = $this->metrics->productsCount();
+        $lowStockCount = $this->metrics->lowStockCount(false);
 
-        $totalCredit = (float) Customer::sum('current_credit_balance');
-        $totalCreditFormatted = $this->formatCompactCurrency($totalCredit);
-        $totalCreditCompact = $totalCreditFormatted['compact'];
-        $totalCreditExact = $totalCreditFormatted['exact'];
-        $creditCustomersCount = (int) Customer::where('current_credit_balance', '>', 0)->count();
+        // Category sub-summaries: countable invoices, line value net of returned units.
+        ['battery' => $catStatBatteries, 'oil' => $catStatOils, 'service' => $catStatServices,
+            'grease' => $catStatGreases, 'scrap' => $catStatScrap] = $this->metrics->categorySales();
 
-        $customersCount = (int) Customer::count();
-        $vehiclesCount = (int) CustomerVehicle::count();
-
-        $productsCount = (int) Product::count();
-        $lowStockCount = (int) Product::whereColumn('current_stock', '<=', 'reorder_threshold')->count();
-
-        // 2. Category Sub-summaries
-        // Same sales rule as the KPIs: countable invoices only, line value net of returned units.
-        $netLineSum = fn ($query) => (float) $query->whereHas('invoice', fn($q) => $q->countable())->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
-
-        $catStatBatteries = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', true)));
-        $catStatOils = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'oils'))));
-        $catStatServices = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', 'services'))));
-        $catStatGreases = $netLineSum(InvoiceItem::whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'greases'))));
-        $catStatScrap = (float) Invoice::countable()->sum('scrap_deduction_amount');
-
-        // Percentages for Donut
         $totalCatSales = $catStatBatteries + $catStatOils + $catStatGreases + $catStatServices;
         if ($totalCatSales > 0) {
             $pctBatteries = round(($catStatBatteries / $totalCatSales) * 100);
@@ -227,122 +92,30 @@ class DashboardController extends Controller
             $pctGreases = round(($catStatGreases / $totalCatSales) * 100);
             $pctServices = max(0, 100 - ($pctBatteries + $pctOils + $pctGreases));
         } else {
-            $pctBatteries = 50;
-            $pctOils = 30;
-            $pctGreases = 10;
-            $pctServices = 10;
+            [$pctBatteries, $pctOils, $pctGreases, $pctServices] = [50, 30, 10, 10];
         }
 
-        // 3. Weekly Sales Trend Chart (Last 7 Days)
-        $trendCategories = [];
-        $trendBatteries = [];
-        $trendOils = [];
-        $trendServices = [];
+        // Weekly sales trend chart (last 7 days).
+        $trend = $this->metrics->categoryTrend($today->copy()->subDays(6)->startOfDay(), $today->copy()->endOfDay());
+        $trendCategories = array_map(fn ($date) => self::ARABIC_DAYS[Carbon::parse($date)->format('l')], array_keys($trend));
+        $trendBatteries = array_column($trend, 'battery');
+        $trendOils = array_column($trend, 'oil');
+        $trendServices = array_column($trend, 'service');
 
-        $arabicDays = [
-            'Saturday' => 'السبت',
-            'Sunday' => 'الأحد',
-            'Monday' => 'الاثنين',
-            'Tuesday' => 'الثلاثاء',
-            'Wednesday' => 'الأربعاء',
-            'Thursday' => 'الخميس',
-            'Friday' => 'الجمعة',
-        ];
-
-        for ($i = 6; $i >= 0; $i--) {
-            $date = Carbon::today()->subDays($i);
-            $dayEnglish = $date->format('l');
-            $trendCategories[] = $arabicDays[$dayEnglish] ?? $dayEnglish;
-
-            $dayStart = $date->copy()->startOfDay();
-            $dayEnd = $date->copy()->endOfDay();
-
-            // Daily sales for batteries
-            $dayBat = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
-                ->whereHas('product', fn($q) => $q->where('is_battery', true))
-                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
-
-            // Daily sales for oils
-            $dayOil = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
-                ->whereHas('product', fn($q) => $q->where('is_battery', false)->whereHas('category', fn($c) => $c->where('slug', 'oils')))
-                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
-
-            // Daily sales for services
-            $daySrv = (float) InvoiceItem::whereHas('invoice', fn($q) => $q->whereBetween('created_at', [$dayStart, $dayEnd])->countable())
-                ->whereHas('product', fn($q) => $q->whereHas('category', fn($c) => $c->where('slug', 'services')))
-                ->sum(DB::raw(InvoiceItem::NET_LINE_SQL));
-
-            $trendBatteries[] = $dayBat;
-            $trendOils[] = $dayOil;
-            $trendServices[] = $daySrv;
-        }
-
-        // 4. Recent Invoices
-        $recentInvoices = Invoice::with(['customer', 'customerVehicle', 'items.product'])
-            ->countable()
-            ->latest('id')
-            ->take(6)
-            ->get();
-
-        // 5. Debtors / Credit Dues
-        $debtors = Customer::with('vehicles')
-            ->where('current_credit_balance', '>', 0)
-            ->orderByDesc('current_credit_balance')
-            ->take(5)
-            ->get();
-
-        // 6. Low Stock Products
-        $lowStockProducts = Product::with('category')
-            ->whereColumn('current_stock', '<=', 'reorder_threshold')
-            ->orderBy('current_stock')
-            ->take(6)
-            ->get();
-
-        // 7. Workshop Attendance for Today
-        $todayStr = Carbon::today()->toDateString();
-        $presentCount = Attendance::whereDate('work_date', $todayStr)->where('status', 'present')->count();
-        $lateCount = Attendance::whereDate('work_date', $todayStr)->where('status', 'late')->count();
-        $absentCount = Attendance::whereDate('work_date', $todayStr)->whereIn('status', ['absent', 'leave'])->count();
-
-        $workshopTechs = Employee::with(['jobTitle', 'attendances' => fn($q) => $q->whereDate('work_date', $todayStr)])
-            ->where('status', 'active')
-            ->take(6)
-            ->get();
+        $recentInvoices = $this->metrics->recentInvoices(6);
+        $debtors = $this->metrics->topDebtors(5);
+        $lowStockProducts = $this->metrics->lowStockProducts(6);
+        ['present' => $presentCount, 'late' => $lateCount, 'absent' => $absentCount] = $this->metrics->attendanceOn($today);
+        $workshopTechs = $this->metrics->activeEmployeesWithAttendance($today, 6);
 
         return view('admin.dashboard', compact(
-            'totalSales',
-            'invoicesCount',
-            'totalCredit',
-            'totalCreditCompact',
-            'totalCreditExact',
-            'creditCustomersCount',
-            'customersCount',
-            'vehiclesCount',
-            'productsCount',
-            'lowStockCount',
-            'catStatBatteries',
-            'catStatOils',
-            'catStatServices',
-            'catStatGreases',
-            'catStatScrap',
-            'pctBatteries',
-            'pctOils',
-            'pctGreases',
-            'pctServices',
-            'trendCategories',
-            'trendBatteries',
-            'trendOils',
-            'trendServices',
-            'recentInvoices',
-            'debtors',
-            'lowStockProducts',
-            'presentCount',
-            'lateCount',
-            'absentCount',
-            'workshopTechs',
-            'salesPeriods',
-            'selectedPeriodKey',
-            'selectedPeriod'
+            'totalSales', 'invoicesCount', 'totalCredit', 'totalCreditCompact', 'totalCreditExact',
+            'creditCustomersCount', 'customersCount', 'vehiclesCount', 'productsCount', 'lowStockCount',
+            'catStatBatteries', 'catStatOils', 'catStatServices', 'catStatGreases', 'catStatScrap',
+            'pctBatteries', 'pctOils', 'pctGreases', 'pctServices',
+            'trendCategories', 'trendBatteries', 'trendOils', 'trendServices',
+            'recentInvoices', 'debtors', 'lowStockProducts', 'presentCount', 'lateCount', 'absentCount',
+            'workshopTechs', 'salesPeriods', 'selectedPeriodKey', 'selectedPeriod'
         ));
     }
 }

@@ -2,14 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Owner;
 
+use App\Contracts\Dashboard\DashboardMetricsInterface;
 use App\Http\Controllers\Controller;
-use App\Models\Attendance;
-use App\Models\Customer;
-use App\Models\Employee;
-use App\Models\Invoice;
-use App\Models\InvoicePayment;
-use App\Models\CreditLedgerEntry;
-use App\Models\Product;
 use App\Support\MoneyHelper;
 use App\Support\OwnerPulseCache;
 use Carbon\Carbon;
@@ -18,6 +12,8 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    public function __construct(private DashboardMetricsInterface $metrics) {}
+
     /**
      * Live Pulse Dashboard API (Ultra low-latency < 50ms).
      * Provides an executive snapshot of current shop pulse.
@@ -31,32 +27,13 @@ class DashboardController extends Controller
             $yesterday = Carbon::yesterday();
 
             // 1. Safe cash today (Invoice cash payments + Credit cash collections)
-            $cashQuery = InvoicePayment::active()->cash()->whereDate('created_at', $today);
-            if ($branchId !== null) {
-                $cashQuery->whereHas('invoice', fn($q) => $q->where('branch_id', $branchId));
-            }
-            $paymentsCash = (float) $cashQuery->sum('amount');
-
-            $creditCollectionsCash = (float) CreditLedgerEntry::where('entry_type', 'payment_collection')
-                ->whereDate('created_at', $today)
-                ->sum('amount');
-
-            $safeCashTotal = $paymentsCash + $creditCollectionsCash;
+            $safeCashTotal = $this->metrics->safeCash($today->copy()->startOfDay(), $today->copy()->endOfDay(), $branchId);
             $safeCashFormatted = MoneyHelper::formatCompactCurrency($safeCashTotal);
 
             // 2. Sales Today & Comparison to Yesterday
-            $invoicesToday = Invoice::countable()->whereDate('created_at', $today);
-            $invoicesYesterday = Invoice::countable()->whereDate('created_at', $yesterday);
-
-            if ($branchId !== null) {
-                $invoicesToday->where('branch_id', $branchId);
-                $invoicesYesterday->where('branch_id', $branchId);
-            }
-
-            $salesTodayRaw = Invoice::sumNetAmount($invoicesToday);
-            $invoicesCountToday = (int) (clone $invoicesToday)->count();
-
-            $salesYesterdayRaw = Invoice::sumNetAmount($invoicesYesterday);
+            $salesTodayRaw = $this->metrics->netSales($today->copy()->startOfDay(), $today->copy()->endOfDay(), $branchId);
+            $invoicesCountToday = $this->metrics->invoiceCount($today->copy()->startOfDay(), $today->copy()->endOfDay(), $branchId);
+            $salesYesterdayRaw = $this->metrics->netSales($yesterday->copy()->startOfDay(), $yesterday->copy()->endOfDay(), $branchId);
 
             $comparedPercent = '+0.0%';
             if ($salesYesterdayRaw > 0) {
@@ -70,17 +47,7 @@ class DashboardController extends Controller
             $salesTodayFormatted = MoneyHelper::formatCompactCurrency($salesTodayRaw);
 
             // 3. Active Shift Surveillance
-            $activeAttendanceQuery = Attendance::query()
-                ->where('work_date', $today)
-                ->whereNotNull('check_in')
-                ->whereNull('check_out');
-            if ($branchId !== null) {
-                $activeAttendanceQuery->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
-            }
-            $activeAttendance = $activeAttendanceQuery
-                ->with(['employee.user', 'employee.jobTitle'])
-                ->latest('check_in')
-                ->first();
+            $activeAttendance = $this->metrics->openAttendance($today, $branchId);
 
             $shiftData = [
                 'is_open'        => false,
@@ -106,14 +73,7 @@ class DashboardController extends Controller
                 ];
             } else {
                 // Check if any invoice was issued today to identify today's active cashier
-                $latestInvoiceQuery = Invoice::countable()->whereDate('created_at', $today);
-                if ($branchId !== null) {
-                    $latestInvoiceQuery->where('branch_id', $branchId);
-                }
-                $latestTodayInvoice = $latestInvoiceQuery
-                    ->with('cashier')
-                    ->latest('id')
-                    ->first();
+                $latestTodayInvoice = $this->metrics->latestInvoiceOn($today, $branchId);
 
                 if ($latestTodayInvoice && $latestTodayInvoice->cashier) {
                     $shiftData = [
@@ -126,32 +86,15 @@ class DashboardController extends Controller
             }
 
             // 4. Workshop Attendance Pulse
-            $empQuery = Employee::active();
-            if ($branchId !== null) {
-                $empQuery->where('branch_id', $branchId);
-            }
-            $totalEmployees = (int) $empQuery->count();
-
-            $attendanceQuery = Attendance::where('work_date', $today)
-                ->whereIn('status', ['present', 'late']);
-            if ($branchId !== null) {
-                $attendanceQuery->whereHas('employee', fn($q) => $q->where('branch_id', $branchId));
-            }
-            $presentCount = (int) $attendanceQuery->count();
+            $totalEmployees = $this->metrics->activeEmployeesCount($branchId);
+            $presentCount = $this->metrics->presentOrLateCount($today, $branchId);
 
             $attendanceRate = $totalEmployees > 0 ? round(($presentCount / $totalEmployees) * 100) . '%' : '0%';
 
             // 5. Critical Alerts
-            $lowStockCount = (int) Product::active()->lowStock()->count();
-
-            $returnsQuery = Invoice::whereDate('updated_at', $today)
-                ->whereIn('status', ['refunded', 'partially_refunded']);
-            if ($branchId !== null) {
-                $returnsQuery->where('branch_id', $branchId);
-            }
-            $returnsCount = (int) $returnsQuery->count();
-
-            $unsettledCreditCount = (int) Customer::where('is_active', true)->where('current_credit_balance', '>', 0)->count();
+            $lowStockCount = $this->metrics->lowStockCount(true);
+            $returnsCount = $this->metrics->returnsOn($today, $branchId);
+            $unsettledCreditCount = $this->metrics->creditCustomersCount(true);
 
             return [
                 'safe_cash_now' => [
@@ -210,42 +153,18 @@ class DashboardController extends Controller
         ];
 
         $data = OwnerPulseCache::periods($period, $branchId, function () use ($period, $periodLabels, $branchId) {
-            $invoicesQuery = Invoice::countable();
-            $creditQuery = CreditLedgerEntry::where('entry_type', 'payment_collection');
+            // Owner periods: "today" is the calendar day; week/month/year start at their calendar start.
+            [$from, $to] = match ($period) {
+                'today' => [Carbon::today()->startOfDay(), Carbon::today()->endOfDay()],
+                'week'  => [Carbon::now()->startOfWeek(), null],
+                'month' => [Carbon::now()->startOfMonth(), null],
+                'year'  => [Carbon::now()->startOfYear(), null],
+                default => [null, null],
+            };
 
-            if ($branchId !== null) {
-                $invoicesQuery->where('branch_id', $branchId);
-            }
-
-            switch ($period) {
-                case 'today':
-                    $invoicesQuery->whereDate('created_at', Carbon::today());
-                    $creditQuery->whereDate('created_at', Carbon::today());
-                    break;
-                case 'week':
-                    $startOfWeek = Carbon::now()->startOfWeek();
-                    $invoicesQuery->where('created_at', '>=', $startOfWeek);
-                    $creditQuery->where('created_at', '>=', $startOfWeek);
-                    break;
-                case 'month':
-                    $startOfMonth = Carbon::now()->startOfMonth();
-                    $invoicesQuery->where('created_at', '>=', $startOfMonth);
-                    $creditQuery->where('created_at', '>=', $startOfMonth);
-                    break;
-                case 'year':
-                    $startOfYear = Carbon::now()->startOfYear();
-                    $invoicesQuery->where('created_at', '>=', $startOfYear);
-                    $creditQuery->where('created_at', '>=', $startOfYear);
-                    break;
-                case 'all':
-                default:
-                    // No date bounds
-                    break;
-            }
-
-            $revenueRaw = Invoice::sumNetAmount($invoicesQuery);
-            $totalSalesCount = (int) (clone $invoicesQuery)->count();
-            $creditCollectedRaw = (float) $creditQuery->sum('amount');
+            $revenueRaw = $this->metrics->netSales($from, $to, $branchId);
+            $totalSalesCount = $this->metrics->invoiceCount($from, $to, $branchId);
+            $creditCollectedRaw = $this->metrics->creditCollected($from, $to);
 
             $revenueFormatted = MoneyHelper::formatCompactCurrency($revenueRaw);
             $creditFormatted = MoneyHelper::formatCompactCurrency($creditCollectedRaw);
