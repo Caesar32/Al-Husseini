@@ -206,6 +206,11 @@ class UserController extends Controller
         $user->is_active = !$user->is_active;
         $user->save();
 
+        // A deactivated user must not keep an owner API token (B1).
+        if (!$user->is_active) {
+            $user->tokens()->delete();
+        }
+
         // A deactivated user must not keep working in an existing session (SEC-04).
         if (!$user->is_active && config('session.driver') === 'database') {
             DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();

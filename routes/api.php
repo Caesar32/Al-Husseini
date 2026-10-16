@@ -27,7 +27,7 @@ Route::prefix('v1/owner')->group(function () {
         ->name('api.v1.owner.login');
 
     // Protected Routes (Requires Bearer token with 'owner:monitor' ability)
-    Route::middleware(['auth:sanctum', 'ability:owner:monitor'])->group(function () {
+    Route::middleware(['auth:sanctum', 'ability:owner:monitor', 'owner.valid'])->group(function () {
 
         // Authentication & Session
         Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.owner.logout');

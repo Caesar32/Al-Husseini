@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
             'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'owner.valid' => \App\Http\Middleware\EnsureOwnerTokenIsValid::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

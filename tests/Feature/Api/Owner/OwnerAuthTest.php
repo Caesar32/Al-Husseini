@@ -165,3 +165,55 @@ test('logout revokes only current token and leaves other device tokens intact', 
         ->getJson(route('api.v1.owner.me'))
         ->assertStatus(401);
 });
+
+test('inactive owner token returns 401 and revokes personal access tokens', function () {
+    $t = $this->owner->createToken('d', ['owner:monitor'])->plainTextToken;
+    $this->owner->update(['is_active' => false]);
+
+    $response = $this->withToken($t)
+        ->getJson(route('api.v1.owner.me'));
+
+    $response->assertStatus(401)
+        ->assertJson([
+            'status' => 'error',
+            'code'   => 'OWNER_ACCESS_REVOKED',
+        ]);
+
+    expect($this->owner->tokens()->count())->toBe(0);
+});
+
+test('owner token returns 401 after the super-admin role is removed', function () {
+    $t = $this->owner->createToken('d', ['owner:monitor'])->plainTextToken;
+    $this->owner->removeRole('super-admin');
+
+    $response = $this->withToken($t)
+        ->getJson(route('api.v1.owner.me'));
+
+    $response->assertStatus(401)
+        ->assertJson([
+            'status' => 'error',
+            'code'   => 'OWNER_ACCESS_REVOKED',
+        ]);
+
+    expect($this->owner->tokens()->count())->toBe(0);
+});
+
+test('active super-admin token returns 200 from the owner profile endpoint', function () {
+    $t = $this->owner->createToken('d', ['owner:monitor'])->plainTextToken;
+
+    $this->withToken($t)
+        ->getJson(route('api.v1.owner.me'))
+        ->assertOk();
+});
+
+test('deactivating a user deletes their personal access tokens', function () {
+    $this->cashier->update(['is_active' => true]);
+    $this->cashier->createToken('d', ['owner:monitor']);
+
+    $this->actingAs($this->owner)
+        ->post(route('admin.users.toggle-status', $this->cashier))
+        ->assertRedirect(route('admin.users.index'));
+
+    expect($this->cashier->fresh()->is_active)->toBeFalse()
+        ->and($this->cashier->tokens()->count())->toBe(0);
+});

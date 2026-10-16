@@ -23,7 +23,7 @@ Phases 3 and 5 depend only on Phase 1, so they can run in parallel with Phases 2
 ## Recorded values
 | Key | Value |
 |---|---|
-| `PHASE0_SHA` | |
+| `PHASE0_SHA` | `0fa6996` |
 | HR edits decision (Phase 0) | Pending owner (A/B/C). The two edited files stay uncommitted and are excluded from every refactor commit. |
 | `N0` (baseline passed count) | 411 passed, 0 failed, 0 skipped (3020 assertions), at `4de75b5` plus the uncommitted HR edits |
 | `N1` .. `N6` | |
