@@ -84,3 +84,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 |---|---|---|
 | M1-01 | Done: scrap `capacity_ah` read as string; `scrap_batteries` list (legacy fallback); sheet renders each | 5 |
 | M0-01, M0-04 | Done: sealed `ApiFailure` hierarchy (Arabic messages); `requireDataMap/List`, `requireBodyMap`, `readPagination` + `PaginationMeta` | 22 |
+| M0-02, M0-03 | Done: `ApiService._send` maps 401/403/404/422/429/5xx/non-JSON/socket/TLS to `ApiFailure`; awaited `clearAll` + `onUnauthorized` stream on 401 | 35 |
