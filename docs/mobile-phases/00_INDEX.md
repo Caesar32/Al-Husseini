@@ -43,7 +43,7 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 
 | Phase | File | Goal | Status |
 |---|---|---|---|
-| M0 | `M0_BASELINE_AND_NETWORKING.md` | Typed failures, a single 401 path, 429/5xx/non-JSON handling, injectable client | Not started |
+| M0 | `M0_BASELINE_AND_NETWORKING.md` | Typed failures, a single 401 path, 429/5xx/non-JSON handling, injectable client | Done |
 | M1 | `M1_MODELS_AND_SERIALIZATION.md` | Null-safe parse helpers; fix F-01, F-03, F-04, F-08, F-11; model unit tests from real payloads | Not started |
 | M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Not started |
 | M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Not started |
@@ -85,3 +85,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M1-01 | Done: scrap `capacity_ah` read as string; `scrap_batteries` list (legacy fallback); sheet renders each | 5 |
 | M0-01, M0-04 | Done: sealed `ApiFailure` hierarchy (Arabic messages); `requireDataMap/List`, `requireBodyMap`, `readPagination` + `PaginationMeta` | 22 |
 | M0-02, M0-03 | Done: `ApiService._send` maps 401/403/404/422/429/5xx/non-JSON/socket/TLS to `ApiFailure`; awaited `clearAll` + `onUnauthorized` stream on 401 | 35 |
+| M1-02 | Done: `json_read.dart` tolerant readers + `Money` value class | 93 |
