@@ -11,7 +11,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
-                <button type="button" class="btn btn-primary" onclick="printModalEmployeeCard()">
+                <button type="button" class="btn btn-primary" data-action="hr.reports.print-card">
                     <i class="ri-printer-line me-1"></i> طباعة كشف الموظف
                 </button>
             </div>

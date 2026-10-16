@@ -27,13 +27,13 @@
                     <div class="col-xl-4 col-lg-5 col-md-12">
                         <label class="form-label fs-12 fw-bold text-muted mb-1 d-block">نطاق التقرير الزمني:</label>
                         <div class="btn-group w-100" role="group">
-                            <button type="button" class="btn btn-outline-primary active report-filter-pill" id="btn-mode-daily" onclick="setReportMode('daily')">
+                            <button type="button" class="btn btn-outline-primary active report-filter-pill" id="btn-mode-daily" data-action="hr.reports.mode" data-mode="daily">
                                 <i class="ri-calendar-check-line me-1"></i> تقرير يومي
                             </button>
-                            <button type="button" class="btn btn-outline-primary report-filter-pill" id="btn-mode-monthly" onclick="setReportMode('monthly')">
+                            <button type="button" class="btn btn-outline-primary report-filter-pill" id="btn-mode-monthly" data-action="hr.reports.mode" data-mode="monthly">
                                 <i class="ri-calendar-todo-line me-1"></i> تقرير شهري
                             </button>
-                            <button type="button" class="btn btn-outline-primary report-filter-pill" id="btn-mode-custom" onclick="setReportMode('custom')">
+                            <button type="button" class="btn btn-outline-primary report-filter-pill" id="btn-mode-custom" data-action="hr.reports.mode" data-mode="custom">
                                 <i class="ri-calendar-event-line me-1"></i> فترة مخصصة
                             </button>
                         </div>
@@ -45,14 +45,14 @@
                         <div id="controls-daily" class="date-controls-group">
                             <label class="form-label fs-12 fw-bold text-muted mb-1">اختر اليوم للمتابعة اليومية:</label>
                             <div class="input-group">
-                                <button class="btn btn-light border" type="button" onclick="navigateDay(-1)" title="اليوم السابق">
+                                <button class="btn btn-light border" type="button" data-action="hr.reports.day" data-offset="-1" title="اليوم السابق">
                                     <i class="ri-arrow-right-s-line"></i>
                                 </button>
-                                <input type="date" class="form-control text-center fw-bold" id="input-daily-date" onchange="loadReport()">
-                                <button class="btn btn-light border" type="button" onclick="navigateDay(1)" title="اليوم التالي">
+                                <input type="date" class="form-control text-center fw-bold" id="input-daily-date" data-action="hr.reports.load">
+                                <button class="btn btn-light border" type="button" data-action="hr.reports.day" data-offset="1" title="اليوم التالي">
                                     <i class="ri-arrow-left-s-line"></i>
                                 </button>
-                                <button class="btn btn-soft-primary" type="button" onclick="setTodayDate()">اليوم</button>
+                                <button class="btn btn-soft-primary" type="button" data-action="hr.reports.today">اليوم</button>
                             </div>
                         </div>
 
@@ -61,7 +61,7 @@
                             <label class="form-label fs-12 fw-bold text-muted mb-1">اختر الشهر والسنة:</label>
                             <div class="row g-2">
                                 <div class="col-7">
-                                    <select class="form-select fw-semibold" id="select-month" onchange="loadReport()">
+                                    <select class="form-select fw-semibold" id="select-month" data-action="hr.reports.load">
                                         <option value="1">يناير (1)</option>
                                         <option value="2">فبراير (2)</option>
                                         <option value="3">مارس (3)</option>
@@ -77,7 +77,7 @@
                                     </select>
                                 </div>
                                 <div class="col-5">
-                                    <select class="form-select fw-semibold" id="select-year" onchange="loadReport()">
+                                    <select class="form-select fw-semibold" id="select-year" data-action="hr.reports.load">
                                         @foreach($years as $year)
                                             <option value="{{ $year }}" @selected($loop->first)>{{ $year }}</option>
                                         @endforeach
@@ -91,10 +91,10 @@
                             <label class="form-label fs-12 fw-bold text-muted mb-1">تحديد نطاق التواريخ:</label>
                             <div class="row g-2">
                                 <div class="col-6">
-                                    <input type="date" class="form-control" id="input-range-start" onchange="loadReport()" title="من تاريخ">
+                                    <input type="date" class="form-control" id="input-range-start" data-action="hr.reports.load" title="من تاريخ">
                                 </div>
                                 <div class="col-6">
-                                    <input type="date" class="form-control" id="input-range-end" onchange="loadReport()" title="إلى تاريخ">
+                                    <input type="date" class="form-control" id="input-range-end" data-action="hr.reports.load" title="إلى تاريخ">
                                 </div>
                             </div>
                         </div>
@@ -104,10 +104,10 @@
                     <div class="col-xl-3 col-lg-12 text-xl-end">
                         <label class="form-label fs-12 fw-bold text-muted mb-1 d-block">إجراءات التقرير:</label>
                         <div class="d-flex gap-2 justify-content-xl-end">
-                            <button type="button" class="btn btn-primary" onclick="printOfficialReport()" title="طباعة كشف رسمي معتمد">
+                            <button type="button" class="btn btn-primary" data-action="hr.reports.print" title="طباعة كشف رسمي معتمد">
                                 <i class="ri-printer-line align-middle me-1"></i> طباعة
                             </button>
-                            <button type="button" class="btn btn-success" onclick="exportReportCSV()" title="تنزيل كشف Excel / CSV">
+                            <button type="button" class="btn btn-success" data-action="hr.reports.export" title="تنزيل كشف Excel / CSV">
                                 <i class="ri-file-excel-2-line align-middle me-1"></i> تصدير Excel
                             </button>
                         </div>
@@ -119,7 +119,7 @@
                     <div class="col-md-4">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light"><i class="ri-building-line"></i></span>
-                            <select class="form-select" id="filter-department" onchange="applyFilters()">
+                            <select class="form-select" id="filter-department" data-action="hr.reports.filter">
                                 <option value="">جميع الأقسام والورش</option>
                                 @foreach($departments as $departmentName)
                                     <option value="{{ $departmentName }}">{{ $departmentName }}</option>
@@ -131,8 +131,8 @@
                     <div class="col-md-4">
                         <div class="input-group input-group-sm">
                             <span class="input-group-text bg-light"><i class="ri-user-search-line"></i></span>
-                            <input type="text" class="form-control" id="search-employee" placeholder="بحث باسم الموظف أو الكود..." value="{{ request('search', '') }}" oninput="applyFilters()">
-                            <button class="btn btn-light border" type="button" onclick="clearReportSearch()" title="مسح البحث">
+                            <input type="text" class="form-control" id="search-employee" placeholder="بحث باسم الموظف أو الكود..." value="{{ request('search', '') }}" data-action="hr.reports.filter">
+                            <button class="btn btn-light border" type="button" data-action="hr.reports.clear-search" aria-label="مسح البحث" title="مسح البحث">
                                 <i class="ri-close-line"></i>
                             </button>
                         </div>

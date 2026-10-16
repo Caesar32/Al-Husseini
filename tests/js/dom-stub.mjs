@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 
-export function createBrowser({ fetchResponses = {} } = {}) {
+export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
     const listeners = {};
     const elements = {};
     const calls = { fetch: [], swal: [], modal: [], intervals: [], cleared: [] };
@@ -12,7 +12,8 @@ export function createBrowser({ fetchResponses = {} } = {}) {
         if (!elements[id]) {
             const handlers = {};
             elements[id] = {
-                id, value: '', textContent: '', innerHTML: '', dataset: {}, style: {},
+                id, value: '', textContent: '', innerHTML: '', dataset: {}, style: {}, options: [],
+                setAttribute() {}, getAttribute: () => null,
                 classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
                 addEventListener: (type, fn) => { (handlers[type] ||= []).push(fn); },
                 fire: (type, extra = {}) => (handlers[type] || []).forEach((fn) => fn({ type, preventDefault() {}, ...extra })),
@@ -43,6 +44,7 @@ export function createBrowser({ fetchResponses = {} } = {}) {
         setInterval: (fn, ms) => { calls.intervals.push(ms); return calls.intervals.length; },
         clearInterval: (id) => calls.cleared.push(id),
         bootstrap: { Modal: function (el) { this.show = () => calls.modal.push(['show', el?.id]); this.hide = () => calls.modal.push(['hide', el?.id]); } },
+        ...globals,
         Swal: { fire: (...args) => { calls.swal.push(args); return Promise.resolve({ isConfirmed: false }); }, showValidationMessage() {} },
         fetch: (url, options = {}) => {
             calls.fetch.push({ url, method: options.method || 'GET', body: options.body ? JSON.parse(options.body) : null });

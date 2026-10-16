@@ -8,6 +8,18 @@
 @endsection
 
 @section('content')
+@php
+    $pageConfig = [
+        'urls' => [
+            'daily' => route('admin.hr.reports.daily'),
+            'monthly' => route('admin.hr.reports.monthly'),
+            'range' => route('admin.hr.reports.range'),
+            'employee' => route('admin.hr.reports.employee', ['employee' => '__ID__']),
+        ],
+        'defaultAvatar' => asset('assets/images/users/avatar-1.jpg'),
+    ];
+@endphp
+<div data-page="hr.reports" data-config='@json($pageConfig)'>
     @include('admin.layouts.partials.page-title', ['pagetitle' => 'الموارد البشرية', 'title' => 'تقارير الحضور والغياب والخصومات'])
 
     {{-- 2. ترويسة الطباعة الرسمية وشريط التحكم والتصفية الزمنية --}}
@@ -67,6 +79,7 @@
 
     {{-- 9. نافذة كشف حساب وسجل انضباط الموظف الفردي --}}
     @include('admin.hr.partials.reports.modal-employee')
+</div>
 @endsection
 
 @section('script')
