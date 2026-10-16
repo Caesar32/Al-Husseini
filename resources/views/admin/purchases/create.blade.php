@@ -62,10 +62,7 @@
                         <label class="form-label">رقم فاتورة المورد / الشحنة <span class="text-danger">*</span></label>
                         <input type="text" name="invoice_number" class="form-control" required placeholder="مثال: INV-SUP-1082" value="{{ old('invoice_number') }}">
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">تاريخ التوريد والاستلام <span class="text-danger">*</span></label>
-                        <input type="date" name="invoice_date" class="form-control" required value="{{ date('Y-m-d') }}">
-                    </div>
+                    <x-form.date name="invoice_date" label="تاريخ التوريد والاستلام" required :value="date('Y-m-d')" wrapper-class="col-md-3" label-class="form-label" />
                     <div class="col-md-2">
                         <label class="form-label">الفرع المستلم <span class="text-danger">*</span></label>
                         <select name="branch_id" class="form-select" required>

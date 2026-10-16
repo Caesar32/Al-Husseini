@@ -63,3 +63,31 @@ test('a textarea keeps its value and an input group wraps the append slot', func
         ->blade('<x-form.input name="password" type="password" label="كلمة المرور"><x-slot:append><button type="button">عرض</button></x-slot:append></x-form.input>')
         ->assertSeeInOrder(['<div class="input-group">', 'type="password"', '<button type="button">عرض</button>', '</div>'], false);
 });
+
+test('a switch posts nothing when unchecked unless an unchecked value is requested', function () {
+    $this->blade('<x-form.switch name="flag" label="تفعيل" help="شرح" />')
+        ->assertSee('type="checkbox" name="flag" id="flag" value="1" role="switch"', false)
+        ->assertSee('aria-describedby="flag-help"', false)
+        ->assertSee('<label class="form-check-label fw-semibold" for="flag">تفعيل</label>', false)
+        ->assertDontSee('type="hidden"', false)
+        ->assertDontSee('checked', false);
+
+    $this->blade('<x-form.switch name="flag" label="تفعيل" :checked="true" unchecked-value="0" />')
+        ->assertSeeInOrder(['<input type="hidden" name="flag" value="0">', 'type="checkbox"', 'checked'], false);
+});
+
+test('a date input keeps min, max and the label class', function () {
+    $this->withViewErrors([])
+        ->blade('<x-form.date name="d" label="التاريخ" value="2026-10-16" min="2026-01-01" label-class="form-label" wrapper-class="col-md-3" />')
+        ->assertSee('<div class="col-md-3">', false)
+        ->assertSee('<label for="d" class="form-label">التاريخ</label>', false)
+        ->assertSee('type="date" name="d" id="d" value="2026-10-16"', false)
+        ->assertSee('min="2026-01-01"', false);
+});
+
+test('the error summary lists every error and renders nothing without errors', function () {
+    $this->withViewErrors(['a' => 'خطأ أ', 'b' => 'خطأ ب'])
+        ->blade('<x-form.errors />')
+        ->assertSeeInOrder(['role="alert"', '<li>خطأ أ</li>', '<li>خطأ ب</li>'], false);
+    $this->withViewErrors([])->blade('<x-form.errors />')->assertDontSee('alert', false);
+});

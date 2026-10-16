@@ -290,7 +290,7 @@
                         <div class="mb-3">
                             <label class="form-label fw-semibold">كلمة المرور الجديدة <span class="text-danger">*</span></label>
                             <div class="input-group">
-                                <input type="password" name="password" id="reset_password_{{ $u->id }}" class="form-control font-monospace" placeholder="أدخل كلمة المرور الجديدة (6 أحرف فأكثر)" required minlength="6" autocomplete="new-password">
+                                <input type="password" name="password" id="reset_password_{{ $u->id }}" class="form-control font-monospace" placeholder="أدخل كلمة المرور الجديدة (8 أحرف فأكثر)" required minlength="8" autocomplete="new-password">
                                 <button type="button" class="btn btn-outline-secondary" onclick="togglePassVisibility('reset_password_{{ $u->id }}', this)">
                                     <i class="ri-eye-line"></i>
                                 </button>
@@ -333,7 +333,7 @@
                                 </option>
                             @endforeach
                         </x-form.select>
-                        <x-form.input name="password" type="password" id="edit_password_{{ $u->id }}" label="كلمة المرور الجديدة (اختياري)" help="اتركه فارغاً إذا كنت لا ترغب في تغيير كلمة المرور." placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية" minlength="6" autocomplete="new-password" :stateful="false">
+                        <x-form.input name="password" type="password" id="edit_password_{{ $u->id }}" label="كلمة المرور الجديدة (اختياري)" help="اتركه فارغاً إذا كنت لا ترغب في تغيير كلمة المرور." placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية" minlength="8" autocomplete="new-password" :stateful="false">
                             <x-slot:append>
                                 <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('edit_password_{{ $u->id }}', this)">
                                     <i class="ri-eye-line" aria-hidden="true"></i>
@@ -367,7 +367,7 @@
                     <x-form.input name="phone" id="add_user_phone" label="رقم الهاتف" placeholder="01xxxxxxxxx" />
                     <x-form.select name="branch_id" id="add_user_branch" label="الفرع المخصص" :options="$branches->pluck('name', 'id')" placeholder="بدون فرع محدد (عام)" />
                     <x-form.select name="role" id="add_user_role" label="الدور والصلاحيات" required help="عند اختيار دور كاشير مبيعات سيتم توجيهه تلقائياً لشاشة الـ POS." :options="$roles->mapWithKeys(fn ($r) => [$r->name => $r->display_label.' ('.$r->name.')'])" placeholder="-- اختر الدور --" />
-                    <x-form.input name="password" type="password" id="add_user_password" label="كلمة المرور الأولية" required placeholder="6 أحرف على الأقل" minlength="6" autocomplete="new-password">
+                    <x-form.input name="password" type="password" id="add_user_password" label="كلمة المرور الأولية" required placeholder="8 أحرف على الأقل" minlength="8" autocomplete="new-password">
                         <x-slot:append>
                             <button type="button" class="btn btn-outline-secondary" aria-label="إظهار كلمة المرور" onclick="togglePassVisibility('add_user_password', this)">
                                 <i class="ri-eye-line" aria-hidden="true"></i>

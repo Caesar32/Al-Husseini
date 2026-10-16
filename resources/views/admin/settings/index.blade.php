@@ -242,13 +242,8 @@
                                 </div>
 
                                 <div class="col-12 mt-4">
-                                    <div class="form-check form-switch form-switch-md">
-                                        <input class="form-check-input" type="checkbox" name="allow_negative_stock" id="allow_negative_stock" value="1" {{ ($settings['allow_negative_stock'] ?? '0') === '1' ? 'checked' : '' }}>
-                                        <label class="form-check-label fw-semibold" for="allow_negative_stock">
-                                            السماح بالبيع في حال نفاد المخزون (Negative Stock)
-                                        </label>
-                                        <div class="text-muted fs-11">عند التفعيل، يستطيع الكاشير إتمام الفاتورة حتى لو لم يتوفر رصيد كافي في مخزن الفرع مع تسجيل رصيد بالسالب لحين توريد الشحنة.</div>
-                                    </div>
+                                    {{-- SettingController reads switches with has(): no hidden "0" input. --}}
+                                    <x-form.switch name="allow_negative_stock" label="السماح بالبيع في حال نفاد المخزون (Negative Stock)" :checked="($settings['allow_negative_stock'] ?? '0') === '1'" help="عند التفعيل، يستطيع الكاشير إتمام الفاتورة حتى لو لم يتوفر رصيد كافي في مخزن الفرع مع تسجيل رصيد بالسالب لحين توريد الشحنة." />
                                 </div>
                             </div>
                         </div>
@@ -275,21 +270,9 @@
                                 </div>
 
                                 <div class="col-12 mt-3">
-                                    <div class="form-check form-switch form-switch-md mb-3">
-                                        <input class="form-check-input" type="checkbox" name="lateness_alert_enabled" id="lateness_alert_enabled" value="1" {{ ($settings['lateness_alert_enabled'] ?? '1') === '1' ? 'checked' : '' }}>
-                                        <label class="form-check-label fw-semibold" for="lateness_alert_enabled">
-                                            إرسال تنبيه فوري للإدارة عند تسجيل بصمة تأخير لأي فني أو بائع
-                                        </label>
-                                        <div class="text-muted fs-11">يتم إنشاء إشعار في قائمة التنبيهات العلوية فور تسجيل البصمة بعد فترة السماح.</div>
-                                    </div>
+                                    <x-form.switch name="lateness_alert_enabled" wrapper-class="form-check form-switch form-switch-md mb-3" label="إرسال تنبيه فوري للإدارة عند تسجيل بصمة تأخير لأي فني أو بائع" :checked="($settings['lateness_alert_enabled'] ?? '1') === '1'" help="يتم إنشاء إشعار في قائمة التنبيهات العلوية فور تسجيل البصمة بعد فترة السماح." />
 
-                                    <div class="form-check form-switch form-switch-md">
-                                        <input class="form-check-input" type="checkbox" name="email_notifications_enabled" id="email_notifications_enabled" value="1" {{ ($settings['email_notifications_enabled'] ?? '1') === '1' ? 'checked' : '' }}>
-                                        <label class="form-check-label fw-semibold" for="email_notifications_enabled">
-                                            تفعيل التنبيهات عبر البريد الإلكتروني للمسيرات وطلبات الإجازات
-                                        </label>
-                                        <div class="text-muted fs-11">إرسال تقرير ملخص عند اعتماد وصرف مسيرات الرواتب الشهرية.</div>
-                                    </div>
+                                    <x-form.switch name="email_notifications_enabled" label="تفعيل التنبيهات عبر البريد الإلكتروني للمسيرات وطلبات الإجازات" :checked="($settings['email_notifications_enabled'] ?? '1') === '1'" help="إرسال تقرير ملخص عند اعتماد وصرف مسيرات الرواتب الشهرية." />
                                 </div>
                             </div>
                         </div>
