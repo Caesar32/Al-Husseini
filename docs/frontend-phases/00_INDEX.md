@@ -25,7 +25,7 @@ This roadmap follows the backend refactor (`REFACTOR_PLAN.md`). Its goal is a co
 | F0 | [F0_BASELINE_AND_DESIGN_TOKENS.md](F0_BASELINE_AND_DESIGN_TOKENS.md) | Pipeline decision, tokens file, hygiene ratchet test, screenshots | none | [x] `287306e`, `7f38539`; 478 passed; screenshots (Step 4) pending owner |
 | F1 | [F1_ATOMIC_COMPONENTS.md](F1_ATOMIC_COMPONENTS.md) | Button, badge, status badge, alert, spinner, icon, money, empty state | F0 | [x] `146bdad`..`d522488`; 506 passed; StatusBadges has the invoice type (others added as pages migrate) |
 | F2 | [F2_FORM_AND_INPUT_CONTROLS.md](F2_FORM_AND_INPUT_CONTROLS.md) | Field wrapper, input, select, date, switch, error states | F1 | [x] `e0e81c8`, `be2b930`; 517 passed. Step 3 (employee modal) BLOCKED: owner HR edits still uncommitted in modal-form.blade.php |
-| F3 | [F3_COMPLEX_BLADE_COMPONENTS.md](F3_COMPLEX_BLADE_COMPONENTS.md) | Modal, data table, filter bar, stat card, page header | F2 | [ ] |
+| F3 | [F3_COMPLEX_BLADE_COMPONENTS.md](F3_COMPLEX_BLADE_COMPONENTS.md) | Modal, data table, filter bar, stat card, page header | F2 | [x] `c9e73e6`..`e60a698`; 527 passed |
 | F4 | [F4_JAVASCRIPT_DECOUPLING.md](F4_JAVASCRIPT_DECOUPLING.md) | `admin-core.js` (esc, fetch, actions), inline handlers and scripts out of views | F0 | [ ] |
 | F5 | [F5_PAGE_VIEWS_REFACTOR.md](F5_PAGE_VIEWS_REFACTOR.md) | POS, dashboard, products (inventory), invoices on the new components | F1-F4 | [ ] |
 | F6 | [F6_RESPONSIVE_AND_ACCESSIBILITY.md](F6_RESPONSIVE_AND_ACCESSIBILITY.md) | Labels, ARIA, focus, keyboard, touch targets, mobile viewports | F5 | [ ] |
