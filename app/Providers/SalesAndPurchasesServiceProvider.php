@@ -27,6 +27,7 @@ class SalesAndPurchasesServiceProvider extends ServiceProvider
         $this->app->bind(WarrantyServiceInterface::class, WarrantyService::class);
         $this->app->bind(ScrapBatteryServiceInterface::class, ScrapBatteryService::class);
         $this->app->bind(\App\Contracts\Catalog\ProductServiceInterface::class, \App\Services\Catalog\ProductService::class);
+        $this->app->bind(\App\Contracts\Catalog\StockLedgerInterface::class, \App\Services\Catalog\StockLedgerService::class);
         $this->app->bind(\App\Contracts\Sales\CustomerServiceInterface::class, \App\Services\Sales\CustomerService::class);
     }
 
