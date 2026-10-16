@@ -205,7 +205,7 @@ class PosController extends Controller
             'cashier',
             'payments',
             'branch',
-            'scrapBattery',
+            'scrapBatteries',
         ]);
 
         return view('admin.pos.receipt', compact('invoice'));

@@ -91,12 +91,10 @@ class InvoiceDetailResource extends JsonResource
                 ],
             ],
 
-            'scrap_battery' => $this->scrapBattery ? [
-                'capacity_ah'    => $this->scrapBattery->capacity_ah,
-                'scrap_value'    => (float) $this->scrapBattery->scrap_value,
-                'lead_weight_kg' => (float) $this->scrapBattery->lead_weight_kg,
-                'status'         => $this->scrapBattery->status,
-            ] : null,
+            'scrap_batteries' => $this->scrapBatteries->map(fn ($scrap) => $this->scrapPayload($scrap))->values()->all(),
+
+            // Deprecated: remove after the Flutter app reads scrap_batteries.
+            'scrap_battery' => $this->scrapBatteries->isNotEmpty() ? $this->scrapPayload($this->scrapBatteries->first()) : null,
 
             'items' => InvoiceItemResource::collection($this->whenLoaded('items')),
 
@@ -111,6 +109,19 @@ class InvoiceDetailResource extends JsonResource
                     ];
                 });
             }),
+        ];
+    }
+
+    /**
+     * @return array{capacity_ah: mixed, scrap_value: float, lead_weight_kg: float, status: mixed}
+     */
+    private function scrapPayload($scrap): array
+    {
+        return [
+            'capacity_ah'    => $scrap->capacity_ah,
+            'scrap_value'    => (float) $scrap->scrap_value,
+            'lead_weight_kg' => (float) $scrap->lead_weight_kg,
+            'status'         => $scrap->status,
         ];
     }
 }

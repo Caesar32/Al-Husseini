@@ -62,7 +62,7 @@ class SalesController extends Controller
                 'customerVehicle:id,plate_number,make,model',
                 'items.product:id,name,sku,barcode,is_battery',
                 'items.warranties',
-                'scrapBattery',
+                'scrapBatteries',
                 'payments',
             ])
             ->findOrFail($id);

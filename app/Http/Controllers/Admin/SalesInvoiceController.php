@@ -57,8 +57,8 @@ class SalesInvoiceController extends Controller
             'branch',
             'items.product.category',
             'payments',
-            'scrapBattery',
-            'technicianCommission.employee',
+            'scrapBatteries',
+            'technicianCommissions.employee',
         ]);
 
         return view('admin.invoices.show', compact('invoice'));

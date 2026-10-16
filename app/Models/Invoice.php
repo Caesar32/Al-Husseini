@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Invoice extends Model
 {
@@ -101,9 +100,10 @@ class Invoice extends Model
         return $this->hasMany(InvoiceItem::class);
     }
 
-    public function scrapBattery(): HasOne
+    /** One sale may trade in several scrap batteries (PosOrderService writes one row per unit). */
+    public function scrapBatteries(): HasMany
     {
-        return $this->hasOne(ScrapBatteriesInventory::class);
+        return $this->hasMany(ScrapBatteriesInventory::class);
     }
 
     public function creditEntries(): HasMany
@@ -111,9 +111,10 @@ class Invoice extends Model
         return $this->hasMany(CreditLedgerEntry::class);
     }
 
-    public function technicianCommission(): HasOne
+    /** One commission per technician per invoice (unique employee_id + invoice_id). */
+    public function technicianCommissions(): HasMany
     {
-        return $this->hasOne(TechnicianCommission::class);
+        return $this->hasMany(TechnicianCommission::class);
     }
 
     public function payments(): HasMany

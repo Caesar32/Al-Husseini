@@ -181,7 +181,7 @@
                     </div>
 
                     <!-- Scrap Battery Section (Trade-in) -->
-                    @if($invoice->scrapBattery || $invoice->scrap_deduction_amount > 0)
+                    @if($invoice->scrapBatteries->isNotEmpty() || $invoice->scrap_deduction_amount > 0)
                         <div class="alert alert-warning border-warning-subtle d-flex align-items-center justify-content-between p-3 mb-4">
                             <div>
                                 <h6 class="alert-heading fw-bold mb-1">
@@ -189,8 +189,9 @@
                                 </h6>
                                 <p class="mb-0 fs-13">
                                     تم خصم قيمة البطارية القديمة من الفاتورة وتم توريدها إلى مخزن الكهنة تلقائياً.
-                                    @if($invoice->scrapBattery)
-                                        | الموديل: <strong>{{ $invoice->scrapBattery->capacity_ah ?? '' }}</strong>
+                                    @if($invoice->scrapBatteries->isNotEmpty())
+                                        | العدد: <strong>{{ $invoice->scrapBatteries->count() }}</strong>
+                                        | الموديل: <strong>{{ $invoice->scrapBatteries->pluck('capacity_ah')->filter()->implode('، ') }}</strong>
                                     @endif
                                 </p>
                             </div>
