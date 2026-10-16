@@ -202,7 +202,7 @@
                                                     </button>
                                                 @endcan
                                                 @can('products.delete')
-                                                    <form method="POST" action="{{ route('admin.products.destroy', $product) }}" onsubmit="return confirm('حذف هذا الصنف نهائياً من الكتالوج؟');">
+                                                    <form method="POST" action="{{ route('admin.products.destroy', $product) }}" data-confirm-message="حذف هذا الصنف نهائياً من الكتالوج؟">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="btn btn-sm btn-soft-danger"><i class="ri-delete-bin-line"></i></button>

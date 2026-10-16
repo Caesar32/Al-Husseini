@@ -84,7 +84,7 @@
             <!-- Upload Avatar Form (Hidden Trigger) -->
             <form action="{{ route('admin.profile.avatar') }}" method="POST" enctype="multipart/form-data" id="avatar-form" class="d-none">
                 @csrf
-                <input type="file" name="avatar" id="profile-img-file-input" accept="image/*" onchange="document.getElementById('avatar-form').submit();">
+                <input type="file" name="avatar" id="profile-img-file-input" accept="image/*" data-action="submit-form" data-action-on="change">
             </form>
         </div>
 

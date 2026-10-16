@@ -1,5 +1,5 @@
 <!--start back-to-top-->
-<button onclick="topFunction()" class="btn btn-danger btn-icon" id="back-to-top">
+<button type="button" data-action="scroll-top" class="btn btn-danger btn-icon" id="back-to-top" aria-label="العودة إلى الأعلى">
     <i class="ri-arrow-up-line"></i>
 </button>
 <!--end back-to-top-->

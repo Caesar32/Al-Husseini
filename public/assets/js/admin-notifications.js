@@ -102,6 +102,11 @@
         }
     };
 
+    // Topbar "mark all as read" button: data-action="notifications.read-all" (Admin core, F4).
+    if (window.Admin) {
+        window.Admin.actions.register('notifications.read-all', () => window.markAllNotificationsRead());
+    }
+
     window.markAllNotificationsRead = async function () {
         try {
             const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');

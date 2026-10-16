@@ -38,7 +38,7 @@
                 </button>
 
                 <!-- App Search (Global Spotlight Search) -->
-                <form class="app-search d-none d-md-block" onsubmit="return false;">
+                <form class="app-search d-none d-md-block" data-action="prevent">
                     <div class="position-relative">
                         <input type="text" class="form-control" placeholder="بحث شامل... (Ctrl + K)" autocomplete="off" id="search-options" value="">
                         <span class="mdi mdi-magnify search-widget-icon"></span>
@@ -55,7 +55,7 @@
                         <i class="bx bx-search fs-22"></i>
                     </button>
                     <div class="dropdown-menu dropdown-menu-lg dropdown-menu-end p-0 shadow-lg border-0" aria-labelledby="page-header-search-dropdown" style="min-width: 320px;">
-                        <form class="p-3" onsubmit="return false;">
+                        <form class="p-3" data-action="prevent">
                             <div class="form-group m-0">
                                 <div class="input-group">
                                     <input type="text" class="form-control" id="search-options-mobile" placeholder="بحث شامل في النظام...">
@@ -132,7 +132,7 @@
                                     <!-- Populated dynamically by HR Store -->
                                 </div>
                                 <div class="text-center py-2 border-top">
-                                    <button type="button" class="btn btn-sm btn-link text-primary" onclick="window.markAllNotificationsRead();">
+                                    <button type="button" class="btn btn-sm btn-link text-primary" data-action="notifications.read-all">
                                         <i class="ri-check-double-line align-middle me-1"></i> تحديد الكل كمقروء
                                     </button>
                                 </div>

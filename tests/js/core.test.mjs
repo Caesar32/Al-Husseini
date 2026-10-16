@@ -160,3 +160,34 @@ test('a data-confirm-message click is cancelled when the user declines and passe
     assert.equal(accepted.defaultPrevented, false);
     assert.equal(ran, 1);
 });
+
+test('a form with data-confirm-message is only submitted when confirmed; clicks inside it never ask', () => {
+    const { fire, window } = loadCore();
+    let asked = 0;
+    window.confirm = () => { asked++; return false; };
+    const form = makeElement({ tag: 'FORM', dataset: { confirmMessage: 'حذف؟' } });
+    const inner = makeElement({ tag: 'INPUT', parent: form });
+
+    fire('click', inner);
+    assert.equal(asked, 0);
+
+    const submit = fire('submit', form);
+    assert.equal(asked, 1);
+    assert.equal(submit.defaultPrevented, true);
+});
+
+test('submit-form submits the element form, or the form named by data-form', () => {
+    const { fire, document } = loadCore();
+    let submitted = [];
+    const own = { submit: () => submitted.push('own') };
+    const named = { submit: () => submitted.push('named') };
+    document.getElementById = (id) => (id === 'avatar-form' ? named : null);
+
+    const select = makeElement({ tag: 'SELECT', dataset: { action: 'submit-form' } });
+    select.form = own;
+    fire('change', select);
+
+    const file = makeElement({ tag: 'INPUT', attrs: { type: 'file' }, dataset: { action: 'submit-form', actionOn: 'change', form: 'avatar-form' } });
+    fire('change', file);
+    assert.deepEqual(submitted, ['own', 'named']);
+});

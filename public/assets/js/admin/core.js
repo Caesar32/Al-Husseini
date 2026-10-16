@@ -243,11 +243,37 @@
         button.setAttribute('aria-pressed', show ? 'true' : 'false');
     });
 
-    // <button type="submit" data-confirm-message="..."> asks before the form submits
-    // (replaces onclick="return confirm(...)"). Capture phase: runs before other handlers.
+    // Generic small actions (replace one-line inline handlers).
+    actions.registerAll({
+        // <select data-action="submit-form"> / <input type="file" data-action="submit-form" data-action-on="change" data-form="id">
+        'submit-form': (el) => {
+            const form = el.dataset.form ? document.getElementById(el.dataset.form) : el.form;
+            form?.submit();
+        },
+        // <form data-action="prevent">: a form that must never submit (live search boxes).
+        prevent: () => {},
+        // <button data-action="focus-select" data-target="inputId">
+        'focus-select': (el) => {
+            const input = document.getElementById(el.dataset.target);
+            input?.focus();
+            input?.select?.();
+        },
+        'scroll-top': () => window.scrollTo({ top: 0, behavior: 'smooth' }),
+    });
+
+    // data-confirm-message asks before proceeding (replaces onclick/onsubmit="return confirm(...)").
+    // On a button or link it guards the click; on a form it guards the submit. Capture phase, so it
+    // runs before any other handler.
     document.addEventListener('click', (event) => {
         const el = event.target.closest('[data-confirm-message]');
-        if (el && !window.confirm(el.dataset.confirmMessage)) {
+        if (el && el.tagName !== 'FORM' && !window.confirm(el.dataset.confirmMessage)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+    document.addEventListener('submit', (event) => {
+        const form = event.target;
+        if (form.dataset && form.dataset.confirmMessage && !window.confirm(form.dataset.confirmMessage)) {
             event.preventDefault();
             event.stopImmediatePropagation();
         }

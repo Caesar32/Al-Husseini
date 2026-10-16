@@ -115,7 +115,7 @@
                             </div>
                         </div>
                         <div class="col-md-3 col-12">
-                            <select class="form-select form-select-sm" name="tier" onchange="this.form.submit()">
+                            <select class="form-select form-select-sm" name="tier" data-action="submit-form">
                                 <option value="">جميع تصنيفات العملاء</option>
                                 @foreach($tierLabels as $tier => $label)
                                     <option value="{{ $tier }}" @selected(($filters['tier'] ?? '') === $tier)>{{ $label }}</option>
@@ -197,7 +197,7 @@
                                                     </button>
                                                 @endcan
                                                 @can('customers.delete')
-                                                    <form method="POST" action="{{ route('admin.customers.destroy', $customer) }}" onsubmit="return confirm('حذف هذا العميل؟');">
+                                                    <form method="POST" action="{{ route('admin.customers.destroy', $customer) }}" data-confirm-message="حذف هذا العميل؟">
                                                         @csrf
                                                         @method('DELETE')
                                                         <button type="submit" class="btn btn-sm btn-soft-danger"><i class="ri-delete-bin-line"></i></button>

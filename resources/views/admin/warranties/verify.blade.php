@@ -119,7 +119,7 @@
                         السيريال <span class="badge bg-light text-dark fs-14 border px-2 py-1">{{ $serial }}</span> غير مسجل في منظومة الضمان الإلكتروني.<br>
                         يرجى التأكد من صحة الرقم الممسوح أو مراجعة فاتورة البيع الأصلية.
                     </p>
-                    <button type="button" onclick="document.getElementById('serialInput').focus(); document.getElementById('serialInput').select();" class="btn btn-soft-primary btn-sm">
+                    <button type="button" data-action="focus-select" data-target="serialInput" class="btn btn-soft-primary btn-sm">
                         <i class="ri-refresh-line me-1"></i> إعادة المحاولة
                     </button>
                 </div>

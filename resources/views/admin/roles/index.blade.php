@@ -182,7 +182,7 @@
                                 @endif
 
                                 @if(!$role->is_system)
-                                    <form action="{{ route('admin.roles.destroy', $role) }}" method="POST" class="d-inline" onsubmit="return confirm('هل أنت متأكد من حذف الدور ({{ $role->name }})؟');">
+                                    <form action="{{ route('admin.roles.destroy', $role) }}" method="POST" class="d-inline" data-confirm-message="هل أنت متأكد من حذف الدور ({{ $role->name }})؟">
                                         @csrf
                                         @method('DELETE')
                                         <button type="submit" class="btn btn-sm btn-soft-danger" title="حذف الدور">
