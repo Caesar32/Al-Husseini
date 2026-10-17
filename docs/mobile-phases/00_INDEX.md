@@ -95,3 +95,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M2-04 | Done: `Paged<T>`; sales repository returns pages (returns use `ReturnSummary`, F-03 data side); `SalesProvider` load-more for invoices and returns with dedupe and `loadMoreError`; legacy getters kept | 148 |
 | M2-05, M2-06 | Done: inventory paginated (`loadMoreAlerts`, no `branch_id`: F-14); cash drawer, staff, credit providers on `AsyncState`; all repositories use envelope helpers | 165 |
 | M2-07 | Done: selected branch persisted through `AuthStorage` (cleared on logout/401) | 168 |
+| M3-01, M3-02 | Done: `AsyncStateView`, `ErrorRetryCard`, `EmptyStateCard`, `StaleDataBanner`, `PagedListView` (pull-to-refresh, load-more, error footer) | 176 |
