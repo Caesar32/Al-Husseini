@@ -99,3 +99,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M3-03 | Done: inventory (paged), credit, staff, cash drawer tabs render through `AsyncStateView`; drawer shows a no-open-shift notice; credit shows utilization rate | 181 |
 | M3-04, M3-08 | Done: sales tab paginates; new Returns segment (`ReturnTile`; closes F-03 in the UI); detail failures show a SnackBar. File is 400 lines (over target; split in M3-09) | 182 |
 | M3-05, M4-05 | Done: live pulse tab 426 → 128 lines, six widgets in `widgets/pulse/`; live and period sections through `AsyncStateView`; stale/offline banner. Review caught Codex swapping safe cash `exact`→`formatted` (restored) | 185 |
+| M3-06 | Done: invoice sheet 354 → 95 lines, five sections in `widgets/invoice/`; new payments section; field-usage diff verified identical | 186 |
