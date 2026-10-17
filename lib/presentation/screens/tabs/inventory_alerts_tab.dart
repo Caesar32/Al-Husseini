@@ -31,7 +31,7 @@ class _InventoryAlertsTabState extends State<InventoryAlertsTab> {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBackground,
       appBar: ExecutiveAppBar(
-        title: 'تنبهات النواقص والمخزون',
+        title: 'تنبيهات النواقص والمخزون',
         onRefresh: () {
           Provider.of<InventoryProvider>(context, listen: false).fetchAlerts();
         },
