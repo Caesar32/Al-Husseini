@@ -6,6 +6,7 @@ import '../../../data/models/cash_drawer_shift.dart';
 import '../../../providers/cash_drawer_provider.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../widgets/arabic_tabular_text.dart';
+import '../../widgets/drawer/drawer_breakdown.dart';
 import '../../widgets/executive_app_bar.dart';
 import '../../widgets/status_badge.dart';
 import '../../widgets/state/async_state_view.dart';
@@ -195,32 +196,32 @@ class _CashDrawerContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          _DrawerBreakdown(
+          DrawerBreakdown(
             title: 'مبيعات كاش (نقدي)',
             formattedValue: shift.formatted['cash_sales'] ?? '',
             icon: Icons.money,
             accentColor: AppColors.safeCashSuccess,
           ),
-          _DrawerBreakdown(
+          DrawerBreakdown(
             title: 'تحصيلات الآجل كاش',
             formattedValue:
                 shift.formatted['credit_collections_cash'] ?? '',
             icon: Icons.collections_bookmark_outlined,
             accentColor: AppColors.safeCashSuccess,
           ),
-          _DrawerBreakdown(
+          DrawerBreakdown(
             title: 'مبيعات البطاقات (POS)',
             formattedValue: shift.formatted['card_sales'] ?? '',
             icon: Icons.credit_card,
             accentColor: AppColors.bankCardInfo,
           ),
-          _DrawerBreakdown(
+          DrawerBreakdown(
             title: 'تحويلات بنكية (InstaPay)',
             formattedValue: shift.formatted['bank_transfer_sales'] ?? '',
             icon: Icons.account_balance,
             accentColor: AppColors.bankCardInfo,
           ),
-          _DrawerBreakdown(
+          DrawerBreakdown(
             title: 'مصروفات نثرية مسحوبة',
             formattedValue: shift.formatted['expenses_paid'] ?? '',
             icon: Icons.remove_circle_outline,
@@ -256,64 +257,6 @@ class _CashDrawerContent extends StatelessWidget {
               ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-class _DrawerBreakdown extends StatelessWidget {
-  const _DrawerBreakdown({
-    required this.title,
-    required this.formattedValue,
-    required this.icon,
-    required this.accentColor,
-  });
-
-  final String title;
-  final String formattedValue;
-  final IconData icon;
-  final Color accentColor;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.strokeBorder),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Icon(icon, color: accentColor, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.cairo(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          ArabicTabularText(
-            text: formattedValue,
-            fontSize: 15,
-            textColor: accentColor,
-          ),
         ],
       ),
     );

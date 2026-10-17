@@ -46,7 +46,7 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 | M0 | `M0_BASELINE_AND_NETWORKING.md` | Typed failures, a single 401 path, 429/5xx/non-JSON handling, injectable client | Done |
 | M1 | `M1_MODELS_AND_SERIALIZATION.md` | Null-safe parse helpers; fix F-01, F-03, F-04, F-08, F-11; model unit tests from real payloads | Done |
 | M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Done |
-| M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Not started |
+| M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Done |
 | M4 | `M4_SECURITY_AND_PERSISTENCE.md` | Secure token storage, base-URL lock, offline/stale indicator, rate-limit UX | Not started |
 | M5 | `M5_QUALITY_AND_TESTING.md` | Provider and widget tests, stricter lints, release APK build gate | Not started |
 
@@ -101,3 +101,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M3-05, M4-05 | Done: live pulse tab 426 → 128 lines, six widgets in `widgets/pulse/`; live and period sections through `AsyncStateView`; stale/offline banner. Review caught Codex swapping safe cash `exact`→`formatted` (restored) | 185 |
 | M3-06 | Done: invoice sheet 354 → 95 lines, five sections in `widgets/invoice/`; new payments section; field-usage diff verified identical | 186 |
 | M3-07, M4-02, M4-03 | Done: login 515 → 225 lines (`LoginForm`, `ServerSettingsSheet`); server setting only in debug builds, https-only when insecure is not allowed, URL change clears the session (F-07); 429 cooldown countdown on the login button. Residual: a custom http URL saved by an older build is still honoured (M4-06) | 190 |
+| M3-09 | Done: tiles moved to `widgets/{sales,drawer,credit,staff}/`; screens now ≤ 230 lines except `cash_drawer_tab.dart` (264) | 190 |

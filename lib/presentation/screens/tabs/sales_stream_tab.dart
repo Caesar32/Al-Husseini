@@ -9,15 +9,13 @@ import '../../../data/models/recent_invoice.dart';
 import '../../../data/models/return_summary.dart';
 import '../../../providers/dashboard_provider.dart';
 import '../../../providers/sales_provider.dart';
-import '../../widgets/arabic_tabular_text.dart';
 import '../../widgets/executive_app_bar.dart';
+import '../../widgets/sales/invoice_tile.dart';
+import '../../widgets/sales/sales_segment_switch.dart';
 import '../../widgets/invoice_detail_sheet.dart';
 import '../../widgets/return_tile.dart';
-import '../../widgets/status_badge.dart';
 import '../../widgets/state/async_state_view.dart';
 import '../../widgets/state/paged_list_view.dart';
-
-enum _SalesSegment { invoices, returns }
 
 class SalesStreamTab extends StatefulWidget {
   const SalesStreamTab({super.key});
@@ -28,7 +26,7 @@ class SalesStreamTab extends StatefulWidget {
 
 class _SalesStreamTabState extends State<SalesStreamTab> {
   final TextEditingController _searchController = TextEditingController();
-  _SalesSegment _segment = _SalesSegment.invoices;
+  SalesSegment _segment = SalesSegment.invoices;
   bool _returnsRequested = false;
   String _searchText = '';
 
@@ -103,14 +101,14 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
               ),
             ),
           ),
-          _SalesSegmentSwitch(
+          SalesSegmentSwitch(
             selected: _segment,
             onSelected: _selectSegment,
           ),
           Expanded(
             child: Consumer<SalesProvider>(
               builder: (context, sales, _) {
-                if (_segment == _SalesSegment.invoices) {
+                if (_segment == SalesSegment.invoices) {
                   return _buildInvoices(context, sales, branchId);
                 }
 
@@ -123,14 +121,14 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
     );
   }
 
-  void _selectSegment(_SalesSegment segment) {
+  void _selectSegment(SalesSegment segment) {
     if (_segment == segment) {
       return;
     }
 
     setState(() => _segment = segment);
 
-    if (segment == _SalesSegment.returns && !_returnsRequested) {
+    if (segment == SalesSegment.returns && !_returnsRequested) {
       _returnsRequested = true;
       final branchId = context.read<DashboardProvider>().selectedBranchId;
       unawaited(
@@ -146,7 +144,7 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
         branchId ?? context.read<DashboardProvider>().selectedBranchId;
     final sales = context.read<SalesProvider>();
 
-    if (_segment == _SalesSegment.invoices) {
+    if (_segment == SalesSegment.invoices) {
       unawaited(
         sales.fetchRecentInvoices(branchId: currentBranchId),
       );
@@ -177,7 +175,7 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
           onLoadMore: sales.loadMoreInvoices,
           onRefresh: () => sales.fetchRecentInvoices(branchId: branchId),
           itemBuilder: (context, invoice, _) {
-            return _InvoiceTile(
+            return InvoiceTile(
               invoice: invoice,
               onTap: () => _openInvoice(context, invoice.id),
             );
@@ -228,173 +226,5 @@ class _SalesStreamTabState extends State<SalesStreamTab> {
         SnackBar(content: Text(error)),
       );
     }
-  }
-}
-
-class _SalesSegmentSwitch extends StatelessWidget {
-  const _SalesSegmentSwitch({
-    required this.selected,
-    required this.onSelected,
-  });
-
-  final _SalesSegment selected;
-  final ValueChanged<_SalesSegment> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: [
-          FilterChip(
-            label: Text(
-              'الفواتير',
-              style: GoogleFonts.cairo(fontSize: 12),
-            ),
-            selected: selected == _SalesSegment.invoices,
-            selectedColor: AppColors.goldAccent,
-            backgroundColor: AppColors.elevatedSurface,
-            onSelected: (value) {
-              if (value) {
-                onSelected(_SalesSegment.invoices);
-              }
-            },
-          ),
-          const SizedBox(width: 8),
-          FilterChip(
-            label: Text(
-              'المرتجعات',
-              style: GoogleFonts.cairo(fontSize: 12),
-            ),
-            selected: selected == _SalesSegment.returns,
-            selectedColor: AppColors.goldAccent,
-            backgroundColor: AppColors.elevatedSurface,
-            onSelected: (value) {
-              if (value) {
-                onSelected(_SalesSegment.returns);
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InvoiceTile extends StatelessWidget {
-  const _InvoiceTile({
-    required this.invoice,
-    required this.onTap,
-  });
-
-  final InvoiceSummary invoice;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: AppColors.surface,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'فاتورة ${invoice.invoiceNumber}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.cairo(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        if (invoice.hasWarrantyBattery) ...[
-                          const SizedBox(width: 8),
-                          const Icon(
-                            Icons.battery_charging_full,
-                            size: 16,
-                            color: AppColors.goldAccent,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ArabicTabularText(
-                    text: invoice.netAmount.display,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    textColor: AppColors.goldAccent,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline,
-                        size: 14,
-                        color: AppColors.textMuted,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        invoice.customerName,
-                        style: GoogleFonts.almarai(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    invoice.timeAgo,
-                    style: GoogleFonts.almarai(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  StatusBadge.info(label: invoice.paymentMethodLabel),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'الكاشير: ${invoice.cashierName}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: GoogleFonts.almarai(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }
