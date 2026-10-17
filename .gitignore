@@ -30,4 +30,6 @@ id_rsa_deploy.pub
 /public/almadina/
 /.dart_tool/
 /build/
+/.flutter-plugins
+/.flutter-plugins-dependencies
 *.sql
