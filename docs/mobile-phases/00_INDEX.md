@@ -102,3 +102,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M3-06 | Done: invoice sheet 354 → 95 lines, five sections in `widgets/invoice/`; new payments section; field-usage diff verified identical | 186 |
 | M3-07, M4-02, M4-03 | Done: login 515 → 225 lines (`LoginForm`, `ServerSettingsSheet`); server setting only in debug builds, https-only when insecure is not allowed, URL change clears the session (F-07); 429 cooldown countdown on the login button. Residual: a custom http URL saved by an older build is still honoured (M4-06) | 190 |
 | M3-09 | Done: tiles moved to `widgets/{sales,drawer,credit,staff}/`; screens now ≤ 230 lines except `cash_drawer_tab.dart` (264) | 190 |
+| M4-01, M4-06 | Done: token in Keychain/Keystore via `flutter_secure_storage` 10.3.4 behind `SecureKeyValueStore`; one-time migration out of SharedPreferences (F-06); release ignores a saved non-https base URL; Android `minSdk` raised to 23 for the plugin | 197 |
