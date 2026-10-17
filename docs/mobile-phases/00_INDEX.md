@@ -20,6 +20,19 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 | Real test coverage | none (no model, repository, provider or widget tests) |
 | Endpoints called | 12 of 12 constants defined; `sales/returns`, `auth/me`, `auth/device-token` are wired in repositories but never reached from the UI |
 
+## Final state (2026-10-17, end of M0-M5)
+
+| Metric | Value |
+|---|---|
+| `flutter analyze` | 0 issues with `flutter_lints` + `prefer_const_constructors`, `avoid_dynamic_calls`, `always_declare_return_types`, `unawaited_futures` |
+| `flutter test` | 199 passed in 32 test files (models, network, storage, providers, widgets, app boot) |
+| Line coverage | 89.2% overall; `lib/core` 92.8%, `lib/data` 97.5%, `lib/providers` 92.1%, `lib/presentation` 87.0% |
+| Release build | `flutter build apk --release` OK, 49.4 MB; Android `compileSdk` 36, `minSdk` 23 |
+| Dart LOC in `lib/` | 8,857 in 77 files; largest screen `cash_drawer_tab.dart` 264; largest widget `login/login_form.dart` 340 |
+| Findings | F-01 to F-13 fixed; F-14 documented (inventory no longer sends `branch_id`) |
+| `auth/device-token` | Still unused: push notifications need Firebase/APNs setup (owner decision, out of scope) |
+| CI | `.github/workflows/mobile-ci.yml` runs analyze + test on `lib/`/`test/`/pubspec changes |
+
 ## Findings by severity (details in each phase file)
 
 | ID | Sev | Finding | Phase |
@@ -48,7 +61,7 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 | M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Done |
 | M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Done |
 | M4 | `M4_SECURITY_AND_PERSISTENCE.md` | Secure token storage, base-URL lock, offline/stale indicator, rate-limit UX | Done |
-| M5 | `M5_QUALITY_AND_TESTING.md` | Provider and widget tests, stricter lints, release APK build gate | Not started |
+| M5 | `M5_QUALITY_AND_TESTING.md` | Provider and widget tests, stricter lints, release APK build gate | Done |
 
 Order: M0 → M1 → M2 → (M3 ∥ M4) → M5. The F-01 fix (M1-01) is small and isolated; it can ship first as a hotfix.
 
@@ -107,3 +120,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M5-02 | Done: lints `prefer_const_constructors`, `avoid_dynamic_calls`, `always_declare_return_types`, `unawaited_futures` enabled, 8 findings fixed (auth/dashboard repositories use envelope helpers). `avoid_catches_without_on_clauses` not enabled: providers catch everything by design and map it through `toApiFailure` | 197 |
 | M5-03, M5-05 | Done: `device_preview` (never imported) moved to dev dependencies; release APK builds, 49.4 MB | 197 |
 | M5-01 | Done: placeholder smoke test replaced by app boot tests (no token → login; valid token → shell; 401 on `auth/me` → login and token cleared) | 199 |
+| M5-04, M5-06, M5-07 | Done: coverage 89.2% (target ≥ 70% met); mobile CI workflow; superseded note on `docs/OWNER_MOBILE_API_PLAN.md` | 199 |

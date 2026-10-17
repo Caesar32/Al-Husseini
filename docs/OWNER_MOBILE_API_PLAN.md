@@ -1,3 +1,5 @@
+> **Superseded (2026-10-17):** this is the original design. The live contract is the code in `app/Http/Controllers/Api/V1/Owner/*` and `app/Http/Resources/Owner/*`; the app-side contract audit is in `docs/mobile-phases/M1_MODELS_AND_SERIALIZATION.md`. Known drift: the login field is `login` (not `phone_or_email`), the drawer sends `bank_transfer_sales` (not `instapay_sales`), the device token field is `device_token` (not `fcm_token`), and money objects also carry `exact`/`compact`.
+
 # 📱 خطة معمارية شاملة: تطبيق المالك للمراقبة والمتابعة عن بُعد
 ## Executive Owner Mobile App (iOS / Flutter API Architecture)
 
