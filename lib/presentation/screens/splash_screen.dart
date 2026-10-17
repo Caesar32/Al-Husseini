@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -81,12 +83,16 @@ class _SplashScreenState extends State<SplashScreen>
     if (!mounted) return;
 
     if (authProvider.isAuthenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainSurveillanceLayout()),
+      unawaited(
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainSurveillanceLayout()),
+        ),
       );
     } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      unawaited(
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        ),
       );
     }
   }

@@ -1,7 +1,10 @@
 import '../../core/constants/api_constants.dart';
+import '../../core/network/api_failure.dart';
 import '../../core/network/api_service.dart';
+import '../../core/network/envelope.dart';
 import '../../core/storage/auth_storage.dart';
 import '../models/auth_user.dart';
+import '../models/json_read.dart';
 
 class AuthRepository {
   final ApiService _api;
@@ -21,9 +24,17 @@ class AuthRepository {
       },
     );
 
-    final data = response['data'] as Map<String, dynamic>;
-    final token = data['token'] as String;
-    final userJson = data['user'] as Map<String, dynamic>;
+    final data = requireDataMap(response);
+    final rawToken = data['token'];
+    final token = readString(rawToken);
+    if (rawToken is! String || token.isEmpty) {
+      throw const BadResponseFailure();
+    }
+
+    final userJson = readMap(data['user']);
+    if (userJson.isEmpty) {
+      throw const BadResponseFailure();
+    }
 
     await _storage.saveToken(token);
     await _storage.saveUser(userJson);
@@ -43,7 +54,7 @@ class AuthRepository {
 
   Future<AuthUser?> getProfile() async {
     final response = await _api.get(ApiConstants.me);
-    final userJson = response['data'] as Map<String, dynamic>;
+    final userJson = requireDataMap(response);
     await _storage.saveUser(userJson);
     return AuthUser.fromJson(userJson);
   }

@@ -1,5 +1,6 @@
 import '../../core/constants/api_constants.dart';
 import '../../core/network/api_service.dart';
+import '../../core/network/envelope.dart';
 import '../models/live_pulse_data.dart';
 import '../models/period_metrics.dart';
 
@@ -15,7 +16,7 @@ class DashboardRepository {
     }
 
     final response = await _api.get(ApiConstants.livePulse, queryParameters: query);
-    final data = response['data'] as Map<String, dynamic>;
+    final data = requireDataMap(response);
     return LivePulseData.fromJson(data);
   }
 
@@ -26,7 +27,7 @@ class DashboardRepository {
     }
 
     final response = await _api.get(ApiConstants.periodMetrics, queryParameters: query);
-    final data = response['data'] as Map<String, dynamic>;
+    final data = requireDataMap(response);
     return PeriodMetrics.fromJson(data);
   }
 }

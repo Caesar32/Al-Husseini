@@ -79,19 +79,19 @@ void main() {
 class _FakeCreditRepository extends CreditRepository {
   _FakeCreditRepository(super.api);
 
-  final CreditOverviewData value = CreditOverviewData(
-    totalOutstanding: const MoneyValue(
+  final CreditOverviewData value = const CreditOverviewData(
+    totalOutstanding: MoneyValue(
       raw: 1000,
       compact: '1000',
       exact: '1000',
     ),
-    collectedToday: const MoneyValue(
+    collectedToday: MoneyValue(
       raw: 100,
       compact: '100',
       exact: '100',
     ),
     debtorsCount: 2,
-    topDebtors: const <DebtorItem>[],
+    topDebtors: <DebtorItem>[],
   );
 
   ApiFailure? failure;
