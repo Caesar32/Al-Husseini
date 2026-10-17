@@ -106,3 +106,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M4-04 | Done: `android:allowBackup="false"` (token stays out of cloud backups); `compileSdk` 36 (the plugin requires it; targetSdk unchanged); `flutter build apk --release` OK, 49.4 MB | 197 |
 | M5-02 | Done: lints `prefer_const_constructors`, `avoid_dynamic_calls`, `always_declare_return_types`, `unawaited_futures` enabled, 8 findings fixed (auth/dashboard repositories use envelope helpers). `avoid_catches_without_on_clauses` not enabled: providers catch everything by design and map it through `toApiFailure` | 197 |
 | M5-03, M5-05 | Done: `device_preview` (never imported) moved to dev dependencies; release APK builds, 49.4 MB | 197 |
+| M5-01 | Done: placeholder smoke test replaced by app boot tests (no token → login; valid token → shell; 401 on `auth/me` → login and token cleared) | 199 |
