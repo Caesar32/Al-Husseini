@@ -86,7 +86,9 @@ void main() {
     final context = await _createContext(
       MockClient(
         (_) async => http.Response.bytes(
-          utf8.encode('{"errors":{"login":["بيانات الدخول غير صحيحة."]}}'),
+          utf8.encode(
+            '{"errors":{"login":["بيانات الدخول غير صحيحة."]}}',
+          ),
           422,
           headers: {'content-type': 'application/json'},
         ),
@@ -98,6 +100,45 @@ void main() {
 
     expect(result, isFalse);
     expect(context.provider.errorMessage, 'بيانات الدخول غير صحيحة.');
+  });
+
+  test('429 stores the retry countdown', () async {
+    final context = await _createContext(
+      MockClient(
+        (_) async => http.Response(
+          '',
+          429,
+          headers: {'retry-after': '30'},
+        ),
+      ),
+    );
+    addTearDown(() => _disposeContext(context));
+
+    final result = await context.provider.login('owner', 'password');
+
+    expect(result, isFalse);
+    expect(
+      context.provider.loginCooldown,
+      greaterThan(const Duration(seconds: 29)),
+    );
+    expect(
+      context.provider.loginCooldown,
+      lessThanOrEqualTo(const Duration(seconds: 30)),
+    );
+    expect(context.provider.errorMessage, contains('30'));
+  });
+
+  test('changing the base URL clears the saved session', () async {
+    final context = await _createContext(
+      MockClient((_) async => http.Response('', 200)),
+    );
+    addTearDown(() => _disposeContext(context));
+
+    await context.provider.updateBaseUrl('https://example.com/api');
+
+    expect(context.storage.getToken(), isNull);
+    expect(context.provider.status, AuthStatus.unauthenticated);
+    expect(context.provider.currentUser, isNull);
   });
 
   test('successful login authenticates and clears session expiry', () async {
@@ -145,7 +186,7 @@ Future<_AuthContext> _createContext(http.Client client) async {
   final repository = AuthRepository(apiService, storage);
   final provider = AuthProvider(repository);
 
-  return _AuthContext(apiService, provider);
+  return _AuthContext(apiService, provider, storage);
 }
 
 Future<void> _disposeContext(_AuthContext context) async {
@@ -154,8 +195,9 @@ Future<void> _disposeContext(_AuthContext context) async {
 }
 
 class _AuthContext {
-  const _AuthContext(this.apiService, this.provider);
+  const _AuthContext(this.apiService, this.provider, this.storage);
 
   final ApiService apiService;
   final AuthProvider provider;
+  final AuthStorage storage;
 }

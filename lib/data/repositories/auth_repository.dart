@@ -73,6 +73,9 @@ class AuthRepository {
   String getBaseUrl() => _api.baseUrl;
 
   Future<void> setBaseUrl(String url) async {
+    if (_api.baseUrl == url) return;
+
     await _storage.saveCustomBaseUrl(url);
+    await _storage.clearAll();
   }
 }

@@ -17,6 +17,7 @@ class AuthProvider extends ChangeNotifier {
   AuthUser? _currentUser;
   String? _errorMessage;
   bool _sessionExpired = false;
+  DateTime? _loginRetryUntil;
 
   AuthProvider(this._repository) {
     _sessionExpiredSubscription =
@@ -29,6 +30,16 @@ class AuthProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _status == AuthStatus.authenticated;
   bool get sessionExpired => _sessionExpired;
+
+  Duration get loginCooldown {
+    final retryUntil = _loginRetryUntil;
+    if (retryUntil == null) return Duration.zero;
+
+    final remaining = retryUntil.difference(DateTime.now());
+    if (remaining.isNegative) return Duration.zero;
+
+    return remaining;
+  }
 
   void _checkInitialAuth() {
     if (_repository.isAuthenticated()) {
@@ -59,10 +70,19 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = await _repository.login(login, password);
       _status = AuthStatus.authenticated;
       _sessionExpired = false;
+      _loginRetryUntil = null;
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = toApiFailure(e).message;
+      final failure = toApiFailure(e);
+
+      if (failure is RateLimitedFailure) {
+        _loginRetryUntil = DateTime.now().add(
+          failure.retryAfter ?? const Duration(seconds: 60),
+        );
+      }
+
+      _errorMessage = failure.message;
       _status = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
@@ -101,6 +121,10 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> updateBaseUrl(String url) async {
     await _repository.setBaseUrl(url);
+    _currentUser = null;
+    _status = AuthStatus.unauthenticated;
+    _sessionExpired = false;
+    _errorMessage = null;
     notifyListeners();
   }
 
