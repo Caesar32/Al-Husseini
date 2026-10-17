@@ -27,3 +27,11 @@
 .ah-welcome-period {
     gap: 8px;
 }
+
+/* Dashboard KPI cards (F5 1b): values fade while a period switch updates them; tooltip values show the help cursor. */
+.ah-kpi-fade {
+    transition: opacity 0.15s ease;
+}
+.ah-cursor-help {
+    cursor: help;
+}

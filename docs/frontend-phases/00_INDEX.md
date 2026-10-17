@@ -27,7 +27,7 @@ This roadmap follows the backend refactor (`REFACTOR_PLAN.md`). Its goal is a co
 | F2 | [F2_FORM_AND_INPUT_CONTROLS.md](F2_FORM_AND_INPUT_CONTROLS.md) | Field wrapper, input, select, date, switch, error states | F1 | [x] `e0e81c8`, `be2b930`; 517 passed. Step 3 (employee modal) BLOCKED: owner HR edits still uncommitted in modal-form.blade.php |
 | F3 | [F3_COMPLEX_BLADE_COMPONENTS.md](F3_COMPLEX_BLADE_COMPONENTS.md) | Modal, data table, filter bar, stat card, page header | F2 | [x] `c9e73e6`..`e60a698`; 527 passed |
 | F4 | [F4_JAVASCRIPT_DECOUPLING.md](F4_JAVASCRIPT_DECOUPLING.md) | `admin-core.js` (esc, fetch, actions), inline handlers and scripts out of views | F0 | [x] steps 1-6 (`ff1b2cf`, `35d4a2d`, `e16cc7e`, step 6 scrap); 533+ passed; budgets handlers 0, scripts 6 (all in layouts: theme loader, HR toast, CSRF helper, engine, one comment false positive), styles 145; POS not split into state/cart/catalog/payment/checkout files (single pos.js + math.js) |
-| F5 | [F5_PAGE_VIEWS_REFACTOR.md](F5_PAGE_VIEWS_REFACTOR.md) | POS, dashboard, products (inventory), invoices on the new components | F1-F4 | [ ] |
+| F5 | [F5_PAGE_VIEWS_REFACTOR.md](F5_PAGE_VIEWS_REFACTOR.md) | POS, dashboard, products (inventory), invoices on the new components | F1-F4 | [ ] in progress: 1a `675524b`, 1b (KPI cards); styles budget 137 |
 | F6 | [F6_RESPONSIVE_AND_ACCESSIBILITY.md](F6_RESPONSIVE_AND_ACCESSIBILITY.md) | Labels, ARIA, focus, keyboard, touch targets, mobile viewports | F5 | [ ] |
 | F7 | [F7_FINAL_POLISH_AND_BUNDLING.md](F7_FINAL_POLISH_AND_BUNDLING.md) | Asset versioning/caching, optional bundling, CSP readiness, visual review | F0-F6 | [ ] |
 

@@ -39,3 +39,21 @@ test('the period action shows that period and remembers it; leaving destroys the
     b.Admin.page.leave();
     assert.ok(charts.every((c) => c.destroyed));
 });
+
+test('the period action toggles d-none on the credit-collected line by the period amount', () => {
+    const { b } = boot();
+    const classes = new Set(['d-none']);
+    b.element('dashCreditCollectedWrap').classList = {
+        add: (c) => classes.add(c),
+        remove: (c) => classes.delete(c),
+        toggle: (c, force) => (force ?? !classes.has(c) ? classes.add(c) : classes.delete(c)),
+        contains: (c) => classes.has(c),
+    };
+
+    b.click({ action: 'dashboard.period', period: 'week' });
+    assert.equal(classes.has('d-none'), false);
+    assert.equal(b.element('dashCreditCollected').textContent, '150 ج.م');
+
+    b.click({ action: 'dashboard.period', period: 'all' });
+    assert.equal(classes.has('d-none'), true);
+});

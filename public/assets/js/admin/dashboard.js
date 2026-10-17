@@ -85,9 +85,9 @@
                 if (creditAmt > 0) {
                     creditCollectedEl.textContent = period.credit_collected_compact || formatCompactCurrency(creditAmt);
                     initOrUpdateTooltip(creditCollectedEl, period.credit_collected_fmt || (creditAmt.toFixed(2) + ' ج.م'));
-                    creditCollectedWrap.style.display = '';
+                    creditCollectedWrap.classList.remove('d-none');
                 } else {
-                    creditCollectedWrap.style.display = 'none';
+                    creditCollectedWrap.classList.add('d-none');
                 }
             }
 
