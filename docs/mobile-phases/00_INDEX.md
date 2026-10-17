@@ -47,7 +47,7 @@ and it omits `exact`, `summary` and `pagination`. When the two disagree, the ser
 | M1 | `M1_MODELS_AND_SERIALIZATION.md` | Null-safe parse helpers; fix F-01, F-03, F-04, F-08, F-11; model unit tests from real payloads | Done |
 | M2 | `M2_REPOSITORIES_AND_PROVIDERS.md` | Uniform `AsyncState`, pagination, poll lifecycle, session-expiry propagation | Done |
 | M3 | `M3_PRESENTATION_REFACTOR.md` | Split monolithic screens into widgets with shared loading/error/empty states | Done |
-| M4 | `M4_SECURITY_AND_PERSISTENCE.md` | Secure token storage, base-URL lock, offline/stale indicator, rate-limit UX | Not started |
+| M4 | `M4_SECURITY_AND_PERSISTENCE.md` | Secure token storage, base-URL lock, offline/stale indicator, rate-limit UX | Done |
 | M5 | `M5_QUALITY_AND_TESTING.md` | Provider and widget tests, stricter lints, release APK build gate | Not started |
 
 Order: M0 → M1 → M2 → (M3 ∥ M4) → M5. The F-01 fix (M1-01) is small and isolated; it can ship first as a hotfix.
@@ -103,3 +103,4 @@ Implementer: Codex `gpt-5.6-luna` at `high` effort, read-only sandbox (`luna-5.5
 | M3-07, M4-02, M4-03 | Done: login 515 → 225 lines (`LoginForm`, `ServerSettingsSheet`); server setting only in debug builds, https-only when insecure is not allowed, URL change clears the session (F-07); 429 cooldown countdown on the login button. Residual: a custom http URL saved by an older build is still honoured (M4-06) | 190 |
 | M3-09 | Done: tiles moved to `widgets/{sales,drawer,credit,staff}/`; screens now ≤ 230 lines except `cash_drawer_tab.dart` (264) | 190 |
 | M4-01, M4-06 | Done: token in Keychain/Keystore via `flutter_secure_storage` 10.3.4 behind `SecureKeyValueStore`; one-time migration out of SharedPreferences (F-06); release ignores a saved non-https base URL; Android `minSdk` raised to 23 for the plugin | 197 |
+| M4-04 | Done: `android:allowBackup="false"` (token stays out of cloud backups); `compileSdk` 36 (the plugin requires it; targetSdk unchanged); `flutter build apk --release` OK, 49.4 MB | 197 |
