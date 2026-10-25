@@ -54,22 +54,39 @@
             flex-direction: column;
             overflow: hidden;
         }
+        /* Cart card: header / item list / checkout controls / pinned submit footer.
+           The item list takes the height left over (at least 140px); the checkout controls keep their
+           natural height and scroll only when the screen is too short; the footer never shrinks. */
+        .pos-cart-panel > .pos-cart-card {
+            display: flex !important;
+            flex-direction: column !important;
+            height: 100% !important;
+            max-height: calc(100vh - 75px) !important;
+            overflow: hidden !important;
+        }
         .pos-cart-items-scroll {
-            flex: 1;
+            flex: 1 1 0 !important;
             overflow-y: auto !important;
-            min-height: 120px;
-            max-height: 38vh;
-            padding: 4px 6px;
+            min-height: 140px !important;
+            padding: 4px;
             background: var(--vz-light, #f8f9fa);
             border-radius: 6px;
             border: 1px solid var(--vz-border-color, #e9ebec);
         }
+        .pos-checkout-body {
+            flex: 0 1 auto !important;
+            min-height: 0;
+            overflow-y: auto !important;
+            scrollbar-width: thin;
+        }
         /* Slim custom scrollbar for fast cashier scanning */
         .pos-cart-items-scroll::-webkit-scrollbar,
+        .pos-checkout-body::-webkit-scrollbar,
         .pos-catalog-scroll::-webkit-scrollbar {
             width: 4px;
         }
         .pos-cart-items-scroll::-webkit-scrollbar-thumb,
+        .pos-checkout-body::-webkit-scrollbar-thumb,
         .pos-catalog-scroll::-webkit-scrollbar-thumb {
             background-color: #cbd5e1;
             border-radius: 4px;
@@ -198,9 +215,49 @@
         background: var(--vz-card-bg, #ffffff);
         border-radius: 5px;
         border: 1px solid var(--vz-border-color, #e2e8f0);
-        padding: 5px 8px;
-        margin-bottom: 4px;
+        padding: 3px 6px;
+        margin-bottom: 3px;
         transition: all 0.12s ease;
+    }
+
+    .pos-checkout-footer {
+        flex-shrink: 0 !important;
+        z-index: 10;
+    }
+
+    /* Trade-in inputs: one 26px row */
+    #tradeInDetailsBox {
+        margin-top: 4px;
+    }
+    #tradeInDetailsBox .form-control,
+    #tradeInDetailsBox .btn,
+    #tradeInDetailsBox .input-group-text {
+        height: 26px;
+        min-height: 26px;
+        font-size: 11px;
+        padding: 0 4px;
+        line-height: 1;
+    }
+
+    /* Product name and price take what the stepper / total / delete leave. */
+    .cart-item-title {
+        flex: 1 1 auto;
+        min-width: 0;
+        max-width: 65%;
+    }
+
+    .cart-serial-group .input-group-text,
+    .cart-serial-group .form-control {
+        font-size: 10px;
+        height: 24px;
+        min-height: 24px;
+        padding: 0 4px;
+    }
+
+    .cart-qty-group .btn,
+    .cart-qty-group .form-control {
+        height: 24px;
+        line-height: 1;
     }
 
     .cart-item-row:hover {
@@ -361,12 +418,24 @@
         background-color: #eff6ff !important;
     }
 
+    .payment-method-group {
+        display: flex;
+        gap: 4px;
+    }
+
     .payment-method-card {
+        flex: 1 1 0;
         cursor: pointer;
-        border: 2px solid var(--vz-border-color, #e9ebec);
-        border-radius: 8px;
-        padding: 7px 4px;
-        text-align: center;
+        border: 1px solid var(--vz-border-color, #e9ebec);
+        border-radius: 999px;
+        height: 28px;
+        padding: 2px 8px;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
         background: var(--vz-card-bg, #ffffff);
         transition: all 0.14s ease;
         user-select: none;
@@ -406,11 +475,17 @@
     .payment-mode-btn {
         flex: 1 1 0;
         cursor: pointer;
-        border: 2px solid var(--vz-border-color, #e9ebec);
-        border-radius: 8px;
-        padding: 5px 2px;
-        text-align: center;
-        line-height: 1.25;
+        border: 1px solid var(--vz-border-color, #e9ebec);
+        border-radius: 999px;
+        height: 28px;
+        padding: 2px 8px;
+        font-size: 11px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        white-space: nowrap;
+        line-height: 1;
         background: var(--vz-card-bg, #ffffff);
         color: var(--vz-body-color, #495057);
         transition: all 0.15s ease;
@@ -688,7 +763,7 @@
     }
 
     /* Financials & Helpers in Checkout Panel */
-    [data-bs-theme="dark"] #cashPresetsBox,
+    [data-bs-theme="dark"] #cashCalculatorBox,
     [data-bs-theme="dark"] #paymentAmountBox,
     [data-bs-theme="dark"] .pos-cart-panel .bg-light {
         background-color: #212529 !important;

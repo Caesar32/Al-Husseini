@@ -946,9 +946,9 @@
                 const qtyText = PosMath.formatQty(line.qty);
                 const lineTotal = PosMath.fromCents(PosMath.lineCents(line.qty, p.price));
                 html += `
-                    <div class="cart-item-row py-1 px-2 mb-1">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div class="overflow-hidden me-2" style="max-width: 54%;">
+                    <div class="cart-item-row">
+                        <div class="d-flex justify-content-between align-items-center gap-1">
+                            <div class="cart-item-title overflow-hidden">
                                 <div class="d-flex align-items-center gap-1">
                                     <span class="badge bg-light text-dark border fs-9 py-0 px-1 font-monospace">${esc(p.brand || 'عام')}</span>
                                     <span class="fs-11 fw-bold text-dark text-truncate" title="${esc(p.name)}">${esc(p.name)}</span>
@@ -957,7 +957,7 @@
                             </div>
                             <div class="d-flex align-items-center gap-1 flex-shrink-0">
                                 ${p.is_battery ? '' : `
-                                <div class="btn-group btn-group-sm border rounded">
+                                <div class="btn-group btn-group-sm border rounded cart-qty-group">
                                     <button type="button" class="btn btn-sm btn-light py-0 px-1 fs-11 text-muted" data-action="pos.qty" data-key="${line.key}" data-delta="-1" title="تقليل">-</button>
                                     <input type="number" class="form-control form-control-sm border-0 rounded-0 font-monospace fw-bold fs-11 px-1 py-0 text-center bg-white"
                                            style="width: 62px;" inputmode="decimal" aria-label="الكمية (${esc(unitLabel(p))})"
@@ -972,9 +972,9 @@
                             </div>
                         </div>
                         ${p.is_battery ? `
-                        <div class="input-group input-group-sm mt-1">
-                            <span class="input-group-text py-0 fs-10"><i class="ri-barcode-line me-1"></i>سيريال *</span>
-                            <input type="text" class="form-control form-control-sm font-monospace fs-11 py-0" data-serial-line="${line.key}"
+                        <div class="input-group input-group-sm cart-serial-group mt-1">
+                            <span class="input-group-text"><i class="ri-barcode-line me-1"></i>سيريال *</span>
+                            <input type="text" class="form-control form-control-sm font-monospace" data-serial-line="${line.key}"
                                    value="${esc(line.serial)}" placeholder="امسح أو اكتب سيريال البطارية" maxlength="100"
                                    data-action="pos.serial" data-key="${line.key}">
                         </div>` : ''}
@@ -1050,6 +1050,10 @@
                 hint.textContent = `سعر الشريحة: ${fmt(s.unit)} × ${s.count}`;
                 priceInput.placeholder = String(s.unit * s.count);
             }
+            // One truncated line next to the switch: the full text stays in the tooltip.
+            hint.title = hint.textContent;
+            hint.classList.toggle('text-danger', s.unit === null);
+            hint.classList.toggle('text-muted', s.unit !== null);
         }
 
         // ─── Totals ──────────────────────────────────────────────────────────────────
@@ -1215,8 +1219,9 @@
             messageEl.classList.toggle('text-warning', type === 'warning');
             input.classList.toggle('is-invalid', !!message && type === 'danger' && paymentMode === 'partial');
 
-            // cash helper (change for the cash received) only when cash is paid now
-            document.getElementById('cashPresetsBox')?.classList.toggle('d-none', !(paysNow && currentPaymentMethod === 'cash' && st.paid > 0));
+            // cash calculator (change for the cash received) only when cash is paid now;
+            // instapay / card / nothing paid now (credit) hide it
+            document.getElementById('cashCalculatorBox')?.classList.toggle('d-none', !(paysNow && currentPaymentMethod === 'cash' && st.paid > 0));
             renderQuickCashChips(fromCents(st.paid));
             calculateCashChange();
         }

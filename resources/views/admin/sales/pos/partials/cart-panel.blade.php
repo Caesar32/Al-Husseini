@@ -2,7 +2,7 @@
 <!-- LEFT (RTL): Live Cart & Checkout Terminal (35% width)           -->
 <!-- ============================================================== -->
 <div class="col-xl-4 col-lg-5 pos-cart-panel">
-    <div class="card shadow-sm border-0 h-100 d-flex flex-column overflow-hidden mb-0">
+    <div class="card pos-cart-card shadow-sm border-0 h-100 d-flex flex-column overflow-hidden mb-0">
         
         <!-- Cart Header (Uses Dashboard Theme Style) -->
         <div class="card-header bg-light border-bottom p-2 px-3 d-flex justify-content-between align-items-center">
@@ -22,58 +22,48 @@
             </div>
         </div>
 
-        <!-- Bottom Calculations & Dues Terminal (Ultra-clean and compact) -->
-        <div class="p-2 px-3 bg-body border-top flex-shrink-0">
-            
-            <!-- Old Battery Trade-in Scrap Switch & Flexible Pricing Section -->
-            <div class="p-2 bg-success-subtle rounded border border-success-subtle mb-1" id="tradeInContainer">
-                <div class="form-check form-switch p-0 d-flex justify-content-between align-items-center mb-0">
-                    <label class="form-check-label fw-bold text-dark fs-11 mb-0 d-flex align-items-center gap-1 cursor-pointer" for="tradeInCheck">
-                        <i class="ri-recycle-line text-success fs-14"></i>
-                        تسليم بطاريات كهنة (قديمة / استبدال)
+        <!-- Checkout controls: shrink and scroll on short screens; the submit footer below never moves -->
+        <div class="pos-checkout-body p-2 px-3 bg-body border-top">
+
+            <!-- Old battery trade-in: switch + tier hint on one line, count / capacity / price on one line.
+                 The deduction itself shows in the totals (خصم الكهنة المسترجعة). -->
+            <div class="p-1 px-2 bg-success-subtle rounded border border-success-subtle mb-1" id="tradeInContainer">
+                <div class="form-check form-switch p-0 d-flex align-items-center gap-2 mb-0">
+                    <label class="form-check-label fw-bold text-dark fs-11 mb-0 d-flex align-items-center gap-1 cursor-pointer text-nowrap" for="tradeInCheck">
+                        <i class="ri-recycle-line text-success fs-13"></i>
+                        تسليم بطاريات كهنة
                     </label>
-                    <input class="form-check-input me-0" type="checkbox" role="switch" id="tradeInCheck" data-action="pos.trade-in">
+                    <span class="fs-10 text-muted text-truncate flex-grow-1 mb-0 py-0" id="scrapTierHint"></span>
+                    <input class="form-check-input me-0 ms-auto flex-shrink-0" type="checkbox" role="switch" id="tradeInCheck" data-action="pos.trade-in">
                 </div>
 
-                <!-- Flexible Details (Count + Custom Price) -->
-                <div id="tradeInDetailsBox" class="mt-1 pt-1 border-top border-success-subtle d-none">
-                    <div class="row g-1 align-items-center">
-                        <div class="col-4">
-                            <label class="form-label fs-9 text-muted mb-0 fw-bold">العدد:</label>
-                            <div class="input-group input-group-sm">
-                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" data-action="pos.scrap-count" data-delta="-1">-</button>
-                                <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCountInput" value="1" min="1" max="20" data-action="pos.scrap-capacity">
-                                <button class="btn btn-outline-secondary px-1 py-0 fs-10" type="button" data-action="pos.scrap-count" data-delta="1">+</button>
-                            </div>
+                <div id="tradeInDetailsBox" class="d-none">
+                    <div class="d-flex align-items-center gap-1">
+                        <div class="input-group input-group-sm flex-nowrap" style="width: 75px;" title="العدد">
+                            <button class="btn btn-outline-secondary" type="button" data-action="pos.scrap-count" data-delta="-1" aria-label="تقليل العدد">-</button>
+                            <input type="number" class="form-control text-center font-monospace fw-bold" id="scrapCountInput" value="1" min="1" max="20" aria-label="عدد البطاريات الكهنة" data-action="pos.scrap-capacity">
+                            <button class="btn btn-outline-secondary" type="button" data-action="pos.scrap-count" data-delta="1" aria-label="زيادة العدد">+</button>
                         </div>
-                        <div class="col-4">
-                            <label class="form-label fs-9 text-muted mb-0 fw-bold">السعة (Ah):</label>
-                            <input type="number" class="form-control form-control-sm text-center font-monospace fw-bold p-0 fs-11" id="scrapCapacityInput" value="70" min="30" max="250" data-action="pos.scrap-capacity">
+                        <div class="input-group input-group-sm flex-nowrap" style="width: 70px;" title="السعة (أمبير)">
+                            <input type="number" class="form-control text-center font-monospace fw-bold" id="scrapCapacityInput" value="70" min="30" max="250" aria-label="سعة البطارية الكهنة (أمبير)" data-action="pos.scrap-capacity">
+                            <span class="input-group-text">Ah</span>
                         </div>
-                        <div class="col-4">
-                            <label class="form-label fs-9 text-muted mb-0 fw-bold">سعر الكهنة:</label>
-                            <div class="input-group input-group-sm">
-                                <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center p-0 fs-11" id="scrapPriceInput" placeholder="السعر" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" data-action="pos.recalc">
-                            </div>
-                        </div>
-                    </div>
-                    <div class="fs-10 text-muted mt-1" id="scrapTierHint"></div>
-                    <div class="d-flex justify-content-between align-items-center mt-1 fs-10 text-muted">
-                        <span>صافي خصم الكهنة:</span>
-                        <span class="fw-bold text-success font-monospace fs-11" id="tradeInDiscountDisplay">- 0 ج.م</span>
+                        <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center" style="width: 85px;" id="scrapPriceInput" placeholder="السعر" aria-label="سعر الكهنة" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" data-action="pos.recalc">
                     </div>
                 </div>
             </div>
 
             <!-- Financial Breakdown -->
             <div class="border-top pt-1 mb-1 fs-11">
-                <div class="d-flex justify-content-between mb-0">
-                    <span class="text-muted">المجموع قبل الخصم:</span>
-                    <span class="fw-bold text-dark font-monospace" id="cartSubtotal">0 ج.م</span>
-                </div>
-                <div class="d-flex justify-content-between align-items-center mb-0 gap-2">
-                    <label for="cartDiscountInput" class="text-muted mb-0 text-nowrap">خصم إضافي:</label>
-                    <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 110px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" data-action="pos.recalc">
+                <div class="d-flex justify-content-between align-items-center gap-2 mb-0">
+                    <span class="text-nowrap">
+                        <span class="text-muted">المجموع قبل الخصم:</span>
+                        <span class="fw-bold text-dark font-monospace" id="cartSubtotal">0 ج.م</span>
+                    </span>
+                    <span class="d-flex align-items-center gap-1">
+                        <label for="cartDiscountInput" class="text-muted mb-0 text-nowrap">خصم إضافي:</label>
+                        <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 90px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" data-action="pos.recalc">
+                    </span>
                 </div>
                 <div class="d-flex justify-content-between mb-0 text-danger d-none" id="cartScrapDiscountRow">
                     <span>خصم الكهنة المسترجعة:</span>
@@ -89,16 +79,13 @@
             <div class="mb-1">
                 <div class="payment-mode-group" role="radiogroup" aria-label="طريقة سداد الفاتورة">
                     <button type="button" class="payment-mode-btn mode-full active" id="mode-full" role="radio" aria-checked="true" data-action="pos.payment-mode" data-mode="full">
-                        <i class="ri-checkbox-circle-line fs-14 d-block"></i>
-                        <span class="fs-10">كامل الدفع</span>
+                        <i class="ri-checkbox-circle-line"></i><span>كامل الدفع</span>
                     </button>
                     <button type="button" class="payment-mode-btn mode-partial" id="mode-partial" role="radio" aria-checked="false" data-action="pos.payment-mode" data-mode="partial">
-                        <i class="ri-pie-chart-2-line fs-14 d-block"></i>
-                        <span class="fs-10">جزء من المبلغ</span>
+                        <i class="ri-pie-chart-2-line"></i><span>جزء من المبلغ</span>
                     </button>
                     <button type="button" class="payment-mode-btn mode-remaining" id="mode-remaining" role="radio" aria-checked="false" data-action="pos.payment-mode" data-mode="remaining">
-                        <i class="ri-hand-coin-line fs-14 d-block"></i>
-                        <span class="fs-10">باقي المبلغ</span>
+                        <i class="ri-hand-coin-line"></i><span>باقي المبلغ</span>
                     </button>
                 </div>
                 <div class="fs-9 text-muted mt-1" id="paymentModeHint"></div>
@@ -106,24 +93,15 @@
 
             <!-- Payment method: how the amount paid now is paid (not needed when nothing is paid now) -->
             <div class="mb-1" id="paymentMethodBox">
-                <div class="row g-1 text-center">
-                    <div class="col-4">
-                        <div class="payment-method-card active pay-cash py-1" id="pay-cash" data-action="pos.payment-method" data-method="cash">
-                            <i class="ri-money-dollar-circle-line fs-14 d-block mb-0 text-success"></i>
-                            <span class="fs-10">كاش</span>
-                        </div>
+                <div class="payment-method-group">
+                    <div class="payment-method-card active pay-cash" id="pay-cash" data-action="pos.payment-method" data-method="cash">
+                        <i class="ri-money-dollar-circle-line text-success"></i><span>كاش</span>
                     </div>
-                    <div class="col-4">
-                        <div class="payment-method-card pay-instapay py-1" id="pay-instapay" data-action="pos.payment-method" data-method="instapay">
-                            <i class="ri-smartphone-line fs-14 d-block mb-0 text-primary"></i>
-                            <span class="fs-10">إنستاباي</span>
-                        </div>
+                    <div class="payment-method-card pay-instapay" id="pay-instapay" data-action="pos.payment-method" data-method="instapay">
+                        <i class="ri-smartphone-line text-primary"></i><span>إنستاباي</span>
                     </div>
-                    <div class="col-4">
-                        <div class="payment-method-card pay-card py-1" id="pay-card" data-action="pos.payment-method" data-method="card">
-                            <i class="ri-bank-card-line fs-14 d-block mb-0 text-info"></i>
-                            <span class="fs-10">فيزا</span>
-                        </div>
+                    <div class="payment-method-card pay-card" id="pay-card" data-action="pos.payment-method" data-method="card">
+                        <i class="ri-bank-card-line text-info"></i><span>فيزا</span>
                     </div>
                 </div>
             </div>
@@ -145,30 +123,26 @@
                 <div class="fs-9 mt-1 d-none" id="paidNowMessage" role="alert"></div>
             </div>
 
-            <!-- Quick cash helper: change for the cash received (relative to the amount paid now) -->
-            <div class="p-1 px-2 bg-light rounded border mb-1" id="cashPresetsBox">
-                <div class="row g-1 align-items-center">
-                    <div class="col-6">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-body fs-9 py-0 px-1">المستلم:</span>
-                            <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" data-action="pos.cash-change">
-                        </div>
-                    </div>
-                    <div class="col-6 text-end">
-                        <span class="fs-10 text-muted">الباقي: </span>
-                        <strong class="text-success font-monospace fs-12" id="cashChangeOutput">0 ج.م</strong>
-                    </div>
+            <!-- Cash calculator (cash payments only): received / change / quick amounts on one line -->
+            <div class="p-1 px-2 bg-light rounded border mb-1 d-flex flex-wrap align-items-center gap-1" id="cashCalculatorBox">
+                <div class="input-group input-group-sm flex-nowrap" style="width: 120px;">
+                    <span class="input-group-text bg-body fs-9 py-0 px-1">المستلم:</span>
+                    <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" data-action="pos.cash-change">
                 </div>
-                <div class="d-flex flex-wrap gap-1 mt-1" id="quickCashChips"></div>
+                <span class="text-nowrap">
+                    <span class="fs-10 text-muted">الباقي:</span>
+                    <strong class="text-success font-monospace fs-12" id="cashChangeOutput">0 ج.م</strong>
+                </span>
+                <div class="d-flex gap-1 ms-auto" id="quickCashChips"></div>
             </div>
 
             <!-- Mandatory Technician in Checkout Box -->
             <div class="p-1 px-2 bg-light rounded border border-danger-subtle mb-1">
-                <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="d-flex justify-content-between align-items-center mb-0">
                     <label class="form-label fs-10 fw-bold text-dark mb-0"><i class="ri-user-settings-line text-primary me-1"></i> العامل / الفني القائم بالتركيب:</label>
                     <span class="badge bg-danger text-white fs-9">إجباري *</span>
                 </div>
-                <select class="form-select form-select-sm fw-bold fs-11 border-danger" id="posTechnicianSelectCart" required data-action="pos.sync-tech" data-target="posTechnicianSelect">
+                <select class="form-select form-select-sm py-1 fw-bold fs-11 border-danger" id="posTechnicianSelectCart" required data-action="pos.sync-tech" data-target="posTechnicianSelect">
                     <option value="">-- اختر العامل / الفني المسؤول عن التركيب --</option>
                     @foreach($technicians as $tech)
                         <option value="{{ $tech->id }}">{{ $tech->full_name }} ({{ $tech->employee_code }})</option>
@@ -176,11 +150,13 @@
                 </select>
             </div>
 
-            <!-- Submit Invoice Button -->
-            <button type="button" class="btn btn-success w-100 fw-bold fs-13 py-1 shadow-sm mt-1" id="btnSubmitInvoice" data-action="pos.submit">
+        </div>
+
+        <!-- Pinned submit footer: always visible, whatever the checkout controls above expand to -->
+        <div class="card-footer pos-checkout-footer bg-body border-top p-2">
+            <button type="button" class="btn btn-success w-100 fw-bold fs-13 py-1 shadow-sm" id="btnSubmitInvoice" data-action="pos.submit">
                 <i class="ri-check-double-line me-1"></i> اعتماد الفاتورة والضمان (Enter ↵)
             </button>
-
         </div>
 
     </div>
