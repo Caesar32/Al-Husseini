@@ -222,10 +222,10 @@ class InvoiceItemDetail {
   final int id;
   final String productName;
   final String productSku;
-  final int quantity;
+  final double quantity;
   final Money unitPrice;
   final Money totalPrice;
-  final int returnedQuantity;
+  final double returnedQuantity;
   final bool isBattery;
   final String? batterySerialNumber;
   final int? warrantyDurationMonths;
@@ -248,10 +248,10 @@ class InvoiceItemDetail {
       id: readInt(json['id']),
       productName: readString(json['product_name'], fallback: 'منتج'),
       productSku: readString(json['sku']),
-      quantity: readInt(json['quantity'], fallback: 1),
+      quantity: readDouble(json['quantity'], fallback: 1),
       unitPrice: Money.fromJson(json['unit_price']),
       totalPrice: Money.fromJson(json['total_price']),
-      returnedQuantity: readInt(json['returned_quantity']),
+      returnedQuantity: readDouble(json['returned_quantity']),
       isBattery: readBool(json['is_battery']),
       batterySerialNumber: readStringOrNull(json['battery_serial_number']),
       warrantyDurationMonths: readIntOrNull(json['warranty_duration_months']),

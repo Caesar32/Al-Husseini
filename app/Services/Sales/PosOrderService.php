@@ -21,6 +21,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\StockMovementType;
 use App\Services\Finance\ManagerOverrideService;
 use App\Services\Support\DocumentNumberService;
+use App\Support\Quantity;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -42,6 +43,7 @@ class PosOrderService implements PosOrderServiceInterface
     {
         return (float) config('finance.epsilon', self::EPSILON);
     }
+
     public function getPaginatedInvoices(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
         $filter = InvoiceFilter::fromArray($filters);
@@ -141,7 +143,13 @@ class PosOrderService implements PosOrderServiceInterface
             // appear on several lines (each battery unit is its own line with its own serial).
             $requestedPerProduct = [];
             foreach ($itemsData as $item) {
-                $requestedPerProduct[$item['product_id']] = ($requestedPerProduct[$item['product_id']] ?? 0) + (int) ($item['quantity'] ?? 1);
+                $product = $products->get($item['product_id']);
+                if (! $product) {
+                    continue;
+                }
+
+                $qtyMilli = $product->quantityMilliOrFail($item['quantity'] ?? 1);
+                $requestedPerProduct[$item['product_id']] = ($requestedPerProduct[$item['product_id']] ?? 0) + $qtyMilli;
             }
 
             foreach ($itemsData as $item) {
@@ -152,11 +160,15 @@ class PosOrderService implements PosOrderServiceInterface
                     throw new \InvalidArgumentException("المنتج ذو المعرف ({$productId}) غير متاح.");
                 }
 
-                $qty = (int) ($item['quantity'] ?? 1);
-                $requestedTotal = $requestedPerProduct[$productId];
-                if ($product->current_stock < $requestedTotal) {
+                $qtyMilli = $product->quantityMilliOrFail($item['quantity'] ?? 1);
+                $qty = Quantity::fromMilli($qtyMilli);
+                $requestedTotalMilli = $requestedPerProduct[$productId];
+                if (Quantity::toMilli($product->current_stock) < $requestedTotalMilli) {
                     throw new \DomainException(
-                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، ولا يكفي لصرف {$requestedTotal}."
+                        'الرصيد المتاح من الصنف (' . $product->name . ') هو '
+                            . Quantity::format($product->current_stock)
+                            . ' فقط، ولا يكفي لصرف '
+                            . Quantity::format(Quantity::fromMilli($requestedTotalMilli)) . '.'
                     );
                 }
 
@@ -164,7 +176,7 @@ class PosOrderService implements PosOrderServiceInterface
                     ? (float) $item['unit_price']
                     : (float) $product->retail_price;
 
-                $totalPrice = round($qty * $unitPrice, 2);
+                $totalPrice = Quantity::lineTotal($qty, $unitPrice);
                 $subtotal += $totalPrice;
 
                 $preparedItems[] = [
@@ -350,7 +362,6 @@ class PosOrderService implements PosOrderServiceInterface
             }
 
             // 7. Save Items, Decrement Stock, and Issue Warranties
-            $totalBatteriesSold = 0;
             foreach ($preparedItems as $pItem) {
                 $invoiceItem = InvoiceItem::create([
                     'invoice_id'               => $invoice->id,
@@ -365,11 +376,12 @@ class PosOrderService implements PosOrderServiceInterface
                 // Decrement inventory safely
                 $product = $products->get($pItem['product_id']);
                 $stockAfter = $this->stock->move($product->id, -$pItem['quantity'], StockMovementType::Sale, $invoice, $cashierUserId);
-                $stockBeforeDecrement = $stockAfter + $pItem['quantity'];
+                $stockAfterMilli = Quantity::toMilli($stockAfter);
+                $stockBeforeDecrementMilli = $stockAfterMilli + Quantity::toMilli($pItem['quantity']);
 
                 // Owner alert: fires only on the 1 -> 0 edge, not on every sale of an
                 // already-depleted item.
-                if ($stockBeforeDecrement > 0 && $stockAfter <= 0) {
+                if ($stockBeforeDecrementMilli > 0 && $stockAfterMilli <= 0) {
                     DispatchOwnerPushNotification::dispatch(
                         'نفاد مخزون صنف حيوي ⚠️',
                         "نفد مخزون الصنف ({$product->name}) بالكامل بعد عملية بيع.",
@@ -379,8 +391,6 @@ class PosOrderService implements PosOrderServiceInterface
 
                 // Issue Warranty certificate if product is battery
                 if ($pItem['is_battery'] && !empty($pItem['battery_serial'])) {
-                    $totalBatteriesSold += $pItem['quantity'];
-
                     // Warranty requires customer_id, ensure valid customer ID
                     if (!$customerId) {
                         // firstOrCreate is race-safe here (savepoint + unique phone); withTrashed so a
@@ -485,9 +495,11 @@ class PosOrderService implements PosOrderServiceInterface
         $totalCredit = (float) $paymentBase->clone()->where('payment_method', 'credit')->sum('amount');
 
         // Batteries count via DB, net of returned units
-        $batteriesCount = (int) \App\Models\InvoiceItem::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->countable())
+        $batteriesSum = \App\Models\InvoiceItem::whereHas('invoice', fn($q) => $q->where('branch_id', $branchId)->whereDate('created_at', $date)->countable())
             ->whereHas('product', fn($q) => $q->where('is_battery', true))
             ->sum(DB::raw('quantity - returned_quantity'));
+        // Battery lines are whole pieces; the decimal SUM ("5.000" on MySQL) is read exactly.
+        $batteriesCount = intdiv(Quantity::toMilli($batteriesSum ?: 0), Quantity::SCALE);
 
         // Still load invoices for detailed return (with relations) — but limited to needed data
         $invoices = Invoice::where('branch_id', $branchId)

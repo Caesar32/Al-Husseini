@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Owner;
 
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -35,13 +36,15 @@ class ReturnResource extends JsonResource
                 'formatted' => number_format((float) $this->final_amount, 2) . ' ج.م',
             ],
             'returned_items'  => $this->whenLoaded('items', function () {
-                return $this->items->filter(fn($item) => $item->returned_quantity > 0)->map(function ($item) {
+                return $this->items->filter(fn($item) => Quantity::toMilli($item->returned_quantity) > 0)->map(function ($item) {
+                    $refunded = Quantity::lineTotal($item->returned_quantity, $item->unit_price);
+
                     return [
                         'product_name'      => $item->product?->name ?? 'صنف غير محدد',
-                        'returned_quantity' => (int) $item->returned_quantity,
+                        'returned_quantity' => Quantity::normalize($item->returned_quantity),
                         'unit_price'        => (float) $item->unit_price,
-                        'total_refunded'    => (float) ($item->returned_quantity * $item->unit_price),
-                        'formatted_total'   => number_format((float) ($item->returned_quantity * $item->unit_price), 2) . ' ج.م',
+                        'total_refunded'    => $refunded,
+                        'formatted_total'   => number_format($refunded, 2) . ' ج.م',
                     ];
                 })->values();
             }),

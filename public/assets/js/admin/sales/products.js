@@ -23,6 +23,9 @@
             document.getElementById('prodCostGroup').classList.toggle('d-none', !!product);
             document.getElementById('prodActiveGroup').classList.toggle('d-none', !product);
 
+            const unitField = form.elements.unit;
+            if (unitField) unitField.value = product?.unit || 'piece';
+
             if (product) {
                 Object.keys(product).forEach(function (key) {
                     const field = form.elements[key];

@@ -243,7 +243,7 @@
                         <div class="fs-9 text-muted">ضمان معتمد: {{ $item->warranty_duration_months }} شهراً</div>
                         @endif
                     </td>
-                    <td style="text-align: center;">{{ $item->quantity }}</td>
+                    <td style="text-align: center;">{{ \App\Support\Quantity::format($item->quantity) }} {{ ($item->product?->unit ?? \App\Enums\ProductUnit::Piece)->label() }}</td>
                     <td style="text-align: left;" class="fw-bold">{{ number_format($item->total_price, 2) }}</td>
                 </tr>
                 @endforeach

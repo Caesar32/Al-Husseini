@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/inventory_alert.dart';
+import '../../../data/models/json_read.dart';
 import '../../../providers/inventory_provider.dart';
 import '../../widgets/arabic_tabular_text.dart';
 import '../../widgets/executive_app_bar.dart';
@@ -189,7 +190,7 @@ class _AlertCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'الرصيد المتبقي: ${item.currentStock}',
+                  'الرصيد المتبقي: ${formatQuantity(item.currentStock)}',
                   style: GoogleFonts.almarai(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
@@ -199,7 +200,7 @@ class _AlertCard extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'حد إعادة أمان الطلب: ${item.reorderThreshold}',
+                  'حد إعادة أمان الطلب: ${formatQuantity(item.reorderThreshold)}',
                   style: GoogleFonts.almarai(
                     fontSize: 11,
                     color: AppColors.textMuted,

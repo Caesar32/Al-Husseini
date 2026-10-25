@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Contracts\Catalog\StockLedgerInterface;
 use App\Models\Product;
+use App\Support\Quantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -75,14 +76,14 @@ class ImportStockCommand extends Command
             $reader->close();
         }
 
-        $changed = array_filter($updates, fn ($u) => $u['old'] !== $u['new']);
+        $changed = array_filter($updates, fn ($u) => $u['old_milli'] !== $u['new_milli']);
         $unchanged = count($updates) - count($changed);
 
         $this->newLine();
         $this->table(['Metric', 'Count'], [
             ['Data rows in file', $stats['rows']],
             ['Blank actual_stock (not counted, ignored)', $stats['blank']],
-            ['Invalid value (negative/fractional/non-numeric/over limit)', $stats['invalid']],
+            ['Invalid value (negative/over-precise/non-numeric/non-whole piece/over limit)', $stats['invalid']],
             ['Duplicate sku rows skipped', $stats['duplicate']],
             ['Not found in products', $stats['not_found']],
             ['Matched products', $stats['matched'] . ' (' . $stats['by_barcode'] . ' via barcode)'],
@@ -161,8 +162,8 @@ class ImportStockCommand extends Command
             return;
         }
 
-        $qty = $this->parseQuantity($raw);
-        if ($qty === null) {
+        $qtyMilli = $this->parseQuantity($raw);
+        if ($qtyMilli === null) {
             $stats['invalid']++;
             $this->log->warning('Invalid quantity', ['line' => $line, 'sku' => $sku, 'value' => is_scalar($raw) ? $raw : gettype($raw)]);
             return;
@@ -180,6 +181,17 @@ class ImportStockCommand extends Command
             return;
         }
 
+        if (! $product->allowsFraction() && $qtyMilli % Quantity::SCALE !== 0) {
+            $stats['invalid']++;
+            $this->log->warning('Fractional quantity is invalid for a piece product', [
+                'line' => $line,
+                'sku' => $product->sku,
+                'value' => $raw,
+            ]);
+            return;
+        }
+
+        $qty = Quantity::fromMilli($qtyMilli);
         if (isset($seen[$product->id])) {
             $stats['duplicate']++;
             $this->log->warning('Duplicate row for product skipped (first value kept)', ['line' => $line, 'sku' => $product->sku, 'first_line' => $seen[$product->id], 'value' => $qty]);
@@ -192,10 +204,17 @@ class ImportStockCommand extends Command
             $stats['by_barcode']++;
             $this->log->info('Matched by barcode (sku did not match)', ['line' => $line, 'sku' => $sku, 'barcode' => $barcode, 'product_sku' => $product->sku]);
         }
-        $updates[$product->id] = ['sku' => $product->sku, 'old' => (int) $product->current_stock, 'new' => $qty];
+        $oldMilli = Quantity::toMilli($product->current_stock);
+        $updates[$product->id] = [
+            'sku'       => $product->sku,
+            'old'       => Quantity::fromMilli($oldMilli),
+            'old_milli' => $oldMilli,
+            'new'       => $qty,
+            'new_milli' => $qtyMilli,
+        ];
     }
 
-    /** Whole, non-negative number within unsigned-int range, else null. */
+    /** Non-negative number with at most three decimals within the legacy stock limit, in milli-units. */
     private function parseQuantity(mixed $raw): ?int
     {
         if (is_string($raw)) {
@@ -206,11 +225,22 @@ class ImportStockCommand extends Command
         } elseif (!is_int($raw) && !is_float($raw)) {
             return null;
         }
-        $n = (float) $raw;
-        if ($n < 0 || $n > 4294967295 || abs($n - round($n)) > 1e-9) {
+
+        if (! Quantity::hasValidPrecision($raw)) {
             return null;
         }
-        return (int) round($n);
+
+        try {
+            $milli = Quantity::toMilli($raw);
+        } catch (\InvalidArgumentException|\OverflowException) {
+            return null;
+        }
+
+        if ($milli < 0 || $milli > Quantity::MAX_MILLI) {
+            return null;
+        }
+
+        return $milli;
     }
 
     private function writeBackup(array $changed): string

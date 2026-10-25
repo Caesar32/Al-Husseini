@@ -13,6 +13,7 @@ use App\Models\Warranty;
 use App\Models\WarrantyClaim;
 use App\Models\Supplier;
 use App\Models\User;
+use App\Support\Quantity;
 
 class SearchService implements SearchServiceInterface
 {
@@ -273,7 +274,7 @@ class SearchService implements SearchServiceInterface
             ->get();
 
         return $products->map(function ($prod) {
-            $stockBadge = $prod->current_stock <= $prod->reorder_threshold
+            $stockBadge = Quantity::toMilli($prod->current_stock) <= Quantity::toMilli($prod->reorder_threshold)
                 ? 'badge bg-danger-subtle text-danger'
                 : 'badge bg-success-subtle text-success';
 

@@ -13,6 +13,7 @@ use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ScrapPricingTier;
 use App\Services\Sales\CustomerService;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -114,7 +115,7 @@ class PosController extends Controller
         $exactBarcode = (bool) ($validated['exact_barcode'] ?? false);
 
         $products = Product::query()
-            ->select(['id', 'name', 'brand', 'sku', 'barcode', 'capacity_ah', 'retail_price', 'current_stock', 'category_id', 'is_battery', 'warranty_months'])
+            ->select(['id', 'name', 'brand', 'sku', 'barcode', 'capacity_ah', 'retail_price', 'current_stock', 'category_id', 'is_battery', 'warranty_months', 'unit'])
             ->where('is_active', true)
             ->with('category:id,slug,name');
 
@@ -242,8 +243,12 @@ class PosController extends Controller
             'category_name'   => $p->category?->name,
             'is_battery'      => (bool) $p->is_battery,
             'capacity_ah'     => $p->capacity_ah,
-            'stock'           => (int) $p->current_stock,
+            'stock'           => Quantity::normalize($p->current_stock),
             'price'           => (float) $p->retail_price,
+            'unit'            => $p->unit?->value,
+            'unit_label'      => $p->unit?->label(),
+            'step'            => $p->unit?->stepperIncrement(),
+            'allows_fraction' => (bool) $p->allowsFraction(),
             'warranty_months' => (int) $p->warranty_months,
         ];
     }

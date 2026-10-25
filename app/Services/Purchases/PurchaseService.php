@@ -11,6 +11,7 @@ use App\Models\PurchaseInvoiceItem;
 use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\SupplierProduct;
+use App\Support\Quantity;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -90,9 +91,10 @@ class PurchaseService implements PurchaseServiceInterface
                     throw new \InvalidArgumentException("المنتج ذو المعرف ({$productId}) غير موجود.");
                 }
 
-                $qty = (int) $item['quantity'];
+                $qtyMilli = $product->quantityMilliOrFail($item['quantity']);
+                $qty = Quantity::fromMilli($qtyMilli);
                 $unitCost = (float) $item['unit_cost_price'];
-                $totalCost = round($qty * $unitCost, 2);
+                $totalCost = Quantity::lineTotal($qty, $unitCost);
                 $subtotal += $totalCost;
 
                 $preparedItems[] = [
@@ -153,26 +155,27 @@ class PurchaseService implements PurchaseServiceInterface
                 ]);
 
                 $product = $products->get($pItem['product_id']);
-                $stockNow = $stockByProduct[$product->id] ??= (int) $product->current_stock;
-                $currentStock = max(0, $stockNow);
+                $stockNowMilli = $stockByProduct[$product->id] ??= Quantity::toMilli($product->current_stock);
+                $currentStockMilli = max(0, $stockNowMilli);
                 $currentCost = (float) $product->cost_price;
-                $newQty = $pItem['quantity'];
+                $newQtyMilli = Quantity::toMilli($pItem['quantity']);
                 $newCost = $pItem['unit_cost_price'];
 
-                $totalQty = $currentStock + $newQty;
-                $newWac = $totalQty > 0
-                    ? (($currentStock * $currentCost) + ($newQty * $newCost)) / $totalQty
+                $totalQtyMilli = $currentStockMilli + $newQtyMilli;
+                $newWac = $totalQtyMilli > 0
+                    ? (($currentStockMilli * $currentCost) + ($newQtyMilli * $newCost)) / $totalQtyMilli
                     : $newCost;
 
                 // A negative stock is first clamped to 0 (unchanged rule), so the delta can exceed the quantity.
-                $stockByProduct[$product->id] = $this->stock->move(
+                $stockAfter = $this->stock->move(
                     $product->id,
-                    $currentStock + $newQty - $stockNow,
+                    Quantity::fromMilli($currentStockMilli + $newQtyMilli - $stockNowMilli),
                     StockMovementType::Purchase,
                     $invoice,
                     $receivedByUserId,
                     (float) $newCost
                 );
+                $stockByProduct[$product->id] = Quantity::toMilli($stockAfter);
                 $product->update(['cost_price' => round($newWac, 2)]);
 
                 // Sync catalog entry in supplier_products. The supplier of the latest purchase
@@ -319,54 +322,78 @@ class PurchaseService implements PurchaseServiceInterface
 
             $returnTotal = 0.0;
             $invoiceItems = PurchaseInvoiceItem::where('purchase_invoice_id', $invoice->id)
+                ->with('product')
                 ->orderBy('id')
                 ->lockForUpdate()
                 ->get();
 
             foreach ($items as $item) {
                 $productId = (int) $item['product_id'];
-                $qty = (int) $item['quantity'];
-
-                if ($qty < 1) {
-                    throw new \InvalidArgumentException('كمية المرتجع يجب أن تكون 1 على الأقل.');
-                }
+                $qtyMilli = Quantity::milliOrFail($item['quantity'] ?? null);
 
                 // Quantities already returned are excluded, so the same goods cannot be returned twice.
                 $lines = $invoiceItems->where('product_id', $productId);
-                $available = $lines->sum(fn ($line) => (int) $line->quantity - (int) $line->returned_quantity);
-                if ($lines->isEmpty() || $qty > $available) {
+                $availableMilli = $lines->reduce(
+                    fn (int $total, PurchaseInvoiceItem $line): int => $total + max(
+                        0,
+                        Quantity::toMilli($line->quantity) - Quantity::toMilli($line->returned_quantity)
+                    ),
+                    0
+                );
+                if ($lines->isEmpty() || $qtyMilli > $availableMilli) {
                     throw new \DomainException("كمية المرتجع للصنف تتجاوز الكمية المتبقية القابلة للإرجاع بالفاتورة الأصلية.");
                 }
 
+                $lines->first()?->product?->quantityMilliOrFail($item['quantity']);
+
                 $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
-                if ($product->current_stock < $qty) {
-                    throw new \DomainException("المخزون الحالي للصنف ({$product->name}) أقل من كمية المرتجع المطلوبة.");
+                if (Quantity::toMilli($product->current_stock) < $qtyMilli) {
+                    throw new \DomainException(
+                        'المخزون الحالي للصنف (' . $product->name . ') أقل من كمية المرتجع المطلوبة ('
+                            . Quantity::format(Quantity::fromMilli($qtyMilli)) . ').'
+                    );
                 }
 
-                $remainingQty = $qty;
-                $stock = (int) $product->current_stock;
+                $remainingMilli = $qtyMilli;
+                $stockMilli = Quantity::toMilli($product->current_stock);
                 foreach ($lines as $line) {
-                    $lineAvailable = (int) $line->quantity - (int) $line->returned_quantity;
-                    if ($remainingQty <= 0 || $lineAvailable <= 0) {
+                    $lineAvailableMilli = max(
+                        0,
+                        Quantity::toMilli($line->quantity) - Quantity::toMilli($line->returned_quantity)
+                    );
+                    if ($remainingMilli <= 0 || $lineAvailableMilli <= 0) {
                         continue;
                     }
-                    $take = min($remainingQty, $lineAvailable);
-                    $returnTotal += round($take * (float) $line->unit_cost_price, 2);
-                    $line->update(['returned_quantity' => (int) $line->returned_quantity + $take]);
+                    $takeMilli = min($remainingMilli, $lineAvailableMilli);
+                    $take = Quantity::fromMilli($takeMilli);
+                    $returnTotal += Quantity::lineTotal($take, $line->unit_cost_price);
+                    $line->update([
+                        'returned_quantity' => Quantity::fromMilli(
+                            Quantity::toMilli($line->returned_quantity) + $takeMilli
+                        ),
+                    ]);
 
                     // Reverse the weighted average cost for the goods leaving stock.
-                    $newStock = $this->stock->move($product->id, -$take, StockMovementType::PurchaseReturn, $invoice, $userId, (float) $line->unit_cost_price);
+                    $newStock = $this->stock->move(
+                        $product->id,
+                        -$take,
+                        StockMovementType::PurchaseReturn,
+                        $invoice,
+                        $userId,
+                        (float) $line->unit_cost_price
+                    );
+                    $newStockMilli = Quantity::toMilli($newStock);
                     $cost = (float) $product->cost_price;
-                    if ($newStock > 0) {
-                        $reversed = (($stock * $cost) - ($take * (float) $line->unit_cost_price)) / $newStock;
+                    if ($newStockMilli > 0) {
+                        $reversed = (($stockMilli * $cost) - ($takeMilli * (float) $line->unit_cost_price)) / $newStockMilli;
                         if ($reversed >= 0) {
                             $cost = round($reversed, 2);
                         }
                     }
                     $product->update(['cost_price' => $cost]);
 
-                    $stock = $newStock;
-                    $remainingQty -= $take;
+                    $stockMilli = $newStockMilli;
+                    $remainingMilli -= $takeMilli;
                 }
             }
 

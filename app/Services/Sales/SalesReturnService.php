@@ -14,6 +14,7 @@ use App\Models\InvoiceItem;
 use App\Models\InvoicePayment;
 use App\Models\Product;
 use App\Models\Warranty;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -50,29 +51,37 @@ class SalesReturnService implements SalesReturnServiceInterface
             $requestedByLine = $this->resolveReturnLines($invoice, $items);
 
             $refundTotal = 0.0;
-            foreach ($requestedByLine as $lineId => $qty) {
+            foreach ($requestedByLine as $lineId => $qtyMilli) {
                 /** @var InvoiceItem $invItem */
                 $invItem = $invoice->items->firstWhere('id', $lineId);
+                $returnableMilli = Quantity::toMilli($invItem->returnableQuantity());
 
                 // Cumulative guard: earlier returns on this line are subtracted (BIZ-03).
-                if ($qty > $invItem->returnableQuantity()) {
+                if ($qtyMilli > $returnableMilli) {
                     throw new \DomainException(sprintf(
-                        'كمية المرتجع للصنف (%s) تتجاوز الكمية المتاحة للإرجاع: %d من أصل %d (سبق إرجاع %d).',
+                        'كمية المرتجع للصنف (%s) تتجاوز الكمية المتاحة للإرجاع: %s من أصل %s (سبق إرجاع %s).',
                         $invItem->product?->name ?? $invItem->product_id,
-                        $invItem->returnableQuantity(),
-                        $invItem->quantity,
-                        $invItem->returned_quantity
+                        Quantity::format(Quantity::fromMilli($returnableMilli)),
+                        Quantity::format($invItem->quantity),
+                        Quantity::format($invItem->returned_quantity)
                     ));
                 }
 
+                $invItem->product?->quantityMilliOrFail(Quantity::fromMilli($qtyMilli));
+
                 $product = Product::where('id', $invItem->product_id)->lockForUpdate()->firstOrFail();
+                $qty = Quantity::fromMilli($qtyMilli);
                 $this->stock->move($product->id, $qty, StockMovementType::SaleReturn, $invoice, $cashierUserId);
 
-                $invItem->increment('returned_quantity', $qty);
+                $invItem->update([
+                    'returned_quantity' => Quantity::fromMilli(
+                        Quantity::toMilli($invItem->returned_quantity) + $qtyMilli
+                    ),
+                ]);
 
                 // Valued at the line unit price. Proration of invoice discount/scrap/tax is an
                 // owner decision (D3) and intentionally not applied here.
-                $refundTotal += round($qty * (float) $invItem->unit_price, 2);
+                $refundTotal += Quantity::lineTotal($qty, $invItem->unit_price);
 
                 // Void warranty if battery
                 if (! empty($invItem->battery_serial_number)) {
@@ -93,7 +102,9 @@ class SalesReturnService implements SalesReturnServiceInterface
                 $refundTotal = $refundable;
             }
 
-            $isFullReturn = $invoice->items->every(fn (InvoiceItem $line) => $line->returnableQuantity() === 0);
+            $isFullReturn = $invoice->items->every(
+                fn (InvoiceItem $line) => Quantity::toMilli($line->returnableQuantity()) === 0
+            );
 
             // ─── إصلاح محاسبة الآجل والنقدي عند المرتجع ───────────────────────────────
             $creditRefund = 0.0;
@@ -174,7 +185,7 @@ class SalesReturnService implements SalesReturnServiceInterface
      * Each row identifies its line by invoice_item_id (preferred) or, for older callers,
      * by product_id when that product appears on exactly one line of the invoice.
      *
-     * @return array<int, int> invoice_item_id => quantity
+     * @return array<int, int> invoice_item_id => quantity in milli-units
      */
     private function resolveReturnLines(Invoice $invoice, array $items): array
     {
@@ -184,10 +195,7 @@ class SalesReturnService implements SalesReturnServiceInterface
 
         $perLine = [];
         foreach ($items as $row) {
-            $qty = (int) ($row['quantity'] ?? 0);
-            if ($qty < 1) {
-                throw new \DomainException('كمية المرتجع يجب أن تكون 1 على الأقل.');
-            }
+            $qtyMilli = Quantity::milliOrFail($row['quantity'] ?? null);
 
             if (! empty($row['invoice_item_id'])) {
                 $line = $invoice->items->firstWhere('id', (int) $row['invoice_item_id']);
@@ -207,7 +215,7 @@ class SalesReturnService implements SalesReturnServiceInterface
                 throw new \DomainException('يجب تحديد البند أو الصنف المراد إرجاعه.');
             }
 
-            $perLine[$line->id] = ($perLine[$line->id] ?? 0) + $qty;
+            $perLine[$line->id] = ($perLine[$line->id] ?? 0) + $qtyMilli;
         }
 
         return $perLine;

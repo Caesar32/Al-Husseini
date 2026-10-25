@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Casts\QuantityCast;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -30,15 +32,20 @@ class InvoiceItem extends Model
         return [
             'unit_price' => 'decimal:2',
             'total_price' => 'decimal:2',
-            'quantity' => 'integer',
-            'returned_quantity' => 'integer',
+            'quantity' => QuantityCast::class,
+            'returned_quantity' => QuantityCast::class,
             'warranty_duration_months' => 'integer',
         ];
     }
 
-    public function returnableQuantity(): int
+    public function returnableQuantity(): int|float
     {
-        return max(0, (int) $this->quantity - (int) $this->returned_quantity);
+        $returnableMilli = max(
+            0,
+            Quantity::toMilli($this->quantity) - Quantity::toMilli($this->returned_quantity)
+        );
+
+        return Quantity::fromMilli($returnableMilli);
     }
 
     public function invoice(): BelongsTo

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\QuantityCast;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,8 +22,8 @@ class PurchaseInvoiceItem extends Model
     protected function casts(): array
     {
         return [
-            'quantity' => 'integer',
-            'returned_quantity' => 'integer',
+            'quantity' => QuantityCast::class,
+            'returned_quantity' => QuantityCast::class,
             'unit_cost_price' => 'decimal:2',
             'total_cost_price' => 'decimal:2',
             'production_date' => 'date',

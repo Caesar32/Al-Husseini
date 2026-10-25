@@ -5,8 +5,8 @@ class InventoryAlertItem {
   final String name;
   final String sku;
   final String? barcode;
-  final int currentStock;
-  final int reorderThreshold;
+  final double currentStock;
+  final double reorderThreshold;
   final double depletionRatio;
   final String stockStatus;
   final String stockStatusLabel;
@@ -34,8 +34,8 @@ class InventoryAlertItem {
   factory InventoryAlertItem.fromJson(Map<String, dynamic> json) {
     final costPrice = readMap(json['cost_price']);
     final retailPrice = readMap(json['retail_price']);
-    final currentStock = readInt(json['current_stock']);
-    final reorderThreshold = readInt(json['reorder_threshold']);
+    final currentStock = readDouble(json['current_stock']);
+    final reorderThreshold = readDouble(json['reorder_threshold']);
 
     return InventoryAlertItem(
       id: readInt(json['id']),
@@ -62,7 +62,7 @@ class InventoryAlertItem {
   }
 }
 
-double _stockRatio(int currentStock, int reorderThreshold) {
+double _stockRatio(double currentStock, double reorderThreshold) {
   if (reorderThreshold <= 0) {
     return 0.0;
   }

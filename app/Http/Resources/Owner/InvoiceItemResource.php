@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Owner;
 
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,8 +22,8 @@ class InvoiceItemResource extends JsonResource
             'sku'                      => $this->product?->sku,
             'barcode'                  => $this->product?->barcode,
             'is_battery'               => (bool) ($this->product?->is_battery ?? false),
-            'quantity'                 => (int) $this->quantity,
-            'returned_quantity'        => (int) $this->returned_quantity,
+            'quantity'                 => Quantity::normalize($this->quantity),
+            'returned_quantity'        => Quantity::normalize($this->returned_quantity),
             'battery_serial_number'    => $this->battery_serial_number,
             'warranty_duration_months' => $this->warranty_duration_months,
             'unit_price'               => [

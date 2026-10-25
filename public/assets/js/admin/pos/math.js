@@ -9,12 +9,22 @@
     const toCents = (value) => Math.round((Number(value) || 0) * 100);
     const fromCents = (cents) => Math.round(cents) / 100;
 
+    // Quantities are compared and summed as integer thousandths (3 decimals, like App\Support\Quantity).
+    const toMilli = (value) => Math.round((Number(value) || 0) * 1000);
+    const fromMilli = (milli) => Math.round(milli) / 1000;
+    const formatQty = (value) => String(fromMilli(toMilli(value)));
+
+    /** Line total in piasters, rounded half up like Quantity::lineTotal() on the server. */
+    function lineCents(qty, price) {
+        return Math.round(toMilli(qty) * toCents(price) / 1000);
+    }
+
     /**
      * @param {Array<{product: {price: number}, qty: number}>} lines
      * @returns {{subtotal: number, total: number}} total = subtotal - discount - scrap deduction, never below 0
      */
     function totals(lines, discount, scrapDeduction) {
-        const subtotal = lines.reduce((sum, l) => sum + l.product.price * l.qty, 0);
+        const subtotal = fromCents(lines.reduce((sum, l) => sum + lineCents(l.qty, l.product.price), 0));
         // Tax: no tax rule is configured in the system (VAT setting unused), so none is applied.
         const total = Math.max(0, subtotal - discount - scrapDeduction);
         return { subtotal, total };
@@ -52,5 +62,5 @@
         return { due, paid, remaining: Math.max(0, due - paid), error, typed: raw !== '' };
     }
 
-    window.PosMath = { toCents, fromCents, totals, payment };
+    window.PosMath = { toCents, fromCents, toMilli, fromMilli, formatQty, lineCents, totals, payment };
 })();

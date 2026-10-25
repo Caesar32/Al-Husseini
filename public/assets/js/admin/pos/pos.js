@@ -85,7 +85,38 @@
         }
 
         function qtyInCart(productId) {
-            return cart.filter(l => l.product.id === productId).reduce((sum, l) => sum + l.qty, 0);
+            const milli = cart.filter(l => l.product.id === productId).reduce((sum, l) => sum + PosMath.toMilli(l.qty), 0);
+            return PosMath.fromMilli(milli);
+        }
+
+        // Piece products move by 1; liter/kg/meter products by their unit step, with up to 3 decimals
+        // (the server re-checks both in StorePosInvoiceRequest).
+        function unitLabel(p) {
+            return p.unit_label || 'قطعة';
+        }
+
+        function qtyStep(p) {
+            return p.allows_fraction ? (Number(p.step) || 0.25) : 1;
+        }
+
+        function stockText(p) {
+            return `${PosMath.formatQty(p.stock)} ${unitLabel(p)}`;
+        }
+
+        // What can still be added to the cart: stock minus what the cart already holds.
+        function remainingStock(p) {
+            return PosMath.fromMilli(PosMath.toMilli(p.stock) - PosMath.toMilli(qtyInCart(p.id)));
+        }
+
+        function warnStockLimit(p, title) {
+            playBeep(440, 0.15);
+            Swal.fire({
+                icon: 'warning',
+                title,
+                text: `الرصيد المتاح من الصنف (${p.name}) هو ${stockText(p)} فقط! لا يمكن إضافة المزيد إلى السلة.`,
+                confirmButtonText: 'حسناً',
+                timer: 2500
+            });
         }
 
         function playBeep(freq = 880, duration = 0.08) {
@@ -589,7 +620,7 @@
                         <span class="fw-bold fs-12 text-dark text-truncate">${esc(p.name)}</span>
                         <span class="fs-11 text-success fw-bold font-monospace text-nowrap">${esc(fmt(p.price))}</span>
                     </div>
-                    <div class="fs-10 text-muted">${esc(p.brand || '')} ${p.stock <= 0 ? '— نفذ من المخزن' : '— مخزون: ' + p.stock}</div>
+                    <div class="fs-10 text-muted">${esc(p.brand || '')} ${p.stock <= 0 ? '— نفذ من المخزن' : '— مخزون: ' + esc(stockText(p))}</div>
                 </div>
             `).join('');
             dropdown.classList.remove('d-none');
@@ -643,9 +674,9 @@
                 return `<span class="badge bg-danger text-white ${cls}">نفذ من المخزن (0)</span>`;
             }
             if (p.stock <= 5) {
-                return `<span class="badge bg-warning-subtle text-danger border border-warning ${cls}">متبقي ${p.stock} فقط!</span>`;
+                return `<span class="badge bg-warning-subtle text-danger border border-warning ${cls}">متبقي ${esc(stockText(p))} فقط!</span>`;
             }
-            return `<span class="badge bg-success-subtle text-success border border-success-subtle ${cls}">المخزون: <strong>${p.stock}</strong></span>`;
+            return `<span class="badge bg-success-subtle text-success border border-success-subtle ${cls}">المخزون: <strong>${esc(PosMath.formatQty(p.stock))}</strong> ${esc(unitLabel(p))}</span>`;
         }
 
         /** Renders whatever is currently loaded in `currentResults` (the active search/category/page set). */
@@ -686,14 +717,14 @@
                 filtered.forEach(p => {
                     const inCart = qtyInCart(p.id);
                     const isOut = p.stock <= 0;
-                    const isMaxed = inCart >= p.stock;
+                    const isMaxed = remainingStock(p) <= 0;
                     rows += `
                         <tr data-action="pos.add" data-id="${Number(p.id)}" class="${isOut ? 'opacity-75' : ''}">
                             <td>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-light text-dark border fs-10 font-monospace px-2 py-1">${esc(p.brand || 'عام')}</span>
                                     <strong class="text-dark fs-13">${esc(p.name)}</strong>
-                                    ${inCart ? `<span class="badge bg-success text-white fs-10"><i class="ri-shopping-cart-fill"></i> ${inCart}</span>` : ''}
+                                    ${inCart ? `<span class="badge bg-success text-white fs-10"><i class="ri-shopping-cart-fill"></i> ${esc(PosMath.formatQty(inCart))}</span>` : ''}
                                 </div>
                             </td>
                             <td><span class="badge bg-light text-secondary border fs-11 font-monospace">${esc(p.capacity_ah || p.category_name || '-')}</span></td>
@@ -733,13 +764,13 @@
             filtered.forEach(p => {
                 const inCart = qtyInCart(p.id);
                 const isOut = p.stock <= 0;
-                const isMaxed = inCart >= p.stock;
+                const isMaxed = remainingStock(p) <= 0;
                 const catBadge = categoryBadges[p.category] || 'bg-light text-dark';
 
                 html += `
                     <div class="col-6 col-sm-6 col-md-6 col-xl-4 col-xxl-3">
                         <div class="card pos-product-card ${isOut ? 'opacity-75' : ''}" data-action="pos.add" data-id="${Number(p.id)}">
-                            ${inCart ? `<span class="in-cart-indicator"><i class="ri-shopping-cart-fill"></i> ${inCart} بالسلة</span>` : ''}
+                            ${inCart ? `<span class="in-cart-indicator"><i class="ri-shopping-cart-fill"></i> ${esc(PosMath.formatQty(inCart))} بالسلة</span>` : ''}
                             <div>
                                 <div class="d-flex justify-content-between align-items-center mb-1 mb-sm-2">
                                     <span class="badge ${catBadge} fs-10 fs-sm-11 fw-bold font-monospace px-1 px-sm-2 py-0.5">${esc(p.brand || 'عام')}</span>
@@ -779,15 +810,11 @@
             const prod = findProduct(productId);
             if (!prod) return false;
 
-            if (qtyInCart(prod.id) >= prod.stock) {
-                playBeep(440, 0.15);
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'تنبيه نفاذ المخزون!',
-                    text: `الرصيد المتاح من الصنف (${prod.name}) هو ${prod.stock} قطعة فقط! لا يمكن إضافة المزيد إلى السلة.`,
-                    confirmButtonText: 'حسناً',
-                    timer: 2500
-                });
+            // A fractional product adds one step, or what is left when that is less (0.1 L of a 0.25 step).
+            const available = remainingStock(prod);
+            const increment = prod.allows_fraction ? Math.min(qtyStep(prod), available) : 1;
+            if (available <= 0 || PosMath.toMilli(increment) > PosMath.toMilli(available)) {
+                warnStockLimit(prod, 'تنبيه نفاذ المخزون!');
                 return false;
             }
 
@@ -798,9 +825,9 @@
             } else {
                 const existing = cart.find(l => l.product.id === prod.id);
                 if (existing) {
-                    existing.qty += 1;
+                    existing.qty = PosMath.fromMilli(PosMath.toMilli(existing.qty) + PosMath.toMilli(increment));
                 } else {
-                    cart.push({ key: ++lineSeq, product: prod, qty: 1, serial: '' });
+                    cart.push({ key: ++lineSeq, product: prod, qty: PosMath.fromMilli(PosMath.toMilli(increment)), serial: '' });
                 }
             }
 
@@ -813,31 +840,65 @@
             return true;
         }
 
-        function updateCartQty(lineKey, delta) {
+        // direction is +1 / -1 from the stepper buttons; the amount moved is the product's step.
+        function updateCartQty(lineKey, direction) {
             const line = cart.find(l => l.key === lineKey);
             if (!line) return;
 
-            if (delta > 0) {
-                if (line.product.is_battery) {
-                    addToCart(line.product.id);
-                    return;
-                }
-                if (qtyInCart(line.product.id) >= line.product.stock) {
-                    playBeep(440, 0.15);
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'تجاوز رصيد المخزون!',
-                        text: `الحد الأقصى المتاح في المخزن هو ${line.product.stock} قطعة فقط.`,
-                        confirmButtonText: 'حسناً',
-                        timer: 2000
-                    });
-                    return;
-                }
+            if (direction > 0) {
+                // Same stock check and step as adding from the catalog (a battery gets its own line).
+                addToCart(line.product.id);
+                return;
             }
 
-            line.qty += delta;
-            if (line.qty <= 0) {
+            const next = PosMath.toMilli(line.qty) - PosMath.toMilli(qtyStep(line.product));
+            if (next <= 0) {
                 cart = cart.filter(l => l.key !== lineKey);
+            } else {
+                line.qty = PosMath.fromMilli(next);
+            }
+            renderCart();
+            renderCatalog();
+        }
+
+        // A quantity typed in the cart (e.g. 3.5 L): at most 3 decimals, whole for piece products,
+        // capped at the stock left for this product. Anything invalid is reverted.
+        function setCartQty(lineKey, raw) {
+            const line = cart.find(l => l.key === lineKey);
+            if (!line) return;
+
+            const p = line.product;
+            const text = String(raw ?? '').trim();
+            const value = Number(text);
+            const exactMilli = value * 1000;
+            let milli = PosMath.toMilli(value);
+            const maxMilli = PosMath.toMilli(p.stock) - (PosMath.toMilli(qtyInCart(p.id)) - PosMath.toMilli(line.qty));
+
+            if (text === '' || !Number.isFinite(value) || milli <= 0
+                || Math.abs(exactMilli - milli) > 1e-6
+                || (!p.allows_fraction && milli % 1000 !== 0)) {
+                playBeep(440, 0.15);
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'كمية غير صالحة',
+                    text: p.allows_fraction
+                        ? `أدخل كمية أكبر من صفر بحد أقصى 3 أرقام عشرية (${unitLabel(p)}).`
+                        : `الصنف (${p.name}) يباع بالقطعة: أدخل عدداً صحيحاً أكبر من صفر.`,
+                    confirmButtonText: 'حسناً',
+                    timer: 2500
+                });
+                renderCart();
+                return;
+            }
+
+            if (milli > maxMilli) {
+                warnStockLimit(p, 'تجاوز رصيد المخزون!');
+                milli = maxMilli;
+            }
+            if (milli <= 0) {
+                cart = cart.filter(l => l.key !== lineKey);
+            } else {
+                line.qty = PosMath.fromMilli(milli);
             }
             renderCart();
             renderCatalog();
@@ -863,7 +924,7 @@
 
         function renderCart() {
             const container = document.getElementById('cartItemsContainer');
-            const totalCount = cart.reduce((sum, l) => sum + l.qty, 0);
+            const totalCount = PosMath.formatQty(PosMath.fromMilli(cart.reduce((sum, l) => sum + PosMath.toMilli(l.qty), 0)));
             document.getElementById('cartCountBadge').textContent = totalCount;
             const mobileBadge = document.getElementById('mobileCartCountBadge');
             if (mobileBadge) mobileBadge.textContent = totalCount;
@@ -882,6 +943,8 @@
             let html = '';
             cart.forEach(line => {
                 const p = line.product;
+                const qtyText = PosMath.formatQty(line.qty);
+                const lineTotal = PosMath.fromCents(PosMath.lineCents(line.qty, p.price));
                 html += `
                     <div class="cart-item-row py-1 px-2 mb-1">
                         <div class="d-flex justify-content-between align-items-center">
@@ -890,16 +953,19 @@
                                     <span class="badge bg-light text-dark border fs-9 py-0 px-1 font-monospace">${esc(p.brand || 'عام')}</span>
                                     <span class="fs-11 fw-bold text-dark text-truncate" title="${esc(p.name)}">${esc(p.name)}</span>
                                 </div>
-                                <small class="text-muted fs-10 font-monospace d-block">${esc(fmt(p.price))} × ${line.qty}</small>
+                                <small class="text-muted fs-10 font-monospace d-block">${esc(fmt(p.price))} × ${esc(qtyText)} ${esc(unitLabel(p))}</small>
                             </div>
                             <div class="d-flex align-items-center gap-1 flex-shrink-0">
                                 ${p.is_battery ? '' : `
                                 <div class="btn-group btn-group-sm border rounded">
                                     <button type="button" class="btn btn-sm btn-light py-0 px-1 fs-11 text-muted" data-action="pos.qty" data-key="${line.key}" data-delta="-1" title="تقليل">-</button>
-                                    <span class="font-monospace fw-bold fs-11 px-2 py-0 d-flex align-items-center bg-white">${line.qty}</span>
+                                    <input type="number" class="form-control form-control-sm border-0 rounded-0 font-monospace fw-bold fs-11 px-1 py-0 text-center bg-white"
+                                           style="width: 62px;" inputmode="decimal" aria-label="الكمية (${esc(unitLabel(p))})"
+                                           value="${esc(qtyText)}" min="${p.allows_fraction ? '0.001' : '1'}" step="${p.allows_fraction ? 'any' : '1'}"
+                                           data-action="pos.qty-input" data-action-on="change" data-key="${line.key}">
                                     <button type="button" class="btn btn-sm btn-light py-0 px-1 fs-11 text-muted" data-action="pos.qty" data-key="${line.key}" data-delta="1" title="زيادة">+</button>
                                 </div>`}
-                                <span class="font-monospace fw-bold text-success fs-12 ms-1 text-end" style="min-width: 65px;">${esc(fmt(p.price * line.qty))}</span>
+                                <span class="font-monospace fw-bold text-success fs-12 ms-1 text-end" style="min-width: 65px;">${esc(fmt(lineTotal))}</span>
                                 <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" data-action="pos.remove" data-key="${line.key}" title="حذف">
                                     <i class="ri-delete-bin-line fs-13"></i>
                                 </button>
@@ -1446,7 +1512,7 @@
             // line.product is the same object reference held in productCache, so this also keeps the
             // cache (and therefore every cached search page referencing this product) in sync.
             cart.forEach(line => {
-                line.product.stock = Math.max(0, line.product.stock - line.qty);
+                line.product.stock = PosMath.fromMilli(Math.max(0, PosMath.toMilli(line.product.stock) - PosMath.toMilli(line.qty)));
             });
 
             const invoiceUrl = POS_ROUTES.invoiceShow.replace('__ID__', encodeURIComponent(data.invoice_id));
@@ -1506,6 +1572,7 @@
             // cart
             'pos.clear-cart': () => clearCart(),
             'pos.qty': (el) => updateCartQty(Number(el.dataset.key), Number(el.dataset.delta)),
+            'pos.qty-input': (input) => setCartQty(Number(input.dataset.key), input.value),
             'pos.remove': (el) => removeCartItem(Number(el.dataset.key)),
             'pos.serial': (input) => setLineSerial(Number(input.dataset.key), input.value),
             'pos.trade-in': () => toggleTradeInFields(),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/json_read.dart';
 import '../../../data/models/recent_invoice.dart';
 import '../arabic_tabular_text.dart';
 
@@ -65,8 +66,8 @@ class InvoiceItemsSection extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      'الكمية: ${item.quantity} × ${item.unitPrice.display}'
-                      '${item.returnedQuantity > 0 ? ' (مرتجع: ${item.returnedQuantity})' : ''}',
+                      'الكمية: ${formatQuantity(item.quantity)} × ${item.unitPrice.display}'
+                      '${item.returnedQuantity > 0 ? ' (مرتجع: ${formatQuantity(item.returnedQuantity)})' : ''}',
                       style: GoogleFonts.almarai(
                         fontSize: 12,
                         color: AppColors.textSecondary,

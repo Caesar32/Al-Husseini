@@ -11,6 +11,7 @@ use App\Models\Supplier;
 use App\Models\SupplierLedgerEntry;
 use App\Models\Warranty;
 use App\Models\WarrantyClaim;
+use App\Support\Quantity;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -168,12 +169,12 @@ class WarrantyService implements WarrantyServiceInterface
                 }
 
                 $replacementProduct = Product::where('id', $replacementProductId)->lockForUpdate()->firstOrFail();
-                if ($replacementProduct->current_stock < 1) {
+                if (Quantity::toMilli($replacementProduct->current_stock) < Quantity::SCALE) {
                     throw new \DomainException("رصيد المخزون للبطارية البديلة ({$replacementProduct->name}) غير كافٍ.");
                 }
 
                 // The 1-piece decrement is journaled against the claim, after it is created below.
-                $replacementStockBefore = (int) $replacementProduct->current_stock;
+                $replacementStockBeforeMilli = Quantity::toMilli($replacementProduct->current_stock);
 
                 // Mark defective warranty as claimed
                 $warranty->update(['status' => 'claimed']);
@@ -220,8 +221,9 @@ class WarrantyService implements WarrantyServiceInterface
             // Decrement 1 piece for instant customer replacement
             if ($decision === 'replaced') {
                 $replacementStockAfter = $this->stock->move($replacementProduct->id, -1, StockMovementType::WarrantyReplacement, $claim, $receivedByUserId);
+                $replacementStockAfterMilli = Quantity::toMilli($replacementStockAfter);
 
-                if ($replacementStockBefore > 0 && $replacementStockAfter <= 0) {
+                if ($replacementStockBeforeMilli > 0 && $replacementStockAfterMilli <= 0) {
                     DispatchOwnerPushNotification::dispatch(
                         'نفاد مخزون صنف حيوي ⚠️',
                         "نفد مخزون الصنف ({$replacementProduct->name}) بعد صرفه كبطارية بديلة ضمن الضمان.",

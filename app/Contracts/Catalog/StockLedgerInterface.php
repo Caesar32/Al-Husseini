@@ -13,14 +13,14 @@ interface StockLedgerInterface
     /**
      * Apply a signed quantity change. Must run inside DB::transaction; locks the product row.
      *
-     * @return int stock after the move
+     * @return int|float stock after the move, normalized to three decimals
      */
-    public function move(int $productId, int $delta, StockMovementType $type, Model $source, ?int $userId = null, ?float $unitCost = null): int;
+    public function move(int $productId, int|float|string $delta, StockMovementType $type, Model $source, ?int $userId = null, ?float $unitCost = null): int|float;
 
     /**
      * Set an absolute stock level, recorded as an Adjustment with delta = new - old.
      *
-     * @return int stock after the adjustment
+     * @return int|float stock after the adjustment, normalized to three decimals
      */
-    public function setTo(int $productId, int $newStock, Model $source, ?int $userId = null): int;
+    public function setTo(int $productId, int|float|string $newStock, Model $source, ?int $userId = null): int|float;
 }

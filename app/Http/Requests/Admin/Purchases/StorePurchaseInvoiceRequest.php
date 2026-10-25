@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Admin\Purchases;
 
+use App\Models\Product;
+use App\Rules\ValidQuantityRule;
+use App\Support\Quantity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -21,7 +24,7 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'invoice_date'            => ['required', 'date'],
             'items'                   => ['required', 'array', 'min:1'],
             'items.*.product_id'      => ['required', 'exists:products,id'],
-            'items.*.quantity'        => ['required', 'integer', 'min:1'],
+            'items.*.quantity'        => ['required', new ValidQuantityRule()],
             'items.*.unit_cost_price' => ['required', 'numeric', 'min:0'],
             'items.*.batch_number'    => ['nullable', 'string', 'max:50'],
             'items.*.production_date' => ['nullable', 'date'],
@@ -42,11 +45,23 @@ class StorePurchaseInvoiceRequest extends FormRequest
                 return;
             }
 
+            $productIds = collect($items)->pluck('product_id')->filter()->unique()->all();
+            $products = Product::whereIn('id', $productIds)->get()->keyBy('id');
             $subtotal = 0;
-            foreach ($items as $item) {
-                $qty = (int) ($item['quantity'] ?? 0);
+            foreach ($items as $index => $item) {
+                $quantity = $item['quantity'] ?? 0;
+                if (Quantity::validationError($quantity) !== null) {
+                    continue; // reported by ValidQuantityRule
+                }
+
+                $product = $products->get($item['product_id'] ?? null);
+                $pieceError = $product ? Quantity::validationError($quantity, ! $product->allowsFraction(), $product->name) : null;
+                if ($pieceError !== null) {
+                    $validator->errors()->add("items.{$index}.quantity", $pieceError);
+                }
+
                 $price = (float) ($item['unit_cost_price'] ?? 0);
-                $subtotal += ($qty * $price);
+                $subtotal += Quantity::lineTotal($quantity, $price);
             }
 
             $tax = (float) $this->input('tax_amount', 0);
@@ -71,7 +86,8 @@ class StorePurchaseInvoiceRequest extends FormRequest
             'items.required'                   => 'يجب إضافة صنف واحد على الأقل لفاتورة المشتريات.',
             'items.*.product_id.required'      => 'يرجى اختيار المنتج لكل بند.',
             'items.*.quantity.required'        => 'الكمية الموردة مطلوبة.',
-            'items.*.quantity.min'             => 'الكمية يجب أن تكون 1 على الأقل.',
+            'items.*.quantity.numeric'         => 'الكمية الموردة يجب أن تكون رقماً.',
+            'items.*.quantity.gt'              => 'الكمية يجب أن تكون أكبر من صفر.',
             'items.*.unit_cost_price.required' => 'سعر تكلفة الشراء للوحدة مطلوب.',
             'paid_amount.required'             => 'المبلغ المدفوع للمورد مطلوب (يمكن كتابة 0 في حالة الآجل بالكامل).',
             'payment_method.required'          => 'طريقة الدفع مطلوبة.',

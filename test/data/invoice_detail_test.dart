@@ -159,6 +159,21 @@ void main() {
     expect(invoice.payments.single.amount.raw, 800);
     expect(invoice.payments.single.date, '2026-01-02T10:30:00Z');
   });
+
+  test('parses fractional item quantities (liters, kg)', () {
+    final item = InvoiceItemDetail.fromJson({
+      'id': 5,
+      'product_name': 'زيت محرك',
+      'quantity': 2.5,
+      'returned_quantity': '0.5',
+      'unit_price': {'raw': 120.5},
+      'total_price': {'raw': 301.25},
+    });
+
+    expect(item.quantity, 2.5);
+    expect(item.returnedQuantity, 0.5);
+    expect(InvoiceItemDetail.fromJson({'id': 6}).quantity, 1);
+  });
 }
 
 Map<String, dynamic> _financials() {

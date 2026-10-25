@@ -254,4 +254,15 @@ void main() {
       expect(money, Money.zero);
     });
   });
+
+  group('formatQuantity', () {
+    test('drops trailing zeros and keeps up to 3 decimals', () {
+      expect(formatQuantity(2), '2');
+      expect(formatQuantity(2.0), '2');
+      expect(formatQuantity(10), '10');
+      expect(formatQuantity(2.5), '2.5');
+      expect(formatQuantity(0.125), '0.125');
+      expect(formatQuantity(0.1 + 0.2), '0.3');
+    });
+  });
 }

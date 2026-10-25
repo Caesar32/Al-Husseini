@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\QuantityCast;
 use App\Enums\StockMovementType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +19,8 @@ class StockMovement extends Model
 
     protected $casts = [
         'type' => StockMovementType::class,
-        'quantity_delta' => 'integer',
-        'stock_after' => 'integer',
+        'quantity_delta' => QuantityCast::class,
+        'stock_after' => QuantityCast::class,
         'unit_cost' => 'decimal:2',
     ];
 

@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\ScrapPricingTier;
 use App\Models\User;
 use App\Models\Warranty;
+use App\Rules\ValidQuantityRule;
+use App\Support\Quantity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Validator;
@@ -29,7 +31,7 @@ class StorePosInvoiceRequest extends FormRequest
             // Items
             'items'                 => ['required', 'array', 'min:1'],
             'items.*.product_id'    => ['required', 'exists:products,id'],
-            'items.*.quantity'      => ['required', 'integer', 'min:1'],
+            'items.*.quantity'      => ['required', new ValidQuantityRule()],
             'items.*.unit_price'    => ['nullable', 'numeric', 'min:0'],
             'items.*.battery_serial'=> ['nullable', 'string', 'max:100'],
 
@@ -93,15 +95,21 @@ class StorePosInvoiceRequest extends FormRequest
             $requestedPerProduct = [];
             foreach ($items as $item) {
                 $pid = $item['product_id'] ?? null;
-                if ($pid !== null) {
-                    $requestedPerProduct[$pid] = ($requestedPerProduct[$pid] ?? 0) + (int) ($item['quantity'] ?? 1);
+                $quantity = $item['quantity'] ?? 1;
+                if ($pid !== null && Quantity::validationError($quantity) === null) {
+                    $requestedPerProduct[$pid] = ($requestedPerProduct[$pid] ?? 0) + Quantity::toMilli($quantity);
                 }
             }
             $stockErrorReported = [];
 
             foreach ($items as $index => $item) {
                 $productId = $item['product_id'] ?? null;
-                $qty = (int) ($item['quantity'] ?? 1);
+                $quantity = $item['quantity'] ?? 1;
+                if (Quantity::validationError($quantity) !== null) {
+                    continue; // reported by ValidQuantityRule
+                }
+                $qtyMilli = Quantity::toMilli($quantity);
+                $qty = Quantity::fromMilli($qtyMilli);
                 $product = $products->get($productId);
 
                 if (!$product) {
@@ -109,17 +117,25 @@ class StorePosInvoiceRequest extends FormRequest
                 }
 
                 // Check stock against the total requested for this product
-                $requestedTotal = $requestedPerProduct[$productId] ?? $qty;
-                if ($product->current_stock < $requestedTotal && !isset($stockErrorReported[$productId])) {
+                $requestedTotalMilli = $requestedPerProduct[$productId] ?? $qtyMilli;
+                if (Quantity::toMilli($product->current_stock) < $requestedTotalMilli && !isset($stockErrorReported[$productId])) {
                     $stockErrorReported[$productId] = true;
                     $validator->errors()->add(
                         "items.{$index}.quantity",
-                        "الرصيد المتاح من الصنف ({$product->name}) هو {$product->current_stock} فقط، لا يكفي لصرف {$requestedTotal}."
+                        'الرصيد المتاح من الصنف (' . $product->name . ') هو '
+                            . Quantity::format($product->current_stock)
+                            . ' فقط، لا يكفي لصرف '
+                            . Quantity::format(Quantity::fromMilli($requestedTotalMilli)) . '.'
                     );
                 }
 
+                $pieceError = Quantity::validationError($quantity, ! $product->allowsFraction(), $product->name);
+                if ($pieceError !== null) {
+                    $validator->errors()->add("items.{$index}.quantity", $pieceError);
+                }
+
                 // Each battery unit carries its own serial and warranty, so a battery line covers exactly one unit.
-                if ($product->is_battery && $qty !== 1) {
+                if ($product->is_battery && $qtyMilli !== Quantity::SCALE) {
                     $validator->errors()->add(
                         "items.{$index}.quantity",
                         "كل بطارية تُسجَّل في سطر مستقل بسيريال خاص بها (الكمية في سطر البطارية يجب أن تكون 1)."
@@ -130,7 +146,7 @@ class StorePosInvoiceRequest extends FormRequest
                 $price = isset($item['unit_price']) && is_numeric($item['unit_price'])
                     ? (float) $item['unit_price']
                     : (float) $product->retail_price;
-                $subtotal += ($price * $qty);
+                $subtotal += Quantity::lineTotal($quantity, $price);
 
                 // Battery Serial Validation
                 if ($product->is_battery) {
@@ -304,7 +320,8 @@ class StorePosInvoiceRequest extends FormRequest
             'items.required'                    => 'يجب إضافة منتج واحد على الأقل في الفاتورة.',
             'items.*.product_id.required'       => 'يرجى اختيار المنتج.',
             'items.*.quantity.required'         => 'الكمية مطلوبة.',
-            'items.*.quantity.min'              => 'الكمية يجب أن تكون 1 على الأقل.',
+            'items.*.quantity.numeric'          => 'الكمية يجب أن تكون رقماً.',
+            'items.*.quantity.gt'               => 'الكمية يجب أن تكون أكبر من صفر.',
             'scrap_capacity_ah.required_if'     => 'يرجى تحديد سعة بطارية الكهنة بالأمبير (Ah).',
             'scrap_count.required_if'           => 'يرجى تحديد عدد بطاريات الكهنة المستلمة.',
             'payments.required'                 => 'يجب تحديد طريقة الدفع وتوزيع المبالغ.',

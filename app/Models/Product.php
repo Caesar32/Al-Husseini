@@ -2,6 +2,9 @@
 
 namespace App\Models;
 
+use App\Casts\QuantityCast;
+use App\Enums\ProductUnit;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +20,7 @@ class Product extends Model
         'sku',
         'barcode',
         'name',
+        'unit',
         'brand',
         'capacity_ah',
         'voltage',
@@ -31,6 +35,10 @@ class Product extends Model
         'is_active',
     ];
 
+    protected $attributes = [
+        'unit' => 'piece',
+    ];
+
     protected function casts(): array
     {
         return [
@@ -38,11 +46,27 @@ class Product extends Model
             'cost_price' => 'decimal:2',
             'retail_price' => 'decimal:2',
             'wholesale_price' => 'decimal:2',
-            'current_stock' => 'integer',
-            'reorder_threshold' => 'integer',
+            'unit' => ProductUnit::class,
+            'current_stock' => QuantityCast::class,
+            'reorder_threshold' => QuantityCast::class,
             'is_battery' => 'boolean',
             'is_active' => 'boolean',
         ];
+    }
+
+    public function allowsFraction(): bool
+    {
+        return ($this->unit ?? ProductUnit::Piece)->allowsFraction();
+    }
+
+    /**
+     * A sale/purchase/return quantity of this product in milli-units (see Quantity::validationError()).
+     *
+     * @throws \DomainException
+     */
+    public function quantityMilliOrFail(mixed $value): int
+    {
+        return Quantity::milliOrFail($value, ! $this->allowsFraction(), (string) $this->name);
     }
 
     public function category(): BelongsTo

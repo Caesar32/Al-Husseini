@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Warranties;
 
 use App\Models\Product;
+use App\Support\Quantity;
 use App\Models\Warranty;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -75,7 +76,7 @@ class ProcessWarrantyClaimRequest extends FormRequest
 
                 if ($replacementProductId) {
                     $product = Product::find($replacementProductId);
-                    if ($product && $product->current_stock < 1) {
+                    if ($product && Quantity::toMilli($product->current_stock) < Quantity::SCALE) {
                         $validator->errors()->add('replacement_product_id', "رصيد المخزون للبطارية البديلة ({$product->name}) نافد حالياً (الرصيد: 0).");
                     }
                 }

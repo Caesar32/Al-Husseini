@@ -2,6 +2,9 @@
 
 namespace App\Http\Requests\Admin\Products;
 
+use App\Enums\ProductUnit;
+use App\Support\Quantity;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,7 +40,25 @@ class StoreProductRequest extends FormRequest
             'warranty_months'   => ['required', 'integer', 'min:0', 'max:120'],
             'retail_price'      => ['required', 'numeric', 'min:0', 'max:9999999'],
             'wholesale_price'   => ['nullable', 'numeric', 'min:0', 'max:9999999'],
-            'reorder_threshold' => ['nullable', 'integer', 'min:0', 'max:100000'],
+            'reorder_threshold' => [
+                'bail', 'nullable', 'numeric', 'min:0', 'max:100000',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! Quantity::hasValidPrecision($value)) {
+                        $fail('حد إعادة الطلب يقبل 3 أرقام عشرية كحد أقصى.');
+                    }
+                },
+            ],
+            'unit'              => [
+                'nullable',
+                Rule::enum(ProductUnit::class),
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    $unit = ProductUnit::tryFrom((string) $value);
+
+                    if ($unit !== null && $unit !== ProductUnit::Piece && request()->boolean('is_battery')) {
+                        $fail('البطاريات تُباع بالقطعة فقط.');
+                    }
+                },
+            ],
             'is_battery'        => ['required', 'boolean'],
             'is_active'         => ['sometimes', 'boolean'],
         ];
@@ -51,6 +72,7 @@ class StoreProductRequest extends FormRequest
     public static function sharedMessages(): array
     {
         return [
+            'unit.enum'              => 'وحدة البيع غير صحيحة.',
             'category_id.required'   => 'يرجى اختيار قسم الصنف.',
             'category_id.exists'     => 'القسم المختار غير موجود.',
             'sku.required'           => 'كود الصنف (SKU) مطلوب.',

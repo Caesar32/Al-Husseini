@@ -6,7 +6,7 @@ import vm from 'node:vm';
 
 const window = {};
 vm.runInContext(readFileSync(new URL('../../public/assets/js/admin/pos/math.js', import.meta.url), 'utf8'), vm.createContext({ window }));
-const { toCents, fromCents, totals, payment } = window.PosMath;
+const { toCents, fromCents, toMilli, fromMilli, formatQty, lineCents, totals, payment } = window.PosMath;
 const formatCents = (c) => `${fromCents(c)} ج.م`;
 const plain = (o) => JSON.parse(JSON.stringify(o));
 
@@ -53,4 +53,16 @@ test('partial mode accepts 0 < paid <= due and rejects the rest with the same me
 test('a cart whose amount due is zero cannot be invoiced', () => {
     assert.match(payment({ due: 0, mode: 'full', raw: '', lineCount: 1, formatCents }).error, /المبلغ المستحق صفر/);
     assert.equal(payment({ due: 0, mode: 'full', raw: '', lineCount: 0, formatCents }).error, null);
+});
+
+test('quantities are exact to 3 decimals and line totals round like the server', () => {
+    assert.equal(toMilli(0.1) + toMilli(0.2), toMilli(0.3));
+    assert.equal(fromMilli(2500), 2.5);
+    assert.equal(formatQty(0.1 + 0.2), '0.3');
+    assert.equal(formatQty('4.250'), '4.25');
+    assert.equal(lineCents(1.5, 120.5), 18075);
+    assert.equal(lineCents(0.333, 10), 333);   // 3.33
+    assert.equal(lineCents(0.125, 0.1), 1);    // 0.0125 rounds half up to 0.01
+    const lines = [{ product: { price: 120.5 }, qty: 2.5 }, { product: { price: 0.1 }, qty: 3 }];
+    assert.deepEqual(plain(totals(lines, 0, 0)), { subtotal: 301.55, total: 301.55 });
 });

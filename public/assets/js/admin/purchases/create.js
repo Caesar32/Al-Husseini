@@ -120,15 +120,22 @@
         }
 
         // --- Calculations ---
+        // Line total in piasters from the quantity in thousandths, rounded half up like
+        // Quantity::lineTotal() on the server (2.5 L x 120.50 = 301.25).
+        function lineCents(qty, price) {
+            return Math.round(Math.round(qty * 1000) * Math.round(price * 100) / 1000);
+        }
+
         function calculateTotals() {
-            let subtotal = 0;
+            let subtotalCents = 0;
             document.querySelectorAll('.item-row').forEach(row => {
                 const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
                 const price = parseFloat(row.querySelector('.price-input').value) || 0;
-                const total = qty * price;
-                row.querySelector('.row-total').value = total.toFixed(2);
-                subtotal += total;
+                const cents = lineCents(qty, price);
+                row.querySelector('.row-total').value = (cents / 100).toFixed(2);
+                subtotalCents += cents;
             });
+            const subtotal = subtotalCents / 100;
 
             subtotalDisplay.innerText = subtotal.toFixed(2) + ' ج.م';
 
@@ -140,6 +147,16 @@
             const paid = parseFloat(paidInput.value) || 0;
             const remaining = Math.max(0, finalTotal - paid);
             remainingDisplay.innerText = remaining.toFixed(2) + ' ج.م';
+        }
+
+        // Piece products take whole quantities; liter/kg/meter products up to 3 decimals
+        // (StorePurchaseInvoiceRequest checks the same). No product picked yet: allow decimals.
+        function applyQtyRules(row) {
+            const selected = row.querySelector('.product-select').selectedOptions[0];
+            const qtyInput = row.querySelector('.qty-input');
+            const wholeOnly = selected && selected.value && selected.getAttribute('data-fraction') === '0';
+            qtyInput.min = wholeOnly ? '1' : '0.001';
+            qtyInput.step = wholeOnly ? '1' : 'any';
         }
 
         function appendRow() {
@@ -158,6 +175,7 @@
             });
 
             clone.querySelector('.remove-row-btn').removeAttribute('disabled');
+            applyQtyRules(clone);
             itemsBody.appendChild(clone);
             rowIndex++;
             calculateTotals();
@@ -203,7 +221,7 @@
                 cost.textContent = `تكلفة: ${Number(p.cost).toLocaleString()} ج.م`;
                 const stock = document.createElement('span');
                 stock.className = 'badge bg-secondary-subtle text-secondary';
-                stock.textContent = `مخزون: ${p.stock}`;
+                stock.textContent = `مخزون: ${p.stock} ${p.unit_label}`;
                 summary.append(cost, ' ', stock);
                 btn.append(details, summary);
                 btn.addEventListener('mousedown', function (e) {
@@ -221,6 +239,7 @@
                 ? first : appendRow();
             row.querySelector('.product-select').value = p.id;
             row.querySelector('.qty-input').value = 1;
+            applyQtyRules(row);
             row.querySelector('.price-input').value = parseFloat(p.cost || 0).toFixed(2);
             calculateTotals();
             productSearchInput.value = '';
@@ -285,6 +304,7 @@
                 if (cost) {
                     row.querySelector('.price-input').value = parseFloat(cost).toFixed(2);
                 }
+                applyQtyRules(row);
                 calculateTotals();
             }
         });

@@ -8,6 +8,7 @@ use App\Http\Requests\Admin\Products\StoreProductRequest;
 use App\Http\Requests\Admin\Products\UpdateProductRequest;
 use App\Models\Category;
 use App\Models\Product;
+use App\Support\Quantity;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -55,7 +56,8 @@ class ProductController extends Controller
                 'barcode'         => $p->barcode,
                 'capacity_ah'     => $p->capacity_ah,
                 'retail_price'    => (float) $p->retail_price,
-                'current_stock'   => (int) $p->current_stock,
+                'current_stock'   => Quantity::normalize($p->current_stock),
+                'unit'            => $p->unit?->value,
                 'is_battery'      => (bool) $p->is_battery,
                 'warranty_months' => (int) $p->warranty_months,
                 'category_slug'   => $p->category?->slug,
@@ -78,7 +80,15 @@ class ProductController extends Controller
 
     public function update(UpdateProductRequest $request, Product $product): RedirectResponse|JsonResponse
     {
-        $product = $this->productService->updateProduct($product, $request->validated());
+        try {
+            $product = $this->productService->updateProduct($product, $request->validated());
+        } catch (DomainException $e) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $e->getMessage(), 'errors' => ['unit' => [$e->getMessage()]]], 422);
+            }
+
+            return back()->withErrors(['unit' => $e->getMessage()])->withInput();
+        }
 
         if ($request->wantsJson()) {
             return response()->json(['success' => true, 'data' => $product]);

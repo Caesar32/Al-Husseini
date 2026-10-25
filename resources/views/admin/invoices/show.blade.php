@@ -147,7 +147,7 @@
                                                 <span class="text-muted fs-12">-</span>
                                             @endif
                                         </td>
-                                        <td class="text-center fw-bold">{{ $item->quantity }}</td>
+                                        <td class="text-center fw-bold">{{ \App\Support\Quantity::format($item->quantity) }} <span class="fs-11 text-muted fw-normal">{{ ($item->product?->unit ?? \App\Enums\ProductUnit::Piece)->label() }}</span></td>
                                         <td class="text-end font-monospace"><x-money :amount="$item->unit_price" /></td>
                                         <td class="text-end font-monospace text-danger"><x-money :amount="$item->discount_amount ?? 0" /></td>
                                         <td class="text-end fw-bold font-monospace text-primary"><x-money :amount="$item->total_price" /></td>
@@ -356,21 +356,24 @@
                     <div class="mb-3">
                         <label class="form-label fw-bold">الأصناف المرتجعة:</label>
                         @foreach($invoice->items as $item)
-                            @php $returnable = $item->returnableQuantity(); @endphp
+                            @php
+                                $returnable = $item->returnableQuantity();
+                                $fractional = (bool) $item->product?->allowsFraction();
+                            @endphp
                             <div class="form-check border p-2 rounded mb-2 d-flex align-items-center justify-content-between {{ $returnable === 0 ? 'opacity-50' : '' }}">
                                 <div>
                                     {{-- Unchecked rows post only a quantity and are dropped by ProcessSalesReturnRequest. --}}
                                     <input class="form-check-input ms-2" type="checkbox" name="items[{{ $loop->index }}][invoice_item_id]" value="{{ $item->id }}" id="item_{{ $item->id }}" {{ $returnable === 0 ? 'disabled' : 'checked' }}>
                                     <label class="form-check-label fw-semibold" for="item_{{ $item->id }}">
                                         {{ $item->product?->name }}
-                                        @if((int) $item->returned_quantity > 0)
-                                            <span class="fs-11 text-muted d-block">سبق إرجاع {{ $item->returned_quantity }} من {{ $item->quantity }}</span>
+                                        @if(\App\Support\Quantity::toMilli($item->returned_quantity) > 0)
+                                            <span class="fs-11 text-muted d-block">سبق إرجاع {{ \App\Support\Quantity::format($item->returned_quantity) }} من {{ \App\Support\Quantity::format($item->quantity) }} {{ ($item->product?->unit ?? \App\Enums\ProductUnit::Piece)->label() }}</span>
                                         @endif
                                     </label>
                                 </div>
                                 <div class="d-flex align-items-center" style="width: 120px;">
                                     <span class="fs-12 text-muted me-2">كمية:</span>
-                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ $returnable }}" min="1" max="{{ $returnable }}" {{ $returnable === 0 ? 'disabled' : '' }}>
+                                    <input type="number" class="form-control form-control-sm text-center" name="items[{{ $loop->index }}][quantity]" value="{{ \App\Support\Quantity::format($returnable) }}" min="{{ $fractional ? '0.001' : '1' }}" step="{{ $fractional ? 'any' : '1' }}" max="{{ \App\Support\Quantity::format($returnable) }}" {{ $returnable === 0 ? 'disabled' : '' }}>
                                 </div>
                             </div>
                         @endforeach

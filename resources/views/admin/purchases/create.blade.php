@@ -21,7 +21,9 @@ $searchProducts = $products->map(function ($p) {
         'sku' => $p->sku,
         'barcode' => $p->barcode,
         'cost' => (float) $p->cost_price,
-        'stock' => (int) $p->current_stock,
+        'stock' => \App\Support\Quantity::normalize($p->current_stock),
+        'unit_label' => ($p->unit ?? \App\Enums\ProductUnit::Piece)->label(),
+        'allows_fraction' => $p->allowsFraction(),
     ];
 })->values()->all();
 @endphp
@@ -132,14 +134,14 @@ $searchProducts = $products->map(function ($p) {
                                     <select name="items[0][product_id]" class="form-select product-select" required>
                                         <option value="">-- اختر المنتج --</option>
                                         @foreach($products as $p)
-                                        <option value="{{ $p->id }}" data-cost="{{ $p->cost_price }}" data-stock="{{ $p->current_stock }}">
-                                            {{ $p->name }} (مخزون: {{ $p->current_stock }} | تكلفة: {{ $p->cost_price }} ج.م)
+                                        <option value="{{ $p->id }}" data-cost="{{ $p->cost_price }}" data-stock="{{ $p->current_stock }}" data-fraction="{{ $p->allowsFraction() ? 1 : 0 }}">
+                                            {{ $p->name }} (مخزون: {{ \App\Support\Quantity::format($p->current_stock) }} {{ ($p->unit ?? \App\Enums\ProductUnit::Piece)->label() }} | تكلفة: {{ $p->cost_price }} ج.م)
                                         </option>
                                         @endforeach
                                     </select>
                                 </td>
                                 <td>
-                                    <input type="number" name="items[0][quantity]" class="form-control qty-input" min="1" value="1" required>
+                                    <input type="number" name="items[0][quantity]" class="form-control qty-input" min="0.001" step="any" value="1" required>
                                 </td>
                                 <td>
                                     <input type="number" step="0.01" name="items[0][unit_cost_price]" class="form-control price-input" min="0" required placeholder="0.00">

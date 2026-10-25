@@ -62,7 +62,7 @@ class ReturnSummary {
 
 class ReturnedItem {
   final String productName;
-  final int returnedQuantity;
+  final double returnedQuantity;
   final Money unitPrice;
   final Money totalRefunded;
 
@@ -79,7 +79,7 @@ class ReturnedItem {
 
     return ReturnedItem(
       productName: readString(json['product_name'], fallback: 'صنف غير محدد'),
-      returnedQuantity: readInt(json['returned_quantity']),
+      returnedQuantity: readDouble(json['returned_quantity']),
       unitPrice: Money(
         raw: unitPriceRaw,
         display: '${unitPriceRaw.toStringAsFixed(2)} ج.م',

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../data/models/json_read.dart';
 import '../../data/models/return_summary.dart';
 import 'status_badge.dart';
 
@@ -111,7 +112,7 @@ class ReturnTile extends StatelessWidget {
                     (item) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
                       child: Text(
-                        '${item.productName} × ${item.returnedQuantity} — '
+                        '${item.productName} × ${formatQuantity(item.returnedQuantity)} — '
                         '${item.totalRefunded.display}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

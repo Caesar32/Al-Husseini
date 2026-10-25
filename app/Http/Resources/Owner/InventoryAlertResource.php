@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Owner;
 
+use App\Support\Quantity;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -14,8 +15,8 @@ class InventoryAlertResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $stock = (int) $this->current_stock;
-        $threshold = (int) $this->reorder_threshold;
+        $stock = Quantity::normalize($this->current_stock);
+        $threshold = Quantity::normalize($this->reorder_threshold);
 
         if ($stock <= 0) {
             $status = 'out_of_stock';

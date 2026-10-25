@@ -4,6 +4,7 @@
 
 @section('content')
 @php
+    $productUnits = \App\Enums\ProductUnit::cases();
     $pageConfig = [
         'storeUrl' => route('admin.products.store'),
         'updateUrl' => route('admin.products.update', ['product' => '__ID__']),
@@ -190,7 +191,7 @@
                                             @if($isService)
                                                 <span class="badge bg-light text-muted border fs-11">خدمة ورشة</span>
                                             @else
-                                                <span class="badge {{ $product->current_stock > $product->reorder_threshold ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' }} font-monospace fs-12">{{ number_format($product->current_stock) }}</span>
+                                                <span class="badge {{ $product->current_stock > $product->reorder_threshold ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' }} font-monospace fs-12">{{ \App\Support\Quantity::format($product->current_stock) }} {{ $product->unit?->label() ?? 'قطعة' }}</span>
                                             @endif
                                         </td>
                                         <td>
@@ -204,7 +205,7 @@
                                             <div class="d-inline-flex gap-1">
                                                 @can('products.edit')
                                                     <button type="button" class="btn btn-sm btn-soft-secondary js-edit-product" data-action="products.edit"
-                                                            data-product="{{ json_encode($product->only(['id', 'category_id', 'sku', 'barcode', 'name', 'brand', 'capacity_ah', 'voltage', 'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price', 'reorder_threshold', 'is_battery', 'is_active'])) }}">
+                                                            data-product="{{ json_encode($product->only(['id', 'category_id', 'sku', 'barcode', 'name', 'unit', 'brand', 'capacity_ah', 'voltage', 'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price', 'reorder_threshold', 'is_battery', 'is_active'])) }}">
                                                         <i class="ri-edit-line"></i> تعديل
                                                     </button>
                                                 @endcan
@@ -283,6 +284,14 @@
                                 </select>
                             </div>
                             <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">وحدة البيع</label>
+                                <select class="form-select" name="unit">
+                                    @foreach($productUnits as $unit)
+                                        <option value="{{ $unit->value }}" @selected($unit->value === 'piece')>{{ $unit->label() }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3">
                                 <label class="form-label fw-bold text-dark fs-13">السعة / المواصفة</label>
                                 <input type="text" class="form-control font-monospace" name="capacity_ah" maxlength="20" placeholder="70Ah أو 5W-40">
                             </div>
@@ -313,7 +322,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold text-dark fs-13">حد إعادة الطلب</label>
-                                <input type="number" class="form-control font-monospace" name="reorder_threshold" min="0" value="5">
+                                <input type="number" class="form-control font-monospace" name="reorder_threshold" step="0.001" min="0" value="5">
                             </div>
 
                             <div class="col-md-4" id="prodCostGroup">

@@ -44,6 +44,12 @@ double readDouble(dynamic v, {double fallback = 0.0}) {
   return fallback;
 }
 
+/// Quantity text with up to 3 decimals and no trailing zeros: 2 -> "2", 2.5 -> "2.5".
+String formatQuantity(num value) {
+  final fixed = value.toStringAsFixed(3);
+  return fixed.replaceFirst(RegExp(r'\.?0+$'), '');
+}
+
 String readString(dynamic v, {String fallback = ''}) {
   if (v == null) {
     return fallback;
