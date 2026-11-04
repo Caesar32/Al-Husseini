@@ -181,6 +181,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
             ->middlewareFor(['index', 'show'], 'can:purchases.view')
             ->middlewareFor(['create', 'store'], 'can:purchases.create');
         Route::get('purchases/{purchase}/print', [PurchaseInvoiceController::class, 'print'])->name('purchases.print')->middleware('can:purchases.view');
+        Route::get('purchases/{purchase}/labels', [\App\Http\Controllers\Admin\BarcodeLabelController::class, 'purchase'])->name('purchases.labels')->middleware('can:purchases.view');
 
         // نقطة البيع ومبيعات الكاشير
         Route::get('pos', [PosController::class, 'index'])->name('pos.index')->middleware('can:pos.access');
@@ -227,6 +228,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         // ─── BEGIN Phase 3: catalog backend (products / customers / vehicles) ───────────────
         Route::get('products/search', [\App\Http\Controllers\Admin\ProductController::class, 'search'])->name('products.search')->middleware('can:products.view');
+        Route::get('products/{product}/labels', [\App\Http\Controllers\Admin\BarcodeLabelController::class, 'product'])->name('products.labels')->middleware('can:products.view');
         Route::post('products', [\App\Http\Controllers\Admin\ProductController::class, 'store'])->name('products.store')->middleware('can:products.create');
         Route::put('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'update'])->name('products.update')->middleware('can:products.edit');
         Route::delete('products/{product}', [\App\Http\Controllers\Admin\ProductController::class, 'destroy'])->name('products.destroy')->middleware('can:products.delete');

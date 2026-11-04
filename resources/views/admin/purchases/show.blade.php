@@ -20,9 +20,19 @@
     </div>
 
     <!-- Header Actions -->
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row mb-3">
         <div class="col-12 text-end">
-            <a href="{{ route('admin.purchases.print', $purchase) }}" class="btn btn-primary">
+            <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#purchaseLabelsModal">
+                <i class="ri-barcode-line align-bottom me-1"></i> طباعة باركود الشحنة / التوريدة
+            </button>
+            <a href="{{ route('admin.purchases.print', $purchase) }}" class="btn btn-primary ms-2">
                 <i class="ri-printer-line align-bottom me-1"></i> طباعة إذن الاستلام
             </a>
             <a href="{{ route('admin.suppliers.ledger', $purchase->supplier) }}" class="btn btn-soft-secondary ms-2">
@@ -122,6 +132,69 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: review the shipment's barcode labels before printing -->
+    <div class="modal fade" id="purchaseLabelsModal" tabindex="-1" aria-labelledby="purchaseLabelsModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <form class="modal-content border-0 shadow" method="GET" action="{{ route('admin.purchases.labels', $purchase) }}" target="_blank">
+                <div class="modal-header bg-success text-white p-3">
+                    <h5 class="modal-title fw-bold text-white fs-15" id="purchaseLabelsModalTitle">طباعة باركود التوريدة {{ $purchase->invoice_number }}</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    @include('admin.labels.partials.print-options', ['idPrefix' => 'purchaseLabels'])
+
+                    <div class="table-responsive mt-3">
+                        <table class="table table-bordered align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>الصنف</th>
+                                    <th>الكود على الملصق</th>
+                                    <th>الكمية المستلمة</th>
+                                    <th>عدد الملصقات</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($labelLines as $line)
+                                    <tr>
+                                        <td class="fw-bold">{{ $line['product']->name }}</td>
+                                        <td>
+                                            @if($line['code'] !== null)
+                                                <span class="font-monospace" dir="ltr">{{ $line['code'] }}</span>
+                                            @else
+                                                <span class="text-danger fs-12">لا يوجد كود إنجليزي؛ عدّل بيانات الصنف أولاً</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            {{ \App\Support\Quantity::format($line['quantity']) }} {{ $line['product']->unit?->label() }}
+                                            @if($line['product']->allowsFraction())
+                                                <small class="text-muted d-block fs-11">يُباع بال{{ $line['product']->unit?->label() }}: أدخل عدد العبوات</small>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <input type="number" class="form-control font-monospace" name="items[{{ $line['item_id'] }}]"
+                                                   aria-label="عدد ملصقات {{ $line['product']->name }}"
+                                                   value="{{ $line['code'] !== null ? $line['suggested'] : 0 }}"
+                                                   min="0" max="{{ \App\Contracts\Catalog\BarcodeLabelServiceInterface::MAX_LABELS }}" step="1"
+                                                   @disabled($line['code'] === null)>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr><td colspan="4" class="text-center text-muted py-4">لا توجد أصناف قابلة للطباعة في هذه الفاتورة.</td></tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">
+                        <i class="ri-printer-line me-1"></i> طباعة
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

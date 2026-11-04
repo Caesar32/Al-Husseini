@@ -8,6 +8,7 @@
     $pageConfig = [
         'storeUrl' => route('admin.products.store'),
         'updateUrl' => route('admin.products.update', ['product' => '__ID__']),
+        'labelsUrl' => route('admin.products.labels', ['product' => '__ID__']),
     ];
 @endphp
 <div data-page="sales.products" data-config='@json($pageConfig)'>
@@ -203,6 +204,13 @@
                                         </td>
                                         <td class="text-center">
                                             <div class="d-inline-flex gap-1">
+                                                @unless($isService)
+                                                    <button type="button" class="btn btn-sm btn-soft-success" data-action="products.labels"
+                                                            data-product-id="{{ $product->id }}" data-product-name="{{ $product->name }}"
+                                                            title="طباعة ملصق باركود" aria-label="طباعة ملصق باركود {{ $product->name }}">
+                                                        <i class="ri-barcode-line"></i>
+                                                    </button>
+                                                @endunless
                                                 @can('products.edit')
                                                     <button type="button" class="btn btn-sm btn-soft-secondary js-edit-product" data-action="products.edit"
                                                             data-product="{{ json_encode($product->only(['id', 'category_id', 'sku', 'barcode', 'name', 'unit', 'brand', 'capacity_ah', 'voltage', 'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price', 'reorder_threshold', 'is_battery', 'is_active'])) }}">
@@ -232,6 +240,33 @@
                     </div>
                 @endif
             </div>
+        </div>
+    </div>
+
+    <!-- Modal: print barcode labels for one product -->
+    <div class="modal fade" id="productLabelsModal" tabindex="-1" aria-labelledby="productLabelsModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form class="modal-content border-0 shadow" id="productLabelsForm" method="GET" target="_blank">
+                <div class="modal-header bg-success text-white p-3">
+                    <h5 class="modal-title fw-bold text-white fs-15" id="productLabelsModalTitle">طباعة ملصق باركود</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="fw-bold text-dark mb-3" id="productLabelsName"></p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark fs-13" for="productLabelsCopies">عدد الملصقات</label>
+                        <input type="number" class="form-control font-monospace" id="productLabelsCopies" name="copies" value="1" min="1"
+                               max="{{ \App\Contracts\Catalog\BarcodeLabelServiceInterface::MAX_LABELS }}" step="1" required>
+                    </div>
+                    @include('admin.labels.partials.print-options', ['idPrefix' => 'productLabels'])
+                </div>
+                <div class="modal-footer bg-light p-3">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">
+                        <i class="ri-printer-line me-1"></i> طباعة
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 

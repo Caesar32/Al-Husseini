@@ -35,6 +35,7 @@
 - purchases.store: POST → `auth` only → StorePurchaseInvoiceRequest → PurchaseService::createDirectPurchase($validated, auth()->id() ?? 1) → redirect to purchases.show.
 - purchases.show: GET → `auth` only → loads supplier, branch, receivedByUser, items.product.category, ledgerEntries.
 - purchases.print: GET /admin/purchases/{purchase}/print → `can:purchases.view`.
+- purchases.labels: GET /admin/purchases/{purchase}/labels → `can:purchases.view` → BarcodeLabelController::purchase → BarcodeLabelService (Code 128 SVG via picqer; encodes barcode, else sku; one label per page; read-only). The product equivalent is products.labels (`can:products.view`). Owner decisions: a liter/kg line suggests one label (staff enter the can count); the 80 mm size is for the XP-80 printer. After changing the label run `php tests/Browser/label-layout-check.php` (measures overflow in headless Chrome; not part of `php artisan test`).
 - No edit, update or destroy routes exist for purchases; invoices cannot be changed after they are saved.
 
 ## Business rules

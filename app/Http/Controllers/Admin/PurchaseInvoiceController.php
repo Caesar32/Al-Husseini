@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Contracts\Catalog\BarcodeLabelServiceInterface;
 use App\Contracts\Purchases\PurchaseServiceInterface;
 use App\Contracts\Purchases\SupplierServiceInterface;
 use App\Http\Controllers\Controller;
@@ -69,7 +70,7 @@ class PurchaseInvoiceController extends Controller
             ->with('status', "تم تسجيل فاتورة الشراء رقم {$invoice->invoice_number} وتحديث المخزون والمتوسط المرجح بنجاح.");
     }
 
-    public function show(PurchaseInvoice $purchase): View
+    public function show(PurchaseInvoice $purchase, BarcodeLabelServiceInterface $labelService): View
     {
         $purchase->load([
             'supplier',
@@ -79,7 +80,9 @@ class PurchaseInvoiceController extends Controller
             'ledgerEntries',
         ]);
 
-        return view('admin.purchases.show', compact('purchase'));
+        $labelLines = $labelService->purchaseLines($purchase);
+
+        return view('admin.purchases.show', compact('purchase', 'labelLines'));
     }
 
     public function print(PurchaseInvoice $purchase): View

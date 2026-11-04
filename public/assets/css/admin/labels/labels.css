@@ -1,0 +1,66 @@
+/*
+ * Barcode label print page (resources/views/admin/labels/print.blade.php).
+ * The stock's dimensions and @page rule come from the label-<size>.css file loaded after this one.
+ * Thermal heads print black only, so everything on the label is pure black at a bold weight.
+ */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: #fff; color: #000; font-family: 'Cairo', Tahoma, sans-serif; font-weight: 700; }
+
+.label {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    /* 0.1mm under the page height: browsers round up, and a spill would feed a blank label. */
+    width: var(--label-w);
+    height: calc(var(--label-h) - 0.1mm);
+    padding: 0.6mm var(--side-pad);
+    overflow: hidden;
+    background: #fff;
+    text-align: center;
+    font-size: var(--font);
+    line-height: 1.15;
+    break-inside: avoid;
+    page-break-inside: avoid;
+}
+
+.label__company { font-size: 0.85em; font-weight: 800; white-space: nowrap; overflow: hidden; }
+.label__title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    font-weight: 800;
+}
+.label__barcode { direction: ltr; height: var(--bar-h); flex: none; }
+.label__barcode img { display: block; margin: 0 auto; }
+/* Wraps rather than clips: when a long code is hard to scan, this text is what staff type in. */
+.label__code { direction: ltr; font-family: Consolas, 'Courier New', monospace; font-size: 0.95em; font-weight: 700; overflow-wrap: anywhere; }
+.label__footer { display: flex; justify-content: space-between; gap: 1mm; font-size: 0.9em; white-space: nowrap; }
+
+@media screen {
+    body { background: #e9ecef; padding-bottom: 24px; }
+    .toolbar {
+        position: sticky; top: 0; z-index: 1;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px;
+        padding: 10px 16px; margin-bottom: 16px;
+        background: #0d2238; color: #fff; font-size: 14px;
+    }
+    .toolbar__spacer { flex: 1; }
+    .toolbar button { padding: 6px 16px; border: 0; border-radius: 4px; font: inherit; cursor: pointer; }
+    .toolbar .btn-print { background: #0ab39c; color: #fff; }
+    .toolbar .btn-close-tab { background: #fff; color: #0d2238; }
+    .notice { margin: 0 16px 16px; padding: 10px 14px; border-radius: 4px; font-size: 13px; line-height: 1.7; }
+    .notice--warning { background: #fff3cd; color: #664d03; }
+    .notice--hint { background: #fff; color: #333; }
+    .sheet { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; padding: 0 16px; }
+    .label { outline: 1px dashed #868e96; }
+    .label--dense .label__code { background: #fff3cd; }
+}
+
+@media print {
+    html, body { width: var(--label-w); }
+    .toolbar, .notice { display: none !important; }
+    .label { break-after: page; page-break-after: always; }
+    .label:last-child { break-after: auto; page-break-after: auto; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

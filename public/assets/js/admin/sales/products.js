@@ -1,12 +1,21 @@
 /**
  * Product catalogue (resources/views/admin/sales/products.blade.php), frontend F4.
- * Config (data-config on [data-page="sales.products"]): { storeUrl, updateUrl (with __ID__) }
- * Actions: products.new, products.edit (data-product = product JSON). Moved from the page's inline script.
+ * Config (data-config on [data-page="sales.products"]): { storeUrl, updateUrl, labelsUrl (with __ID__) }
+ * Actions: products.new, products.edit (data-product = product JSON), products.labels (data-product-id, data-product-name).
+ * Moved from the page's inline script.
  */
 (function () {
     'use strict';
 
     Admin.page.register('sales.products', function (root, config) {
+        // Before the productForm guard: users who may only view products can still print labels.
+        Admin.actions.register('products.labels', function (btn) {
+            document.getElementById('productLabelsForm').action = config.labelsUrl.replace('__ID__', encodeURIComponent(btn.dataset.productId));
+            document.getElementById('productLabelsName').textContent = btn.dataset.productName;
+            document.getElementById('productLabelsCopies').value = 1;
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('productLabelsModal')).show();
+        });
+
         const form = document.getElementById('productForm');
         if (!form) return;
 
