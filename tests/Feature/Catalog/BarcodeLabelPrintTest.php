@@ -77,7 +77,7 @@ function labelSvgs(string $html): array
 /**
  * The first label on the page, read from its elements instead of searching the whole page's text.
  *
- * @return array{rows: list<string>, title: string, code: string, alt: string, image: string, element_after_barcode: string, footer: ?list<string>, text: string}
+ * @return array{rows: list<string>, company: string, price: ?string, title: string, code: string, warranty: ?string, footer: list<string>, alt: string, image: string, element_after_barcode: string, text: string}
  */
 function parsedLabel(string $html): array
 {
@@ -95,17 +95,19 @@ function parsedLabel(string $html): array
 
     $image = $xpath->query('.//img', $label);
     expect($image->length)->toBe(1);
-    $barcode = $part('barcode');
-    $footer = $part('footer');
+    $optional = fn (string $class) => ($node = $part($class)) ? $text($node) : null;
 
     return [
         'rows' => array_map(fn (DOMElement $row) => $row->getAttribute('class'), $elements($label)),
+        'company' => $text($part('company')),
+        'price' => $optional('price'),
         'title' => $text($part('title')),
         'code' => $text($part('code')),
+        'warranty' => $optional('warranty'),
+        'footer' => array_map(fn (DOMElement $child) => $child->getAttribute('class'), $elements($part('footer'))),
         'alt' => $image->item(0)->getAttribute('alt'),
         'image' => $image->item(0)->getAttribute('src'),
-        'element_after_barcode' => $barcode->nextElementSibling?->getAttribute('class') ?? '',
-        'footer' => $footer ? array_map($text, $elements($footer)) : null,
+        'element_after_barcode' => $part('barcode')->nextElementSibling?->getAttribute('class') ?? '',
         'text' => $text($label),
     ];
 }
@@ -195,6 +197,10 @@ test('each size loads a stylesheet whose page and label dimensions match the enu
     $height = "{$size->heightMm()}mm";
     $css = file_get_contents(public_path("assets/css/admin/labels/label-{$size->value}.css"));
 
+    // Width first is what makes the page landscape; an orientation keyword here would invalidate the rule.
+    expect($size->widthMm())->toBeGreaterThan($size->heightMm());
+    expect(substr_count($css, '@page'))->toBe(1);
+
     expect($css)->toContain("@page { size: {$width} {$height}; margin: 0; }")
         ->toContain("--label-w: {$width};")
         ->toContain("--label-h: {$height};")
@@ -220,11 +226,74 @@ test('a code too long for the label warns and does not open the print dialog by 
         ->assertSee('OIL-SHL-5W40-4L')
         ->assertDontSee('data-auto-print', false);
 
-    // The same code fits on the 80 mm roll at a scannable bar width.
-    $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1, 'size' => '80x30']))
+});
+
+test('a code too dense for the small label prints at a scannable bar width on the default label', function () {
+    $product = labelProduct(['sku' => 'BAT-CHL-70G']);
+
+    $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1, 'size' => '40x25']))
+        ->assertSee('كود الأصناف التالية طويل')
+        ->assertDontSee('data-auto-print', false);
+
+    $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1, 'size' => '50x25']))
         ->assertDontSee('كود الأصناف التالية طويل')
         ->assertSee('data-auto-print', false);
 });
+
+test('only the XP-237B stocks are offered, with 50x25 selected by default', function () {
+    expect(array_map(fn (BarcodeLabelSize $size) => $size->value, BarcodeLabelSize::cases()))->toBe(['50x25', '40x25']);
+
+    labelLine($this->purchase, labelProduct(), 1);
+
+    foreach ([route('admin.purchases.show', $this->purchase), route('admin.sales.products')] as $screen) {
+        $html = $this->get($screen)->assertOk()->assertDontSee('80x30', false)->getContent();
+
+        preg_match_all('#<option value="(\d+x\d+)"\s*(selected)?[^>]*>#', $html, $options, PREG_SET_ORDER);
+        $selected = array_filter($options, fn (array $option) => ($option[2] ?? '') === 'selected');
+
+        expect(array_map(fn (array $option) => $option[1], $options))->toBe(['50x25', '40x25'])
+            ->and(array_map(fn (array $option) => $option[1], array_values($selected)))->toBe(['50x25']);
+    }
+});
+
+test('a 13-digit barcode keeps its quiet zone on the label and its bars inside the safe margins', function (BarcodeLabelSize $size) {
+    $product = labelProduct(['barcode' => '6221234567890']);
+
+    $html = $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1, 'size' => $size->value]))
+        ->assertOk()
+        ->assertDontSee('كود الأصناف التالية طويل')
+        ->assertSee('data-auto-print', false)
+        ->getContent();
+
+    preg_match('/<svg width="([\d.]+)mm"/', labelSvgs($html)[0], $svg);
+    $modules = (new Picqer\Barcode\Types\TypeCode128())->getBarcode('6221234567890')->getWidth();
+    $moduleWidth = (float) $svg[1] / $modules;
+
+    expect($moduleWidth)->toBeGreaterThanOrEqual(0.25)
+        ->and((float) $svg[1])->toBeLessThanOrEqual($size->printableWidthMm())
+        ->and((float) $svg[1] + 20 * $moduleWidth)->toBeLessThanOrEqual($size->widthMm());
+})->with(BarcodeLabelSize::cases());
+
+test('the removed 80 mm size is rejected and a label without a size prints as 50x25', function () {
+    $product = labelProduct();
+
+    $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1, 'size' => '80x30']))
+        ->assertSessionHasErrors('size');
+
+    $this->get(route('admin.products.labels', ['product' => $product, 'copies' => 1]))
+        ->assertOk()
+        ->assertSee('assets/css/admin/labels/label-50x25.css', false);
+});
+
+test('the safe margins measured on the printer are kept and the barcode is centred', function (BarcodeLabelSize $size) {
+    $css = file_get_contents(public_path('assets/css/admin/labels/labels.css'));
+
+    expect($size->sidePaddingMm())->toBeGreaterThanOrEqual(2.0)->toBeLessThanOrEqual(2.5)
+        ->and($size->printableWidthMm())->toBe($size->widthMm() - 2 * $size->sidePaddingMm())
+        ->and($css)->toContain('padding: 1mm var(--side-pad);')
+        ->toContain('text-align: center;')
+        ->toContain('.label__barcode img { display: block; margin: 0 auto; }');
+})->with(BarcodeLabelSize::cases());
 
 test('a product with no ASCII code cannot be printed and the reason is shown', function () {
     $product = labelProduct(['sku' => 'كود-عربي', 'barcode' => null]);
@@ -333,7 +402,6 @@ test('a branch-confined user cannot print labels of another branch invoice', fun
 dataset('label sizes', [
     '50x25mm' => '50x25',
     '40x25mm' => '40x25',
-    '80mm roll' => '80x30',
 ]);
 
 function chlorideLabel(string $size, array $query = [], array $product = []): array
@@ -358,15 +426,17 @@ test('with show_price=1 the label shows the name, barcode image, readable code, 
     expect($label['title'])->toBe('بطارية كلورايد جولد 70 أمبير')
         ->and($label['code'])->toBe('6221234567890')
         ->and($label['alt'])->toBe('6221234567890')
-        ->and($label['footer'])->toBe(['ضمان 12 شهر', '3,850 ج.م'])
-        ->and($label['text'])->toContain('الحسيني للبطاريات');
+        ->and($label['warranty'])->toBe('ضمان 12 شهر')
+        ->and($label['price'])->toBe('3,850 ج.م')
+        ->and($label['company'])->toBe('الحسيني للبطاريات');
 })->with('label sizes');
 
-test('the readable code is printed directly under the barcode image', function (string $size) {
+test('the landscape layout shares rows across the width and prints the code directly under the barcode', function (string $size) {
     $label = chlorideLabel($size, ['show_price' => 1]);
 
-    expect($label['rows'])->toBe(['label__company', 'label__title', 'label__barcode', 'label__code', 'label__footer'])
-        ->and($label['element_after_barcode'])->toBe('label__code');
+    expect($label['rows'])->toBe(['label__header', 'label__title', 'label__barcode', 'label__footer'])
+        ->and($label['element_after_barcode'])->toBe('label__footer')
+        ->and($label['footer'])->toBe(['label__warranty', 'label__code']);
 })->with('label sizes');
 
 test('the barcode image is a vector SVG that encodes the printed code', function (string $size) {
@@ -418,27 +488,36 @@ test('the capacity is not repeated when its number is already in the name', func
 test('without show_price the price disappears and the name, barcode and warranty stay intact', function (string $size, array $query) {
     $label = chlorideLabel($size, $query);
 
-    expect($label['footer'])->toBe(['ضمان 12 شهر', ''])
+    expect($label['price'])->toBeNull()
+        ->and($label['warranty'])->toBe('ضمان 12 شهر')
         ->and($label['text'])->not->toContain('ج.م')
         ->and($label['text'])->not->toContain('3,850')
         ->and($label['title'])->toBe('بطارية كلورايد جولد 70 أمبير')
         ->and($label['code'])->toBe('6221234567890')
-        ->and($label['element_after_barcode'])->toBe('label__code');
+        ->and($label['element_after_barcode'])->toBe('label__footer');
 })->with('label sizes')->with([
     'show_price=0' => [['show_price' => 0]],
     'show_price absent' => [[]],
 ]);
 
-test('the footer is left out when there is neither a price nor a warranty', function (string $size) {
-    expect(chlorideLabel($size, ['show_price' => 0], ['warranty_months' => 0])['footer'])->toBeNull();
+test('with neither a price nor a warranty the label still shows the code under the barcode', function (string $size) {
+    $label = chlorideLabel($size, ['show_price' => 0], ['warranty_months' => 0]);
+
+    expect($label['price'])->toBeNull()
+        ->and($label['warranty'])->toBeNull()
+        ->and($label['footer'])->toBe(['label__code'])
+        ->and($label['code'])->toBe('6221234567890');
 })->with('label sizes');
 
 test('a product without warranty shows only its price', function (string $size) {
-    expect(chlorideLabel($size, ['show_price' => 1], ['warranty_months' => 0])['footer'])->toBe(['', '3,850 ج.م']);
+    $label = chlorideLabel($size, ['show_price' => 1], ['warranty_months' => 0]);
+
+    expect($label['price'])->toBe('3,850 ج.م')
+        ->and($label['warranty'])->toBeNull();
 })->with('label sizes');
 
 test('the retail price is formatted in Egyptian pounds', function (int|float $price, string $expected) {
-    expect(chlorideLabel('50x25', ['show_price' => 1], ['retail_price' => $price])['footer'][1])->toBe($expected);
+    expect(chlorideLabel('50x25', ['show_price' => 1], ['retail_price' => $price])['price'])->toBe($expected);
 })->with([
     'whole amount' => [3850, '3,850 ج.م'],
     'piasters kept' => [1250.5, '1,250.50 ج.م'],
@@ -457,7 +536,8 @@ test('a shipment label prints the same content as a product label', function () 
     $label = parsedLabel($html);
     expect($label['title'])->toBe('بطارية كلورايد جولد 70 أمبير')
         ->and($label['code'])->toBe('6221234567890')
-        ->and($label['footer'])->toBe(['ضمان 12 شهر', '3,850 ج.م']);
+        ->and($label['warranty'])->toBe('ضمان 12 شهر')
+        ->and($label['price'])->toBe('3,850 ج.م');
 });
 
 test('the stylesheet keeps long content from being clipped silently', function () {
@@ -468,7 +548,11 @@ test('the stylesheet keeps long content from being clipped silently', function (
         return $match[1];
     };
 
-    expect($rule('.label__footer'))->toContain('justify-content: space-between')
+    expect($rule('.label__header'))->toContain('flex-wrap: wrap')
+        ->not->toContain('overflow')
+        ->and($rule('.label__company'))->not->toContain('overflow')
+        ->and($rule('.label__price'))->not->toContain('overflow')
+        ->and($rule('.label__footer'))->toContain('grid-template-columns: 1fr auto 1fr')
         ->not->toContain('overflow')
         ->and($rule('.label__code'))->toContain('overflow-wrap: anywhere')
         ->not->toContain('nowrap')

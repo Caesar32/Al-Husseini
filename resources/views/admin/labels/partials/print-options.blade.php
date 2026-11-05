@@ -3,7 +3,7 @@
         <label class="form-label fw-bold text-dark fs-13" for="{{ $idPrefix }}Size">مقاس الملصق</label>
         <select class="form-select" id="{{ $idPrefix }}Size" name="size">
             @foreach(\App\Enums\BarcodeLabelSize::cases() as $labelSize)
-                <option value="{{ $labelSize->value }}">{{ $labelSize->label() }}</option>
+                <option value="{{ $labelSize->value }}" @selected($labelSize === \App\Enums\BarcodeLabelSize::DEFAULT)>{{ $labelSize->label() }}</option>
             @endforeach
         </select>
     </div>

@@ -13,7 +13,8 @@ html, body { background: #fff; color: #000; font-family: 'Cairo', Tahoma, sans-s
     /* 0.1mm under the page height: browsers round up, and a spill would feed a blank label. */
     width: var(--label-w);
     height: calc(var(--label-h) - 0.1mm);
-    padding: 0.6mm var(--side-pad);
+    /* Safe margins measured on a printed label; nothing may sit closer to the edge or the tear line. */
+    padding: 1mm var(--side-pad);
     overflow: hidden;
     background: #fff;
     text-align: center;
@@ -23,7 +24,10 @@ html, body { background: #fff; color: #000; font-family: 'Cairo', Tahoma, sans-s
     page-break-inside: avoid;
 }
 
-.label__company { font-size: 0.85em; font-weight: 800; white-space: nowrap; overflow: hidden; }
+/* The label is wider than tall: text shares rows across the width, leaving the height to the barcode. */
+.label__header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 1mm; }
+.label__company { font-size: 0.9em; font-weight: 800; white-space: nowrap; }
+.label__price { font-size: 1.05em; font-weight: 800; white-space: nowrap; }
 .label__title {
     display: -webkit-box;
     -webkit-box-orient: vertical;
@@ -33,9 +37,13 @@ html, body { background: #fff; color: #000; font-family: 'Cairo', Tahoma, sans-s
 }
 .label__barcode { direction: ltr; height: var(--bar-h); flex: none; }
 .label__barcode img { display: block; margin: 0 auto; }
+/* Equal outer tracks keep the code centred under the bars; the warranty pushes it aside only if it must. */
+.label__footer { display: grid; grid-template-columns: 1fr auto 1fr; align-items: baseline; column-gap: 1mm; font-size: 0.9em; }
+.label__warranty { grid-column: 1; text-align: right; white-space: nowrap; }
 /* Wraps rather than clips: when a long code is hard to scan, this text is what staff type in. */
-.label__code { direction: ltr; font-family: Consolas, 'Courier New', monospace; font-size: 0.95em; font-weight: 700; overflow-wrap: anywhere; }
-.label__footer { display: flex; justify-content: space-between; gap: 1mm; font-size: 0.9em; white-space: nowrap; }
+.label__code { grid-column: 2; direction: ltr; font-family: Consolas, 'Courier New', monospace; font-weight: 700; overflow-wrap: anywhere; }
+/* A code this long shares its row with the warranty and may wrap; smaller text keeps it inside the label. */
+.label--dense .label__code { font-size: 0.8em; }
 
 @media screen {
     body { background: #e9ecef; padding-bottom: 24px; }

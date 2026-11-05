@@ -145,7 +145,11 @@ class BarcodeLabelService implements BarcodeLabelServiceInterface
 
     private function moduleWidthMm(int $modules, BarcodeLabelSize $size): float
     {
-        $available = $size->printableWidthMm() / ($modules + self::QUIET_ZONE_MODULES);
+        // The bars must stay inside the safe margins; the blank quiet zone only needs to be on the label.
+        $available = min(
+            $size->printableWidthMm() / $modules,
+            $size->widthMm() / ($modules + self::QUIET_ZONE_MODULES),
+        );
 
         foreach (self::MODULE_WIDTHS_MM as $width) {
             if ($width <= $available) {

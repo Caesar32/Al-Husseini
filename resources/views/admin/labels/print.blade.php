@@ -34,22 +34,27 @@
     </div>
     <div class="notice notice--hint">
         في نافذة الطباعة: اختر طابعة الاستيكر، والهوامش <strong>بدون (None)</strong>، والمقياس <strong>100%</strong>، وألغِ رؤوس وتذييلات الصفحة.
+        وفي إعدادات تعريف الطابعة: مقاس الورق <strong>عرض {{ $size->widthMm() }} مم × طول {{ $size->heightMm() }} مم</strong> والاتجاه <strong>Portrait</strong>؛ فالعرض مكتوب هنا كأبعاد، واختيار Landscape في التعريف قد يدير الملصق 90 درجة.
     </div>
 
     <main class="sheet">
         @foreach($labels as $label)
             @for($copy = 0; $copy < $label->copies; $copy++)
                 <section class="label {{ $label->isDense ? 'label--dense' : '' }}">
-                    <div class="label__company">{{ $label->company }}</div>
+                    <div class="label__header">
+                        <div class="label__company">{{ $label->company }}</div>
+                        @if($label->price !== null)
+                            <div class="label__price">{{ number_format($label->price, fmod($label->price, 1) == 0 ? 0 : 2) }} ج.م</div>
+                        @endif
+                    </div>
                     <div class="label__title">{{ $label->title }}</div>
                     <div class="label__barcode"><img src="{{ $label->barcodeImage }}" alt="{{ $label->code }}"></div>
-                    <div class="label__code">{{ $label->code }}</div>
-                    @if($label->price !== null || $label->warrantyMonths > 0)
-                        <div class="label__footer">
-                            <span>{{ $label->warrantyMonths > 0 ? "ضمان {$label->warrantyMonths} شهر" : '' }}</span>
-                            <span>{{ $label->price !== null ? number_format($label->price, fmod($label->price, 1) == 0 ? 0 : 2) . ' ج.م' : '' }}</span>
-                        </div>
-                    @endif
+                    <div class="label__footer">
+                        @if($label->warrantyMonths > 0)
+                            <div class="label__warranty">ضمان {{ $label->warrantyMonths }} شهر</div>
+                        @endif
+                        <div class="label__code">{{ $label->code }}</div>
+                    </div>
                 </section>
             @endfor
         @endforeach

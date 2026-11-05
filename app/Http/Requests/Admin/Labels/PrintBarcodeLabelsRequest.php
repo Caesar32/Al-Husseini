@@ -18,7 +18,7 @@ abstract class PrintBarcodeLabelsRequest extends FormRequest
 
     public function labelSize(): BarcodeLabelSize
     {
-        return BarcodeLabelSize::tryFrom((string) $this->input('size')) ?? BarcodeLabelSize::Medium;
+        return BarcodeLabelSize::tryFrom((string) $this->input('size')) ?? BarcodeLabelSize::DEFAULT;
     }
 
     public function showPrice(): bool

@@ -1,3 +1,7 @@
-/* One label = one page of exactly the stock's size. Keep in sync with App\Enums\BarcodeLabelSize. */
+/*
+ * One label = one page of exactly the stock's size. Keep in sync with App\Enums\BarcodeLabelSize.
+ * Width first makes the page landscape. Do not add the "landscape" keyword: CSS does not allow it after
+ * explicit lengths, and Chrome then ignores the whole size and prints on a Letter sheet.
+ */
 @page { size: 40mm 25mm; margin: 0; }
-:root { --label-w: 40mm; --label-h: 25mm; --side-pad: 1.5mm; --bar-h: 8mm; --font: 6.5pt; }
+:root { --label-w: 40mm; --label-h: 25mm; --side-pad: 2.5mm; --bar-h: 10mm; --font: 6.5pt; }

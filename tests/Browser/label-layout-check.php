@@ -2,7 +2,8 @@
 
 /*
  * Measures the real barcode label layout in headless Chrome: for every size, font and product scenario
- * it reports text that overflows, is clipped or overlaps, and whether the page warned before printing.
+ * it reports text that overflows, is clipped or overlaps, and whether the page warned before printing;
+ * for every size it also prints a PDF and checks the page dimensions and that no blank page appears.
  * overflow:hidden hides these problems from any HTML or CSS assertion, so only a browser's layout can
  * find them.
  *
@@ -57,15 +58,33 @@ window.addEventListener('load', async () => {
     const within = (name, rect) => {
         if (rect.left < inner.left - 0.5 || rect.right > inner.right + 0.5) problems.push(name + ' overflows the width');
     };
-    within('company', textBox(label.querySelector('.label__company')));
-    within('code', textBox(label.querySelector('.label__code')));
-    within('barcode', label.querySelector('img').getBoundingClientRect());
+    const barcode = label.querySelector('img').getBoundingClientRect();
+    within('barcode', barcode);
 
-    const footer = label.querySelector('.label__footer');
-    if (footer) {
-        const parts = [...footer.children].filter((s) => s.textContent.trim() !== '').map(textBox);
-        parts.forEach((p) => within('footer', p));
-        if (parts.length === 2 && parts[0].left < parts[1].right && parts[1].left < parts[0].right) problems.push('warranty and price overlap');
+    const centre = (rect) => (rect.left + rect.right) / 2;
+    const labelCentre = centre(box);
+    if (Math.abs(centre(barcode) - labelCentre) > 0.5) problems.push('barcode is off-centre');
+    if (style.paddingTop !== style.paddingBottom || parseFloat(style.paddingTop) < 3.77) problems.push('top or bottom margin under 1 mm');
+    if (parseFloat(style.paddingLeft) < 7.55 || parseFloat(style.paddingRight) < 7.55) problems.push('side margin under 2 mm');
+
+    const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    // Overlap and order use element boxes: a font's text box is taller than its line, so it reaches into the next row.
+    const elementBox = (el) => el.getBoundingClientRect();
+    const company = label.querySelector('.label__company');
+    const code = label.querySelector('.label__code');
+    within('company', textBox(company));
+    within('code', textBox(code));
+    if (elementBox(code).top < barcode.bottom - 0.5) problems.push('code is not under the barcode');
+
+    const price = label.querySelector('.label__price');
+    if (price) {
+        within('price', textBox(price));
+        if (overlap(elementBox(company), elementBox(price))) problems.push('company and price overlap');
+    }
+    const warranty = label.querySelector('.label__warranty');
+    if (warranty) {
+        within('warranty', textBox(warranty));
+        if (overlap(elementBox(code), elementBox(warranty))) problems.push('warranty and code overlap');
     }
 
     // Lines without the clamp; scrollHeight would not do, since a font's box can exceed its line-height.
@@ -108,9 +127,38 @@ $publicUrl = 'file:///'.str_replace('\\', '/', "{$root}/public");
 $workDir = str_replace('\\', '/', sys_get_temp_dir()).'/label-layout-check-'.getmypid();
 mkdir($workDir);
 
+$nullDevice = PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null';
+
 $failures = 0;
 $total = 0;
 foreach (BarcodeLabelSize::cases() as $size) {
+    // The page Chrome really prints: an invalid @page rule falls back to a full sheet, and a spill feeds a blank label.
+    $copies = 3;
+    $labels = $service->forProduct(new Product($scenarios['real battery']), $copies, $size, true);
+    $html = view('admin.labels.print', ['labels' => $labels, 'size' => $size, 'title' => 'layout check'])->render();
+    $file = "{$workDir}/pages.html";
+    file_put_contents($file, str_replace(rtrim(asset(''), '/'), $publicUrl, str_replace('</title>', '</title>'.$printStub, $html)));
+    shell_exec(sprintf(
+        '"%s" --headless=new --disable-gpu --no-pdf-header-footer --allow-file-access-from-files --user-data-dir=%s --virtual-time-budget=10000 --print-to-pdf=%s %s 2>%s',
+        $chrome,
+        escapeshellarg("{$workDir}/profile"),
+        escapeshellarg("{$workDir}/pages.pdf"),
+        escapeshellarg("file:///{$file}"),
+        $nullDevice,
+    ));
+    if (preg_match_all('/MediaBox\s*\[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/', (string) @file_get_contents("{$workDir}/pages.pdf"), $boxes) === 0) {
+        fwrite(STDERR, "Chrome produced no PDF for {$size->value}.\n");
+        exit(2);
+    }
+    $pageWidth = round((float) $boxes[1][0] * 25.4 / 72, 1);
+    $pageHeight = round((float) $boxes[2][0] * 25.4 / 72, 1);
+    $pageFailed = count($boxes[1]) !== $copies
+        || abs($pageWidth - $size->widthMm()) > 0.5
+        || abs($pageHeight - $size->heightMm()) > 0.5;
+    $total++;
+    $failures += $pageFailed ? 1 : 0;
+    printf("\n%-6s %s PDF: %d labels = %d pages of %.1f x %.1f mm\n", $pageFailed ? 'FAIL' : 'OK', $size->value, $copies, count($boxes[1]), $pageWidth, $pageHeight);
+
     foreach (['Cairo' => true, 'offline fallback' => false] as $fontName => $useWebFont) {
         echo "\n{$size->value} / {$fontName}\n";
 
@@ -132,7 +180,7 @@ foreach (BarcodeLabelSize::cases() as $size) {
                 $chrome,
                 escapeshellarg("{$workDir}/profile"),
                 escapeshellarg("file:///{$file}"),
-                PHP_OS_FAMILY === 'Windows' ? 'NUL' : '/dev/null',
+                $nullDevice,
             ));
 
             if (! preg_match('#<pre id="result">(.*?)</pre>#s', $dom, $match)) {

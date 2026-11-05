@@ -1,3 +1,0 @@
-/* One label = one page of exactly the stock's size. Keep in sync with App\Enums\BarcodeLabelSize. */
-@page { size: 80mm 30mm; margin: 0; }
-:root { --label-w: 80mm; --label-h: 30mm; --side-pad: 4mm; --bar-h: 11mm; --font: 9pt; }
