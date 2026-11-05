@@ -20,7 +20,8 @@ class LeaveService implements LeaveServiceInterface
     {
         return EmployeeLeave::with(['employee.branch', 'actionedByUser'])
             ->latest('id')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**

@@ -16,7 +16,8 @@ class DeductionService implements DeductionServiceInterface
     {
         return EmployeeDeduction::with(['employee', 'deductionRule', 'approvedByUser'])
             ->latest('id')
-            ->paginate($perPage);
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**

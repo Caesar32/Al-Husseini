@@ -47,7 +47,7 @@ class EmployeeService implements EmployeeServiceInterface
             });
         }
 
-        return $query->paginate($perPage);
+        return $query->paginate($perPage)->withQueryString();
     }
 
     /**

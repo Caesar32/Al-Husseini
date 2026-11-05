@@ -10,6 +10,7 @@ use App\Observers\AttendanceObserver;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -35,6 +36,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // The admin theme is Bootstrap; Laravel's default pagination markup is Tailwind and renders unstyled.
+        Paginator::useBootstrapFive();
+
         // ─── حماية صارمة من مشاكل N+1 في بيئة التطوير ───────────────────────────────
         // يرمي Exception فوري إذا تم الوصول إلى أي علاقة بدون Eager Loading مسبق
         Model::preventLazyLoading(! app()->isProduction());

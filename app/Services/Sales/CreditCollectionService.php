@@ -152,7 +152,8 @@ class CreditCollectionService implements CustomerDebtServiceInterface
             ->where('entry_type', 'payment_collection')
             ->with(['customer:id,name,phone', 'collectedByUser:id,name'])
             ->latest('id')
-            ->paginate($perPage, ['id', 'customer_id', 'amount', 'receipt_number', 'collected_by', 'notes', 'created_at'], 'payments_page');
+            ->paginate($perPage, ['id', 'customer_id', 'amount', 'receipt_number', 'collected_by', 'notes', 'created_at'], 'payments_page')
+            ->withQueryString();
     }
 
     public function collectedBetween(CarbonInterface $from, CarbonInterface $to): float

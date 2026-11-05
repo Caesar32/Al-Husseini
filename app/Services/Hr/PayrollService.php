@@ -36,7 +36,7 @@ class PayrollService implements PayrollServiceInterface
             $query->where('branch_id', $branchId);
         }
 
-        $payrolls = $query->paginate($perPage);
+        $payrolls = $query->paginate($perPage)->withQueryString();
         $latestPayroll = (clone $query)->first();
 
         // Consistency is computed once, server-side, with the same rules used by approve/disburse,
