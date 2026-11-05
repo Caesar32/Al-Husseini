@@ -29,7 +29,7 @@ class EmployeeFactory extends Factory
             'full_name' => $name,
             'national_id' => '2' . fake()->numberBetween(80, 99) . fake()->numerify('###########'),
             'phone' => '01' . fake()->randomElement(['0', '1', '2', '5']) . fake()->numerify('########'),
-            'hire_date' => fake()->dateTimeBetween('-3 years', '-1 month')->format('Y-m-d'),
+            'hire_date' => fake()->dateTimeBetween('2020-01-01', '2025-12-31')->format('Y-m-d'),
             'shift_start_time' => '09:00:00',
             'shift_end_time' => '17:00:00',
             'grace_period_minutes' => 15,

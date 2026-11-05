@@ -154,13 +154,25 @@ class PayrollService implements PayrollServiceInterface
                 $salary = $employee->currentSalary;
                 if (!$salary) continue;
 
-                $basic      = (float) $salary->basic_salary;
-                $allowances = (float) ($salary->housing_allowance + $salary->transport_allowance + $salary->other_allowances);
-                $dayRate    = $basic / $totalMonthDays;
+                // Owner decision: nothing before the hire date counts, neither pay nor absence.
+                $hireDate = Carbon::parse($employee->hire_date)->startOfDay();
+                if ($hireDate->greaterThan($endDate)) continue;
+
+                $periodStart = $hireDate->greaterThan($startDate) ? $hireDate : $startDate->copy()->startOfDay();
+                $expectedWorkingDays = $this->expectedWorkingDays($periodStart, $endDate, $normWorkingDays);
+
+                $fullBasic = (float) $salary->basic_salary;
+                $fullAllowances = (float) ($salary->housing_allowance + $salary->transport_allowance + $salary->other_allowances);
+                $absenceDayRate = $fullBasic / $normWorkingDays;
+
+                $basic      = round($absenceDayRate * $expectedWorkingDays, 2);
+                $allowances = round($fullAllowances * $expectedWorkingDays / $normWorkingDays, 2);
+                $dayRate    = $fullBasic / $totalMonthDays;
                 $hourlyRate = $dayRate / $dailyWorkingHours; // ساعات العمل اليومية (إعداد daily_working_hours)
 
                 // 1. حساب الحضور والغياب والإجازات والتأخير (من الذاكرة — بدون استعلام)
-                $attendances = $allAttendances->get($employee->id, collect());
+                $attendances = $allAttendances->get($employee->id, collect())
+                    ->filter(fn (Attendance $attendance) => Carbon::parse($attendance->work_date)->startOfDay()->greaterThanOrEqualTo($periodStart));
                 $employeeLeaves = $allLeaves->get($employee->id, collect());
 
                 $paidLeaveDays = 0;
@@ -169,7 +181,7 @@ class PayrollService implements PayrollServiceInterface
                 foreach ($employeeLeaves as $leave) {
                     $leaveStart = Carbon::parse($leave->start_date)->startOfDay();
                     $leaveEnd = Carbon::parse($leave->end_date)->startOfDay();
-                    $windowStart = $startDate->copy()->startOfDay();
+                    $windowStart = $periodStart->copy();
                     $windowEnd = $endDate->copy()->startOfDay();
 
                     $effectiveStart = $leaveStart->greaterThan($windowStart) ? $leaveStart : $windowStart;
@@ -187,9 +199,10 @@ class PayrollService implements PayrollServiceInterface
 
                 $presentDays         = $attendances->where('status', '!=', 'absent')->count();
                 $coveredDays         = $presentDays + $paidLeaveDays;
-                $unexcusedAbsentDays = max(0, $normWorkingDays - $coveredDays); // معيار أيام العمل الشهرية (إعداد monthly_working_days)
-                $absentDays          = $unexcusedAbsentDays + $unpaidLeaveDays;
-                $absenceCost         = $absentDays * $dayRate;
+                $unexcusedAbsentDays = max(0, $expectedWorkingDays - $coveredDays); // معيار أيام العمل الشهرية (إعداد monthly_working_days)
+                // Owner decision: a day's absence is basic / working days, so absence can never cost more than the basic.
+                $absentDays          = min($expectedWorkingDays, $unexcusedAbsentDays + $unpaidLeaveDays);
+                $absenceCost         = min($basic, round($absentDays * $absenceDayRate, 2));
 
                 $totalLateMinutes  = $attendances->sum('late_minutes');
                 $totalOvertimeHours = (float) $attendances->sum('overtime_hours');
@@ -282,6 +295,21 @@ class PayrollService implements PayrollServiceInterface
     }
 
     /**
+     * Working days an employee owes from the given day to the end of the month: the full norm for a
+     * whole month, otherwise the norm's share of the calendar days left, in whole days like absent_days.
+     */
+    private function expectedWorkingDays(Carbon $periodStart, Carbon $monthEnd, int $normWorkingDays): int
+    {
+        if ($periodStart->day === 1) {
+            return $normWorkingDays;
+        }
+
+        $calendarDaysLeft = $monthEnd->day - $periodStart->day + 1;
+
+        return max(1, (int) round($normWorkingDays * $calendarDaysLeft / $monthEnd->daysInMonth));
+    }
+
+    /**
      * Validate payroll header totals against its immutable item breakdown.
      *
      * The item rows are the source of truth for approval/disbursement.
@@ -349,7 +377,10 @@ class PayrollService implements PayrollServiceInterface
             $reasons[] = "صافي البنود ({$net}) لا يساوي الأساسي + البدلات + الإضافي - الخصومات + الرصيد المرحّل ({$expectedNet}).";
         }
 
-        $zeroWithComponents = abs($net) < 0.01 && ($basic + $allowances > 0 || $deductions > 0);
+        // A net of zero is legitimate when deductions exactly cancel the earnings (a full month's
+        // absence on a salary without allowances). Unrecovered debt or broken arithmetic still blocks it.
+        $exactlyOffset = ! $netMismatch && $carriedDebt < 0.01;
+        $zeroWithComponents = abs($net) < 0.01 && ($basic + $allowances > 0 || $deductions > 0) && ! $exactlyOffset;
         if ($zeroWithComponents) {
             $reasons[] = 'صافي المسير صفر رغم وجود مستحقات أو خصومات.';
         }

@@ -445,7 +445,7 @@ class SystemDiagnosticService
                     'full_name'            => 'محمود الفني - محاكاة',
                     'phone'                => '012' . rand(10000000, 99999999),
                     'national_id'          => '295' . rand(10000000000, 99999999999),
-                    'hire_date'            => now()->toDateString(),
+                    'hire_date'            => now()->subYear()->toDateString(), // A full month: the payroll step below expects no proration.
                     'shift_start_time'     => '09:00:00',
                     'shift_end_time'       => '17:00:00',
                     'grace_period_minutes' => 15,

@@ -120,15 +120,15 @@ test('end to end monthly lifecycle: hiring, attendance, deductions, leaves, and 
     // إجمالي البدلات: 1,500 + 500 = 2,000 ج.م
     // أيام الحضور المسجلة: 22 يوم حضور (20 في الموعد + 2 متأخر) + 2 يوم إجازة سنوية مدفوعة معتمدة = 24 يوم مغطى
     // أيام الغياب غير المبرر = 26 - 24 = 2 يوم غياب
-    // تكلفة الغياب = 2 * (9000 / 30) = 600 ج.م
+    // تكلفة الغياب = 2 * (9000 / 26) = 692.31 ج.م
     // الجزاء الإداري المعتمد = 300 ج.م
-    // إجمالي الاستقطاعات = 600 + 300 = 900 ج.م
-    // صافي الراتب المستحق = (9000 + 2000) - 900 = 10,100 ج.م
+    // إجمالي الاستقطاعات = 692.31 + 300 = 992.31 ج.م
+    // صافي الراتب المستحق = (9000 + 2000) - 992.31 = 10,007.69 ج.م
     expect((float)$item->basic_salary)->toBe(9000.0)
         ->and((float)$item->total_allowance)->toBe(2000.0)
-        ->and((float)$item->total_deduction)->toBe(900.0)
-        ->and((float)$item->net_salary)->toBe(10100.0)
-        ->and((float)$payroll->total_net)->toBe(10100.0);
+        ->and((float)$item->total_deduction)->toBe(992.31)
+        ->and((float)$item->net_salary)->toBe(10007.69)
+        ->and((float)$payroll->total_net)->toBe(10007.69);
 
     // 6. اعتماد المسير من الإدارة
     $approved = $this->payrollService->approvePayroll($payroll, $admin->id);

@@ -60,6 +60,31 @@ test('two sequential partial returns cannot exceed the sold quantity', function 
         ->toThrow(DomainException::class);
 });
 
+test('a full return refunds only the cash paid and the trade-in battery stays in scrap stock', function () {
+    // 2 x 1500 less a 500 trade-in: the customer paid 2500 in cash.
+    $invoice = p5Sale([
+        'has_scrap' => true,
+        'scrap_capacity_ah' => 70,
+        'scrap_count' => 1,
+        'scrap_deduction_amount' => 500,
+        'payments' => [['method' => 'cash', 'amount' => 2500]],
+    ]);
+
+    $this->posService->processSalesReturn($invoice->id, [['invoice_item_id' => $invoice->items->first()->id, 'quantity' => 2]], 'إرجاع كامل', $this->cashier->id);
+
+    $invoice->refresh();
+    $scrap = \App\Models\ScrapBatteriesInventory::where('invoice_id', $invoice->id)->get();
+
+    expect($invoice->status)->toBe('refunded')
+        ->and((float) $invoice->refunded_amount)->toBe(2500.0)
+        ->and((float) InvoicePayment::where('invoice_id', $invoice->id)->where('amount', '<', 0)->sum('amount'))->toBe(-2500.0)
+        ->and((float) $invoice->paid_amount)->toBe(0.0)
+        ->and((float) $invoice->scrap_deduction_amount)->toBe(500.0)
+        ->and($scrap)->toHaveCount(1)
+        ->and($scrap->first()->status)->toBe('in_stock')
+        ->and((float) $scrap->first()->scrap_value)->toBe(500.0);
+});
+
 test('cumulative refunds are capped at what the customer actually paid', function () {
     // 2 x 1500 with a 600 discount: the customer paid 2400, not 3000.
     $invoice = p5Sale(['discount_amount' => 600, 'payments' => [['method' => 'cash', 'amount' => 2400]]]);

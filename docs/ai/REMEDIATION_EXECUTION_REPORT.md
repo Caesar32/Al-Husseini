@@ -169,6 +169,9 @@ Fixed, each with a test:
 Checked with no defect found: all 17 modal targets resolve, no legacy LTR classes, money writes run in transactions, the stock ledger refuses negative stock, and HR lists do not grow in queries with more rows.
 
 Not changed, for the owner to decide:
-- Payroll charges a mid-month hire as absent for the days before hiring, because the absence count ignores the hire date. Also, the absent day count uses `monthly_working_days` (26) while the day rate divides by calendar days.
-- Refund proration of discount, scrap and tax (D3), including scrap stock left in place after a full return.
+- Refund proration of discount and tax on partial returns (D3).
 - Not exercised: real browser flows, MySQL-specific behaviour and the printed labels' final margins.
+
+Owner decisions applied (2026-11-05), recorded in `docs/ai/hr.md`:
+- Payroll prorates from `hire_date` and charges nothing before it; an absence day is basic / `monthly_working_days`, and absence alone never exceeds the basic or creates debt.
+- D3, scrap only: on a full return the customer gets back the money actually paid, and the trade-in battery stays in scrap stock with its value.
