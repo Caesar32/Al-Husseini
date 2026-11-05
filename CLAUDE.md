@@ -30,7 +30,7 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Env: `MANAGER_OVERRIDE_CODE_HASH` (required for overrides), `SEED_DEFAULT_PASSWORD`, `LOGIN_ACCOUNT_SWITCHER`, `LOGIN_SWITCHER_PASSWORD` (non-production only), `BRANCH_ISOLATION`, `FINANCE_EPSILON`.
 
 ## Commands
-- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 465 passed, 0 failed, 0 skipped (2026-10-16, end of the refactor roadmap). `tests/Architecture` is its own testsuite.
+- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 681 passed, 0 failed, 0 skipped (2026-11-05, project-wide audit). `tests/Architecture` is its own testsuite.
 - Dev: `php artisan migrate`, `php artisan db:seed` (includes `ProductCategoriesSeeder`), `php artisan serve`; `npm run build` only for the unused Vite pipeline.
 - Diagnostics: `php artisan system:diagnose [--audit|--simulate|--keep]` (`--keep` writes real data). `php artisan suppliers:rebuild-ledger-balances` is dry-run by default (`--apply` writes a JSON backup first; do not run on real data without owner approval).
 - Style: Pint is configured but the codebase was never Pint-formatted; do not mass-reformat.

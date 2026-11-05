@@ -154,3 +154,21 @@ Plan: `REFACTOR_PLAN.md` + `docs/refactor/00..07`. Base `PHASE0_SHA` = `0fa6996`
 2. Needs your approval before deletion: public/assets/js/sales-store.js, public/assets/js/hr-store.js, app/Observers/InvoiceObserver.php, app/Observers/PurchaseInvoiceObserver.php, resources/views/admin/dashboard/partials/invoice-modal.blade.php, the dead SupplierController::create method, and the five agent worktrees and branches (`batch/*`, `worktree-agent-*`, under .claude/worktrees).
 3. Done in Batch 6: ARC-04, ARC-06, DB-03, DB-04, FE-08. Left: the unused Vite/Tailwind pipeline. Owner: run `php artisan migrate` on dev MySQL (2026_10_16_000001 stock_movements, 2026_10_16_000002 payroll index); move the Flutter app to `scrap_batteries`; decide whether `resources/views/admin/scrap/index.blade.php` gets the same script-section fix as the warranty page (its page JS never renders); `ImportLegacyDataCommand` resets stock of existing products to 0 without a journal row if re-run.
 4. Owner decisions listed above, each unblocking its dependent task.
+
+# Project-wide audit (2026-11-05)
+Scope: pagination and Blade, sales/purchases/scrap/stock, HR/payroll/queries/permissions. The audit was targeted (grep plus reading the money and payroll paths), not a line-by-line review of every file.
+
+Fixed, each with a test:
+- Pagination rendered Tailwind markup in the Bootstrap theme; `AppServiceProvider` now calls `Paginator::useBootstrapFive()`.
+- The payroll register had no pagination links, so batches past the first 15 were unreachable.
+- Employee, leave, deduction, payroll and credit collection paginators now keep the query string.
+- A refund portion of exactly 0.01 skipped its payment and credit records.
+- Scrap values on stock did not add up to the invoice deduction (100 over 3 batteries stocked 99.99).
+- `approvePayroll` read the status without a lock, so a stale draft could pull a disbursed batch back to approved.
+
+Checked with no defect found: all 17 modal targets resolve, no legacy LTR classes, money writes run in transactions, the stock ledger refuses negative stock, and HR lists do not grow in queries with more rows.
+
+Not changed, for the owner to decide:
+- Payroll charges a mid-month hire as absent for the days before hiring, because the absence count ignores the hire date. Also, the absent day count uses `monthly_working_days` (26) while the day rate divides by calendar days.
+- Refund proration of discount, scrap and tax (D3), including scrap stock left in place after a full return.
+- Not exercised: real browser flows, MySQL-specific behaviour and the printed labels' final margins.
