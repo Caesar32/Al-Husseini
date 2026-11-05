@@ -39,16 +39,16 @@
 
                 <div id="tradeInDetailsBox" class="d-none">
                     <div class="d-flex align-items-center gap-1">
-                        <div class="input-group input-group-sm flex-nowrap" style="width: 75px;" title="العدد">
+                        <div class="input-group input-group-sm flex-nowrap pos-scrap-count-group" title="العدد">
                             <button class="btn btn-outline-secondary" type="button" data-action="pos.scrap-count" data-delta="-1" aria-label="تقليل العدد">-</button>
                             <input type="number" class="form-control text-center font-monospace fw-bold" id="scrapCountInput" value="1" min="1" max="20" aria-label="عدد البطاريات الكهنة" data-action="pos.scrap-capacity">
                             <button class="btn btn-outline-secondary" type="button" data-action="pos.scrap-count" data-delta="1" aria-label="زيادة العدد">+</button>
                         </div>
-                        <div class="input-group input-group-sm flex-nowrap" style="width: 70px;" title="السعة (أمبير)">
+                        <div class="input-group input-group-sm flex-nowrap pos-scrap-capacity-group" title="السعة (أمبير)">
                             <input type="number" class="form-control text-center font-monospace fw-bold" id="scrapCapacityInput" value="70" min="30" max="250" aria-label="سعة البطارية الكهنة (أمبير)" data-action="pos.scrap-capacity">
                             <span class="input-group-text">Ah</span>
                         </div>
-                        <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center" style="width: 85px;" id="scrapPriceInput" placeholder="السعر" aria-label="سعر الكهنة" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" data-action="pos.recalc">
+                        <input type="number" step="10" min="0" class="form-control form-control-sm font-monospace fw-bold text-success text-center" id="scrapPriceInput" placeholder="السعر" aria-label="سعر الكهنة" title="اتركه فارغاً لاحتساب السعر من شرائح التسعير" data-action="pos.recalc">
                     </div>
                 </div>
             </div>
@@ -62,7 +62,7 @@
                     </span>
                     <span class="d-flex align-items-center gap-1">
                         <label for="cartDiscountInput" class="text-muted mb-0 text-nowrap">خصم إضافي:</label>
-                        <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" style="max-width: 90px;" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" data-action="pos.recalc">
+                        <input type="number" step="1" min="0" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11 text-end" id="cartDiscountInput" placeholder="0" title="يتطلب صلاحية الخصم أو كود موافقة المشرف" data-action="pos.recalc">
                     </span>
                 </div>
                 <div class="d-flex justify-content-between mb-0 text-danger d-none" id="cartScrapDiscountRow">
@@ -125,7 +125,7 @@
 
             <!-- Cash calculator (cash payments only): received / change / quick amounts on one line -->
             <div class="p-1 px-2 bg-light rounded border mb-1 d-flex flex-wrap align-items-center gap-1" id="cashCalculatorBox">
-                <div class="input-group input-group-sm flex-nowrap" style="width: 120px;">
+                <div class="input-group input-group-sm flex-nowrap pos-cash-received-group">
                     <span class="input-group-text bg-body fs-9 py-0 px-1">المستلم:</span>
                     <input type="number" min="0" step="0.01" class="form-control form-control-sm font-monospace fw-bold py-0 fs-11" id="cashReceivedInput" placeholder="0" data-action="pos.cash-change">
                 </div>

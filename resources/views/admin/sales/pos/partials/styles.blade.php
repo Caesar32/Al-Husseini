@@ -1,4 +1,11 @@
 <style>
+    /* Compact cart controls (cart-panel.blade.php) */
+    .input-group.pos-scrap-count-group { width: 75px; }
+    .input-group.pos-scrap-capacity-group { width: 70px; }
+    .input-group.pos-cash-received-group { width: 120px; }
+    #scrapPriceInput { width: 85px; }
+    #cartDiscountInput { max-width: 90px; }
+
     /* Global POS Viewport Lock - Full Height Cashier Terminal on Large Screens */
     .footer {
         display: none !important;
