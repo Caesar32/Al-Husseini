@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin\Scrap;
 
 use App\Models\ScrapBatteriesInventory;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreScrapSaleBatchRequest extends FormRequest
@@ -20,17 +21,25 @@ class StoreScrapSaleBatchRequest extends FormRequest
             'buyer_phone'             => ['nullable', 'string', 'max:30'],
             'total_amount'            => ['required', 'numeric', 'min:0.01'],
             'payment_method'          => ['required', 'in:cash,bank_transfer,cheque'],
-            'scrap_battery_ids'       => ['required', 'array', 'min:1'],
+            'selection_mode'          => ['nullable', 'in:selected,all,count'],
+            'scrap_battery_ids'       => [Rule::requiredIf(fn () => $this->selectionMode() === 'selected'), 'array', 'min:1'],
             'scrap_battery_ids.*'     => ['required', 'integer'],
+            'batch_count'             => ['nullable', 'required_if:selection_mode,count', 'integer', 'min:1'],
             'notes'                   => ['nullable', 'string', 'max:500'],
         ];
+    }
+
+    /** Callers that send only scrap_battery_ids sell exactly those batteries. */
+    private function selectionMode(): string
+    {
+        return (string) $this->input('selection_mode', 'selected');
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function ($validator) {
             $ids = $this->input('scrap_battery_ids', []);
-            if (!is_array($ids) || empty($ids)) {
+            if ($this->selectionMode() !== 'selected' || !is_array($ids) || empty($ids)) {
                 return;
             }
 
@@ -56,6 +65,8 @@ class StoreScrapSaleBatchRequest extends FormRequest
             'payment_method.required'     => 'طريقة الدفع والتسوية مطلوبة.',
             'scrap_battery_ids.required'  => 'يرجى تحديد بطاريات الكهنة المراد بيعها من رصيد المخزن.',
             'scrap_battery_ids.min'       => 'يجب تحديد بطارية كهنة واحدة على الأقل لإتمام البيع.',
+            'batch_count.required_if'     => 'يرجى إدخال عدد البطاريات المراد بيعها.',
+            'batch_count.min'             => 'عدد البطاريات يجب أن يكون واحداً على الأقل.',
         ];
     }
 }

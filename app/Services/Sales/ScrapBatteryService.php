@@ -7,6 +7,7 @@ use App\Models\ScrapBatteriesInventory;
 use App\Models\ScrapPricingTier;
 use App\Models\ScrapSale;
 use App\Services\Support\DocumentNumberService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
@@ -67,6 +68,7 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
                     'weight_kg'   => (float) $items->sum('lead_weight_kg'),
                 ];
             })
+            ->sortBy(fn (array $row) => (int) $row['capacity'])
             ->values()
             ->all();
 
@@ -83,18 +85,8 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
     public function dispatchScrapSaleBatch(array $data, int $authorizedByUserId): array
     {
         return DB::transaction(function () use ($data, $authorizedByUserId) {
-            $batteryIds = $data['scrap_battery_ids'] ?? [];
-            if (empty($batteryIds)) {
-                throw new \InvalidArgumentException('يجب تحديد بطاريات كهنة لبيعها.');
-            }
-
-            $batteries = ScrapBatteriesInventory::whereIn('id', $batteryIds)
-                ->lockForUpdate()
-                ->get();
-
-            if ($batteries->count() !== count($batteryIds)) {
-                throw new \DomainException('بعض البطاريات المحددة غير موجودة.');
-            }
+            $batteries = $this->lockBatteriesForSale($data);
+            $batteryIds = $batteries->pluck('id')->all();
 
             foreach ($batteries as $bat) {
                 if ($bat->status !== 'in_stock') {
@@ -142,6 +134,51 @@ class ScrapBatteryService implements ScrapBatteryServiceInterface
                 'authorized_by'    => $authorizedByUserId,
             ];
         });
+    }
+
+    /** The batteries of one sale, locked: the given ids, the whole stock, or the oldest N of it. */
+    private function lockBatteriesForSale(array $data): Collection
+    {
+        $mode = $data['selection_mode'] ?? 'selected';
+
+        if ($mode === 'selected') {
+            $ids = array_values(array_unique(array_map('intval', $data['scrap_battery_ids'] ?? [])));
+            if (empty($ids)) {
+                throw new \InvalidArgumentException('يجب تحديد بطاريات كهنة لبيعها.');
+            }
+
+            $batteries = ScrapBatteriesInventory::whereIn('id', $ids)->lockForUpdate()->get();
+            if ($batteries->count() !== count($ids)) {
+                throw new \DomainException('بعض البطاريات المحددة غير موجودة.');
+            }
+
+            return $batteries;
+        }
+
+        $stock = ScrapBatteriesInventory::query()
+            ->where('status', 'in_stock')
+            ->when($data['branch_id'] ?? null, fn ($q, $branchId) => $q->where('branch_id', $branchId))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($stock->isEmpty()) {
+            throw new \DomainException('لا توجد بطاريات كهنة في رصيد المخزن لبيعها.');
+        }
+
+        if ($mode === 'all') {
+            return $stock;
+        }
+
+        $count = (int) ($data['batch_count'] ?? 0);
+        if ($count < 1) {
+            throw new \InvalidArgumentException('يجب تحديد عدد البطاريات المراد بيعها.');
+        }
+        if ($count > $stock->count()) {
+            throw new \DomainException("العدد المطلوب ({$count}) أكبر من رصيد المخزن الحالي ({$stock->count()}).");
+        }
+
+        return $stock->take($count)->values();
     }
 
     public function updatePricingTiers(array $tiers): void

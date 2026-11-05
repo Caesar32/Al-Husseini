@@ -80,9 +80,11 @@
     <!-- Actions & Pricing Tiers Bar -->
     <div class="row mb-3">
         <div class="col-sm-6">
-            <button type="button" class="btn btn-danger" id="openSellModalBtn" disabled data-bs-toggle="modal" data-bs-target="#sellScrapModal">
+            @can('scrap.transfer')
+            <button type="button" class="btn btn-danger" id="openSellModalBtn" @disabled($metrics['total_units'] === 0) data-stock-units="{{ $metrics['total_units'] }}" data-stock-cost="{{ $metrics['total_scrap_value'] }}" data-bs-toggle="modal" data-bs-target="#sellScrapModal">
                 <i class="ri-truck-line align-bottom me-1"></i> بيع وتفريغ شحنة كهنة لمصنع تدوير (<span id="selectedCountDisplay">0</span>)
             </button>
+            @endcan
             <button type="button" class="btn btn-soft-secondary ms-2" data-bs-toggle="modal" data-bs-target="#pricingTiersModal">
                 <i class="ri-settings-4-line align-bottom me-1"></i> جدول تسعير الكهنة المعتمد
             </button>
@@ -104,7 +106,7 @@
         <div class="card-header border-bottom-dashed d-flex justify-content-between align-items-center">
             <h5 class="card-title mb-0">سجل بطاريات الكهنة المستلمة بالفرع ({{ $inventory->total() }})</h5>
             <div>
-                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn" data-action="scrap.select-all">تحديد الكل بالمخزن</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBtn" data-action="scrap.select-all">تحديد الكل في هذه الصفحة</button>
             </div>
         </div>
         <div class="card-body">
@@ -136,7 +138,7 @@
                                 <i class="ri-check-line text-muted"></i>
                                 @endif
                             </td>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $inventory->firstItem() + $loop->index }}</td>
                             <td><span class="badge bg-dark fs-12">{{ $item->capacity_ah }}</span></td>
                             <td class="fw-bold text-success">{{ number_format($item->scrap_value, 2) }} ج.م</td>
                             <td>{{ $item->lead_weight_kg ? number_format($item->lead_weight_kg, 1) . ' كجم' : '---' }}</td>
@@ -176,19 +178,42 @@
     </div>
 </div>
 
+@can('scrap.transfer')
 <!-- Modal: Sell Scrap Batch -->
 <div class="modal fade" id="sellScrapModal" tabindex="-1" aria-labelledby="sellScrapModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <form method="POST" action="{{ route('admin.scrap.sell_batch') }}" class="modal-content" id="sellBatchForm">
             @csrf
             <div id="hiddenInputsContainer"></div>
+            @if($branchId)
+                <input type="hidden" name="branch_id" value="{{ $branchId }}">
+            @endif
             <div class="modal-header">
                 <h5 class="modal-title" id="sellScrapModalLabel">بيع شحنة كهنة وتفريغ المخزن</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <fieldset class="mb-3">
+                    <legend class="form-label fs-14">البطاريات المراد بيعها <span class="text-danger">*</span></legend>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="selection_mode" id="sellModeSelected" value="selected" required data-action="scrap.mode" data-action-on="change">
+                        <label class="form-check-label" for="sellModeSelected">البطاريات المحددة من الجدول</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="selection_mode" id="sellModeAll" value="all" required data-action="scrap.mode" data-action-on="change">
+                        <label class="form-check-label" for="sellModeAll">كل رصيد المخزن الحالي ({{ number_format($metrics['total_units']) }} بطارية)</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="selection_mode" id="sellModeCount" value="count" required data-action="scrap.mode" data-action-on="change">
+                        <label class="form-check-label" for="sellModeCount">عدد معين (الأقدم استلاماً أولاً)</label>
+                    </div>
+                    <div class="mt-2" id="batchCountWrap" hidden>
+                        <label class="form-label" for="batchCountInput">عدد البطاريات</label>
+                        <input type="number" class="form-control" id="batchCountInput" name="batch_count" min="1" max="{{ $metrics['total_units'] }}" step="1" disabled data-action="scrap.count" data-action-on="input">
+                    </div>
+                </fieldset>
                 <div class="alert alert-info py-2">
-                    عدد البطاريات المحددة للبيع: <strong id="modalBatchCount">0</strong> بطارية<br>
+                    عدد البطاريات التي ستخرج من المخزن: <strong id="modalBatchCount">0</strong> بطارية<br>
                     إجمالي تكلفة استلامها من العملاء: <strong id="modalBatchCost">0.00</strong> ج.م
                 </div>
                 <div class="mb-3">
@@ -201,7 +226,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">إجمالي مبلغ بيع الشحنة المتفق عليه (ج.م) <span class="text-danger">*</span></label>
-                    <input type="number" step="0.01" name="total_amount" class="form-control" required placeholder="0.00">
+                    <input type="number" step="0.01" min="0.01" name="total_amount" class="form-control" required placeholder="0.00">
                 </div>
                 <div class="mb-3">
                     <label class="form-label">طريقة استلام المبلغ <span class="text-danger">*</span></label>
@@ -223,6 +248,7 @@
         </form>
     </div>
 </div>
+@endcan
 
 <!-- Modal: Pricing Tiers -->
 <div class="modal fade" id="pricingTiersModal" tabindex="-1" aria-labelledby="pricingTiersModalLabel" aria-hidden="true">
@@ -255,7 +281,7 @@
                                 </td>
                                 <td>{{ $tier->capacity_min_ah }} - {{ $tier->capacity_max_ah }} Ah</td>
                                 <td>
-                                    <input type="number" step="10" name="tiers[{{ $loop->index }}][default_scrap_price]" class="form-control" value="{{ $tier->default_scrap_price }}" required>
+                                    <input type="number" step="0.01" min="0" name="tiers[{{ $loop->index }}][default_scrap_price]" class="form-control" value="{{ $tier->default_scrap_price }}" required @cannot('settings.manage') disabled @endcannot>
                                 </td>
                                 <td>
                                     <span class="badge {{ $tier->is_active ? 'bg-success' : 'bg-danger' }}">
@@ -270,11 +296,17 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-light" data-bs-dismiss="modal">إغلاق</button>
+                @can('settings.manage')
                 <button type="submit" class="btn btn-primary">حفظ الأسعار الجديدة</button>
+                @endcan
             </div>
         </form>
     </div>
 </div>
 
+@endsection
+
+@section('script')
+{{-- After the layout's core.js, which defines Admin. Inside the content section this script stopped with a ReferenceError. --}}
 <script src="{{ asset('assets/js/admin/scrap.js') }}"></script>
 @endsection

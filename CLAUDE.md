@@ -30,7 +30,7 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Env: `MANAGER_OVERRIDE_CODE_HASH` (required for overrides), `SEED_DEFAULT_PASSWORD`, `LOGIN_ACCOUNT_SWITCHER`, `LOGIN_SWITCHER_PASSWORD` (non-production only), `BRANCH_ISOLATION`, `FINANCE_EPSILON`.
 
 ## Commands
-- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 681 passed, 0 failed, 0 skipped (2026-11-05, project-wide audit). `tests/Architecture` is its own testsuite.
+- Tests: `php artisan test --compact` (all), `... <path>` (focused). Last full run: 719 passed, 0 failed, 0 skipped (2026-11-05, scrap inventory fix). `tests/Architecture` is its own testsuite.
 - Dev: `php artisan migrate`, `php artisan db:seed` (includes `ProductCategoriesSeeder`), `php artisan serve`; `npm run build` only for the unused Vite pipeline.
 - Diagnostics: `php artisan system:diagnose [--audit|--simulate|--keep]` (`--keep` writes real data). `php artisan suppliers:rebuild-ledger-balances` is dry-run by default (`--apply` writes a JSON backup first; do not run on real data without owner approval).
 - Style: Pint is configured but the codebase was never Pint-formatted; do not mass-reformat.
@@ -41,7 +41,7 @@ Sales/POS/Credit, Catalog (products, customers, vehicles), Purchases/Suppliers, 
 - Post-merge commits on `main`: CI cache-clear tweak; Flutter production API config + `ProductCategoriesSeeder`; HR `national_id` optional + department/title text inputs; client-side supplier/product live search on purchase create.
 - Refactor roadmap (`REFACTOR_PLAN.md`, `docs/refactor/`) done on `main` (`0fa6996`..): owner API `owner.valid` middleware; XSS fixes (purchase create, warranty verify); push job `afterCommit`; stock ledger + `stock_movements`; `DashboardMetricsService` for both dashboards; `SalesReturnService` and `CreditCollectionService::settleCustomerDebt`; JS URLs from `route()`/layout meta tags; `Invoice::scrapBatteries()` / `technicianCommissions()` hasMany (owner API keeps deprecated `scrap_battery`). Manual browser checks per phase are still pending.
 - Pending on dev MySQL (owner action): `php artisan migrate` (2026_10_01_* and 2026_10_16_* migrations).
-- Remaining work: unused Vite pipeline; `admin/scrap/index.blade.php` page script never renders (nested `@section('scripts')`, owner decision); Flutter app should read `scrap_batteries`.
+- Remaining work: unused Vite pipeline; Flutter app should read `scrap_batteries`.
 
 ## Critical known issues / owner decisions (do not invent rules)
 Blocked: refund proration of discount/tax on partial returns (scrap decided: a full return refunds the money paid and the trade-in stays in scrap stock); technician commissions are never created in production (payroll reads them); automatic end of `on_leave`; scrap sale has no cash/treasury record; locale switch only flips RTL/LTR; purchase-return route permission; supplier catalog sync merge vs replace; replacement-warranty period; supplier credit-limit enforcement; resale of a returned battery serial; role grants for `purchases.create`/`suppliers.*` (super-admin only); production data repair (`product_id 1` sales from the old POS). `/admin` and `/admin/warranties/verify` answer JSON to the nav engine's AJAX header (fall back to a full reload).

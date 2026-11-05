@@ -20,15 +20,12 @@ class ScrapInventoryController extends Controller
 
     public function index(Request $request): View|JsonResponse
     {
-        // Selected branch, else the user's branch; users without a branch see all branches.
-        // Metrics and the inventory list use the same branch scope.
-        $branchId = $request->filled('branch_id')
-            ? (int) $request->get('branch_id')
-            : (auth()->user()?->branch_id ? (int) auth()->user()->branch_id : null);
+        $branchId = $this->scopedBranchId($request);
 
         $metrics = $this->scrapBatteryService->getInventoryMetrics($branchId);
         $inventory = $this->scrapBatteryService->getPaginatedInventory(
-            $request->only(['status', 'capacity_ah', 'batch_number']) + ['branch_id' => $branchId]
+            // No status in the request is the first visit: the stock on hand, as the filter shows.
+            $request->only(['status', 'capacity_ah', 'batch_number']) + ['status' => 'in_stock', 'branch_id' => $branchId]
         );
 
         if ($request->wantsJson()) {
@@ -47,7 +44,10 @@ class ScrapInventoryController extends Controller
     public function sellBatch(StoreScrapSaleBatchRequest $request): RedirectResponse|JsonResponse
     {
         try {
-            $result = $this->scrapBatteryService->dispatchScrapSaleBatch($request->validated(), (int) auth()->id());
+            $result = $this->scrapBatteryService->dispatchScrapSaleBatch(
+                ['branch_id' => $this->scopedBranchId($request)] + $request->validated(),
+                (int) auth()->id()
+            );
 
             if ($request->wantsJson()) {
                 return response()->json([
@@ -66,6 +66,19 @@ class ScrapInventoryController extends Controller
 
             return redirect()->back()->withErrors(['scrap_error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * Selected branch, else the user's branch; users without a branch see all branches.
+     * The metrics, the list and a whole-stock sale all use this scope, so they count the same batteries.
+     */
+    private function scopedBranchId(Request $request): ?int
+    {
+        if ($request->filled('branch_id')) {
+            return (int) $request->input('branch_id');
+        }
+
+        return auth()->user()?->branch_id ? (int) auth()->user()->branch_id : null;
     }
 
     public function updateTiers(Request $request): RedirectResponse|JsonResponse
