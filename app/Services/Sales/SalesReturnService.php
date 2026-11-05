@@ -119,7 +119,7 @@ class SalesReturnService implements SalesReturnServiceInterface
             }
 
             // Credit portion: reduce customer balance and ledger
-            if ($creditRefund > 0.01 && $invoice->customer_id) {
+            if ($creditRefund > 0 && $invoice->customer_id) {
                 $customer = Customer::where('id', $invoice->customer_id)->lockForUpdate()->firstOrFail();
                 $balanceBefore = (float) $customer->current_credit_balance;
                 $balanceAfter = max(0, round($balanceBefore - $creditRefund, 2));
@@ -141,7 +141,7 @@ class SalesReturnService implements SalesReturnServiceInterface
             }
 
             // Cash portion: create negative payment and reduce paid_amount
-            if ($cashRefund > 0.01) {
+            if ($cashRefund > 0) {
                 InvoicePayment::create([
                     'invoice_id' => $invoice->id,
                     'payment_method' => 'cash',

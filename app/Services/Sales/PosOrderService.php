@@ -426,10 +426,17 @@ class PosOrderService implements PosOrderServiceInterface
             // 8. Deposit Scrap Battery into Inventory if trade-in occurred
             if ($hasScrap && $scrapDeduction > 0) {
                 $scrapAh = (int) ($data['scrap_capacity_ah'] ?? 70);
-                $scrapCount = (int) ($data['scrap_count'] ?? 1);
-                $unitScrapValue = round($scrapDeduction / max(1, $scrapCount), 2);
+                $scrapCount = max(1, (int) ($data['scrap_count'] ?? 1));
+
+                // In piasters, the last battery taking the remainder: the stock value must add up to the deduction.
+                $deductionPiasters = (int) round($scrapDeduction * 100);
+                $unitPiasters = intdiv($deductionPiasters, $scrapCount);
 
                 for ($i = 0; $i < $scrapCount; $i++) {
+                    $unitScrapValue = ($i === $scrapCount - 1
+                        ? $deductionPiasters - $unitPiasters * ($scrapCount - 1)
+                        : $unitPiasters) / 100;
+
                     ScrapBatteriesInventory::create([
                         'branch_id'      => $branchId,
                         'invoice_id'     => $invoice->id,
