@@ -63,7 +63,7 @@ class PayrollService implements PayrollServiceInterface
     public function generateMonthlyPayroll(int $branchId, int $year, int $month): Payroll
     {
         return DB::transaction(function () use ($branchId, $year, $month) {
-            $existing = Payroll::where('branch_id', $branchId)->where('year', $year)->where('month', $month)->first();
+            $existing = Payroll::where('branch_id', $branchId)->where('year', $year)->where('month', $month)->lockForUpdate()->first();
             if ($existing && $existing->status === 'disbursed') {
                 throw new Exception("لا يمكن إعادة احتساب مسير رواتب تم صرفه وإغلاقه بالفعل.");
             }
@@ -373,28 +373,34 @@ class PayrollService implements PayrollServiceInterface
      */
     public function approvePayroll(Payroll $payroll, ?int $approvedBy = null, bool $confirmDebtReview = false): bool
     {
-        if ($payroll->status !== 'draft') {
-            throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
-        }
+        return DB::transaction(function () use ($payroll, $approvedBy, $confirmDebtReview) {
+            // The status is read under a lock: the given model may be stale (a second tab), and
+            // approving from it would pull an already disbursed batch back to approved.
+            $locked = Payroll::query()->lockForUpdate()->findOrFail($payroll->id);
 
-        $this->assertPayrollTotalsConsistent($payroll);
+            if ($locked->status !== 'draft') {
+                throw new Exception("المسير معتمد مسبقاً أو تم صرفه.");
+            }
 
-        $hasUnrecoveredDebt = $payroll->items()->where('carried_debt', '>', 0)->exists();
+            $this->assertPayrollTotalsConsistent($locked);
 
-        if ($hasUnrecoveredDebt && !$confirmDebtReview) {
-            throw new Exception("يوجد موظفون لديهم أرصدة رواتب غير مستردة. يجب مراجعة الرصيد المرحّل والتأكيد قبل اعتماد المسير.");
-        }
+            $hasUnrecoveredDebt = $locked->items()->where('carried_debt', '>', 0)->exists();
 
-        $approverId = $approvedBy ?? Auth::id();
+            if ($hasUnrecoveredDebt && !$confirmDebtReview) {
+                throw new Exception("يوجد موظفون لديهم أرصدة رواتب غير مستردة. يجب مراجعة الرصيد المرحّل والتأكيد قبل اعتماد المسير.");
+            }
 
-        if (empty($approverId)) {
-            throw new Exception("يجب تحديد المستخدم المعتمِد — لا يمكن اعتماد مسير الرواتب بدون تسجيل المسؤول.");
-        }
+            $approverId = $approvedBy ?? Auth::id();
 
-        return $payroll->update([
-            'status'      => 'approved',
-            'approved_by' => $approverId,
-        ]);
+            if (empty($approverId)) {
+                throw new Exception("يجب تحديد المستخدم المعتمِد — لا يمكن اعتماد مسير الرواتب بدون تسجيل المسؤول.");
+            }
+
+            return $payroll->update([
+                'status'      => 'approved',
+                'approved_by' => $approverId,
+            ]);
+        });
     }
 
     /**
