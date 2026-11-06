@@ -128,3 +128,51 @@ function collectAll(b) {
     for (const id of b.ids()) seen.push(b.element(id).innerHTML || '');
     return seen.join('\n');
 }
+
+// Settings page, allow_negative_stock: off keeps every limit, on lets the cashier sell ahead of the stock.
+function bootWithSetting(products, allowNegativeStock) {
+    const config = { ...CONFIG, allowNegativeStock, data: { ...CONFIG.data, products } };
+    const b = createBrowser({ globals: { localStorage: { getItem: () => null, setItem() {} } } });
+    b.load('public/assets/js/admin/pos/math.js');
+    b.context.PosMath = b.window.PosMath;
+    b.load('public/assets/js/admin/pos/pos.js');
+    const root = { dataset: { page: 'pos', config: JSON.stringify(config) } };
+    const original = b.document.querySelectorAll;
+    b.document.querySelectorAll = (sel) => (sel === '[data-page]' ? [root] : original(sel));
+    b.Admin.page.boot();
+    return b;
+}
+
+const EMPTY_FILTER = { id: 31, name: 'فلتر', price: 80, stock: 0, is_battery: false, category: 'filters', unit: 'piece', unit_label: 'قطعة', step: 1, allows_fraction: false };
+
+test('selling below zero off: an empty product shows as out of stock and cannot be added', () => {
+    const b = bootWithSetting([EMPTY_FILTER], false);
+    assert.ok(collectAll(b).includes('نفذ من المخزن (0)'));
+    assert.ok(collectAll(b).includes('disabled'), 'add button disabled');
+
+    b.click({ action: 'pos.add', id: '31' });
+    assert.ok(!collectAll(b).includes('data-action="pos.qty"'), 'nothing added to the cart');
+});
+
+test('selling below zero on: an empty product shows as available to order and can be added', () => {
+    const b = bootWithSetting([EMPTY_FILTER], true);
+    assert.ok(collectAll(b).includes('متاح للطلب (0)'));
+    assert.ok(!collectAll(b).includes('نفذ من المخزن'));
+
+    b.click({ action: 'pos.add', id: '31' });
+    const html = collectAll(b);
+    assert.ok(html.includes('data-action="pos.qty"'), 'added to the cart');
+
+    const key = html.match(/data-action="pos.qty" data-key="(\d+)" data-delta="1"/)[1];
+    b.click({ action: 'pos.qty', key, delta: '1' });
+    assert.ok(cartHtml(b).includes('value="2"'), 'a second unit is accepted too');
+});
+
+test('selling below zero on: a typed quantity is not capped at the stock', () => {
+    const b = bootWithSetting([{ ...EMPTY_FILTER, stock: 1 }], true);
+    b.click({ action: 'pos.add', id: '31' });
+    const key = collectAll(b).match(/data-action="pos.qty" data-key="(\d+)" data-delta="1"/)[1];
+
+    typeQty(b, key, '5');
+    assert.ok(cartHtml(b).includes('value="5"'), 'typed quantity kept');
+});

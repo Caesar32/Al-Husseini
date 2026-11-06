@@ -1,6 +1,6 @@
 /**
  * Point of sale (resources/views/admin/sales/pos.blade.php + pos/partials/*), frontend F4.
- * Config (data-config on [data-page="pos"]): { data: {products, customers, scrapTiers}, routes: {store, customerStore, invoiceShow (__ID__), productsSearch} }
+ * Config (data-config on [data-page="pos"]): { data: {products, customers, scrapTiers}, allowNegativeStock, routes: {store, customerStore, invoiceShow (__ID__), productsSearch} }
  *
  * Moved from pos/partials/scripts.blade.php; checkout, cart and payment logic is unchanged.
  * Every inline handler became a data-action (registered at the end); document/window listeners
@@ -23,6 +23,8 @@
         const POS_DATA = config.data;
         const POS_ROUTES = config.routes;
         const WALK_IN = 'WALK_IN';
+        // Settings page, allow_negative_stock: sell ahead of the stock until the physical count.
+        const ALLOW_NEGATIVE_STOCK = config.allowNegativeStock === true;
 
         let currentCategory = 'all';
         let catalogViewMode = 'grid'; // 'grid' or 'list'
@@ -106,6 +108,16 @@
         // What can still be added to the cart: stock minus what the cart already holds.
         function remainingStock(p) {
             return PosMath.fromMilli(PosMath.toMilli(p.stock) - PosMath.toMilli(qtyInCart(p.id)));
+        }
+
+        // A product that cannot be sold at all right now (the add button is disabled).
+        function isUnavailable(p) {
+            return !ALLOW_NEGATIVE_STOCK && p.stock <= 0;
+        }
+
+        // Stock in the catalog is used up by the cart (only a limit when selling below zero is off).
+        function isCartAtLimit(p) {
+            return !ALLOW_NEGATIVE_STOCK && remainingStock(p) <= 0;
         }
 
         function warnStockLimit(p, title) {
@@ -620,7 +632,7 @@
                         <span class="fw-bold fs-12 text-dark text-truncate">${esc(p.name)}</span>
                         <span class="fs-11 text-success fw-bold font-monospace text-nowrap">${esc(fmt(p.price))}</span>
                     </div>
-                    <div class="fs-10 text-muted">${esc(p.brand || '')} ${p.stock <= 0 ? '— نفذ من المخزن' : '— مخزون: ' + esc(stockText(p))}</div>
+                    <div class="fs-10 text-muted">${esc(p.brand || '')} ${p.stock <= 0 ? (ALLOW_NEGATIVE_STOCK ? '— متاح للطلب' : '— نفذ من المخزن') : '— مخزون: ' + esc(stockText(p))}</div>
                 </div>
             `).join('');
             dropdown.classList.remove('d-none');
@@ -671,7 +683,9 @@
         function stockBadgeHtml(p, compact) {
             const cls = compact ? 'fs-11 fw-bold px-2 py-1' : 'pos-stock-badge';
             if (p.stock <= 0) {
-                return `<span class="badge bg-danger text-white ${cls}">نفذ من المخزن (0)</span>`;
+                return ALLOW_NEGATIVE_STOCK
+                    ? `<span class="badge bg-warning-subtle text-warning border border-warning ${cls}">متاح للطلب (${esc(PosMath.formatQty(p.stock))})</span>`
+                    : `<span class="badge bg-danger text-white ${cls}">نفذ من المخزن (${esc(PosMath.formatQty(p.stock))})</span>`;
             }
             if (p.stock <= 5) {
                 return `<span class="badge bg-warning-subtle text-danger border border-warning ${cls}">متبقي ${esc(stockText(p))} فقط!</span>`;
@@ -716,8 +730,8 @@
                 let rows = '';
                 filtered.forEach(p => {
                     const inCart = qtyInCart(p.id);
-                    const isOut = p.stock <= 0;
-                    const isMaxed = remainingStock(p) <= 0;
+                    const isOut = isUnavailable(p);
+                    const isMaxed = isCartAtLimit(p);
                     rows += `
                         <tr data-action="pos.add" data-id="${Number(p.id)}" class="${isOut ? 'opacity-75' : ''}">
                             <td>
@@ -763,8 +777,8 @@
             let html = '';
             filtered.forEach(p => {
                 const inCart = qtyInCart(p.id);
-                const isOut = p.stock <= 0;
-                const isMaxed = remainingStock(p) <= 0;
+                const isOut = isUnavailable(p);
+                const isMaxed = isCartAtLimit(p);
                 const catBadge = categoryBadges[p.category] || 'bg-light text-dark';
 
                 html += `
@@ -805,17 +819,20 @@
             grid.innerHTML = html;
         }
 
-        // ─── Cart (stock limits mirror the server: total per product ≤ current stock) ─
+        // ─── Cart (stock limits mirror the server: total per product ≤ current stock, unless selling below zero is on) ─
         function addToCart(productId) {
             const prod = findProduct(productId);
             if (!prod) return false;
 
             // A fractional product adds one step, or what is left when that is less (0.1 L of a 0.25 step).
             const available = remainingStock(prod);
-            const increment = prod.allows_fraction ? Math.min(qtyStep(prod), available) : 1;
-            if (available <= 0 || PosMath.toMilli(increment) > PosMath.toMilli(available)) {
-                warnStockLimit(prod, 'تنبيه نفاذ المخزون!');
-                return false;
+            let increment = prod.allows_fraction ? qtyStep(prod) : 1;
+            if (!ALLOW_NEGATIVE_STOCK) {
+                increment = prod.allows_fraction ? Math.min(qtyStep(prod), available) : 1;
+                if (available <= 0 || PosMath.toMilli(increment) > PosMath.toMilli(available)) {
+                    warnStockLimit(prod, 'تنبيه نفاذ المخزون!');
+                    return false;
+                }
             }
 
             let focusKey = null;
@@ -891,7 +908,7 @@
                 return;
             }
 
-            if (milli > maxMilli) {
+            if (!ALLOW_NEGATIVE_STOCK && milli > maxMilli) {
                 warnStockLimit(p, 'تجاوز رصيد المخزون!');
                 milli = maxMilli;
             }
@@ -1517,7 +1534,8 @@
             // line.product is the same object reference held in productCache, so this also keeps the
             // cache (and therefore every cached search page referencing this product) in sync.
             cart.forEach(line => {
-                line.product.stock = PosMath.fromMilli(Math.max(0, PosMath.toMilli(line.product.stock) - PosMath.toMilli(line.qty)));
+                const left = PosMath.toMilli(line.product.stock) - PosMath.toMilli(line.qty);
+                line.product.stock = PosMath.fromMilli(ALLOW_NEGATIVE_STOCK ? left : Math.max(0, left));
             });
 
             const invoiceUrl = POS_ROUTES.invoiceShow.replace('__ID__', encodeURIComponent(data.invoice_id));

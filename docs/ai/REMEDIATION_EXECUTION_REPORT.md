@@ -69,7 +69,7 @@ Branch `remediation/2026-10` (from `main` 45b9ccc). The plan is in MASTER_REMEDI
 - 1ec18f5: diagnostics payroll check uses PayrollService::evaluateConsistency().
 - 37e2530: dead mock-store loaders removed from the dashboard script (FE-05). The unused invoice-modal partial was NOT deleted (file deletion needs owner approval).
 - ca3b08c: settings wired where the seeded value equals current behaviour (monthly_working_days, daily_working_hours, overtime_rate_multiplier, warranty_months_default, invoice_prefix); Setting::get no longer caches defaults.
-  - Not wired, owner decision: vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), allow_negative_stock (unsigned stock column on MySQL), scrap_prefix.
+  - Not wired, owner decision: vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), scrap_prefix. allow_negative_stock was wired on 2026-11-07 at the owner's request (POS sales only, default off).
 - ff3df99: migration 000002 made idempotent with a working down() (DB-02). A full rollback and re-migrate of all 10 remediation migrations on isolated SQLite passes (integrity_check ok, foreign_key_check clean).
 - Tests: 275 passed / 1675 assertions.
 
@@ -123,7 +123,7 @@ Plan: `REFACTOR_PLAN.md` + `docs/refactor/00..07`. Base `PHASE0_SHA` = `0fa6996`
 | Replacement warranty | period | full new period (current) or remaining |
 | Supplier credit limit | enforcement | block, warn, or ignore |
 | Returned battery serial | resale | unique index on `warranties.serial_number` includes voided rows |
-| Settings not wired | vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), allow_negative_stock (unsigned stock on MySQL), scrap_prefix | wiring changes behaviour |
+| Settings not wired | vat_percentage (14 vs 0 today), session_timeout_minutes (120 vs 1440 today), scrap_prefix | wiring changes behaviour |
 | Payroll rules | late-penalty rate, zero-net guard when debt absorbs the batch, leave balances (the 26-day norm is now a setting) | policy |
 | Role grants | `purchases.create`, `suppliers.create/edit` are super-admin only | which roles should hold them |
 

@@ -13,14 +13,15 @@ use LogicException;
 
 class StockLedgerService implements StockLedgerInterface
 {
-    public function move(int $productId, int|float|string $delta, StockMovementType $type, Model $source, ?int $userId = null, ?float $unitCost = null): int|float
+    public function move(int $productId, int|float|string $delta, StockMovementType $type, Model $source, ?int $userId = null, ?float $unitCost = null, bool $allowNegative = false): int|float
     {
         $product = $this->lockProduct($productId);
         $deltaMilli = $this->validatedMilli($product, $delta, 'التغيير');
         $currentMilli = Quantity::toMilli($product->current_stock);
         $afterMilli = $currentMilli + $deltaMilli;
 
-        if ($afterMilli < 0) {
+        // Only a decrease can be refused: a return or receipt must still reduce a negative balance.
+        if ($afterMilli < 0 && $deltaMilli < 0 && ! $allowNegative) {
             throw new \DomainException("لا يمكن أن يصبح رصيد الصنف ({$product->name}) سالباً.");
         }
 

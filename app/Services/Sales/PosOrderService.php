@@ -15,6 +15,7 @@ use App\Models\InvoicePayment;
 use App\Models\Product;
 use App\Models\ScrapBatteriesInventory;
 use App\Models\ScrapPricingTier;
+use App\Models\Setting;
 use App\Models\TechnicianCommission;
 use App\Models\Warranty;
 use App\Enums\InvoiceStatus;
@@ -139,6 +140,9 @@ class PosOrderService implements PosOrderServiceInterface
             $subtotal = 0.0;
             $preparedItems = [];
 
+            // Owner setting: sell ahead of the stock while the physical count is pending.
+            $allowNegativeStock = Setting::enabled('allow_negative_stock');
+
             // Stock is checked against the total requested per product: the same product may
             // appear on several lines (each battery unit is its own line with its own serial).
             $requestedPerProduct = [];
@@ -163,7 +167,7 @@ class PosOrderService implements PosOrderServiceInterface
                 $qtyMilli = $product->quantityMilliOrFail($item['quantity'] ?? 1);
                 $qty = Quantity::fromMilli($qtyMilli);
                 $requestedTotalMilli = $requestedPerProduct[$productId];
-                if (Quantity::toMilli($product->current_stock) < $requestedTotalMilli) {
+                if (! $allowNegativeStock && Quantity::toMilli($product->current_stock) < $requestedTotalMilli) {
                     throw new \DomainException(
                         'الرصيد المتاح من الصنف (' . $product->name . ') هو '
                             . Quantity::format($product->current_stock)
@@ -375,7 +379,7 @@ class PosOrderService implements PosOrderServiceInterface
 
                 // Decrement inventory safely
                 $product = $products->get($pItem['product_id']);
-                $stockAfter = $this->stock->move($product->id, -$pItem['quantity'], StockMovementType::Sale, $invoice, $cashierUserId);
+                $stockAfter = $this->stock->move($product->id, -$pItem['quantity'], StockMovementType::Sale, $invoice, $cashierUserId, allowNegative: $allowNegativeStock);
                 $stockAfterMilli = Quantity::toMilli($stockAfter);
                 $stockBeforeDecrementMilli = $stockAfterMilli + Quantity::toMilli($pItem['quantity']);
 

@@ -32,6 +32,12 @@ class Setting extends Model
         return (float) $value;
     }
 
+    /** On/off setting, stored as '1' or '0' by the settings page. Missing means off. */
+    public static function enabled(string $key): bool
+    {
+        return (string) static::get($key, '0') === '1';
+    }
+
     public static function get(string $key, mixed $default = null): mixed
     {
         // Only the stored value is cached; a missing key is not cached (null), so the caller's

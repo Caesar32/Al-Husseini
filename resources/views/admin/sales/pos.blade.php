@@ -10,6 +10,7 @@
 @php
     $pageConfig = [
         'data' => ['products' => $products, 'customers' => $customers, 'scrapTiers' => $scrapTiers],
+        'allowNegativeStock' => \App\Models\Setting::enabled('allow_negative_stock'),
         'routes' => [
             'store' => route('admin.pos.store'),
             'customerStore' => route('admin.customers.store'),

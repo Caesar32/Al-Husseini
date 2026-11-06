@@ -5,6 +5,7 @@ namespace App\Http\Requests\Admin\Pos;
 use App\Models\Customer;
 use App\Models\Product;
 use App\Models\ScrapPricingTier;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\Warranty;
 use App\Rules\ValidQuantityRule;
@@ -101,6 +102,7 @@ class StorePosInvoiceRequest extends FormRequest
                 }
             }
             $stockErrorReported = [];
+            $allowNegativeStock = Setting::enabled('allow_negative_stock');
 
             foreach ($items as $index => $item) {
                 $productId = $item['product_id'] ?? null;
@@ -118,7 +120,7 @@ class StorePosInvoiceRequest extends FormRequest
 
                 // Check stock against the total requested for this product
                 $requestedTotalMilli = $requestedPerProduct[$productId] ?? $qtyMilli;
-                if (Quantity::toMilli($product->current_stock) < $requestedTotalMilli && !isset($stockErrorReported[$productId])) {
+                if (! $allowNegativeStock && Quantity::toMilli($product->current_stock) < $requestedTotalMilli && !isset($stockErrorReported[$productId])) {
                     $stockErrorReported[$productId] = true;
                     $validator->errors()->add(
                         "items.{$index}.quantity",
