@@ -27,8 +27,10 @@
         const ALLOW_NEGATIVE_STOCK = config.allowNegativeStock === true;
 
         let customerSearch = '';
+        let customerComboboxOpen = false;
+        let customerActiveIndex = -1;
         let currentCategory = 'all';
-        let catalogViewMode = 'grid'; // 'grid' or 'list'
+        let catalogViewMode = 'list'; // 'list' (the default) or 'grid'
         // Cart lines: { key, product, qty, serial }. Each battery unit is its own line (qty 1) because
         // every battery carries its own serial number and warranty.
         let cart = [];
@@ -48,6 +50,9 @@
         let currentLastPage = 1;
         let isFetchingCatalog = false;
         let isShowingFeatured = true;   // true until the user searches, picks a category, or scrolls past the shortlist
+        let catalogRequestId = 0;       // only the latest request may paint: a new search overrides a background page
+        let catalogRetryTimer = null;
+        const INFINITE_SCROLL_MARGIN_PX = 300;
         let catalogSearchDebounceTimer = null;
         let scannerSettleTimer = null;
         let lastKeystrokeAt = 0;
@@ -166,6 +171,13 @@
             renderCart();
 
             listen(document, 'keydown', function (e) {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                    e.preventDefault();
+                    const input = document.getElementById('catalogSearchInput');
+                    input?.focus();
+                    input?.select();
+                    return;
+                }
                 if (e.key === 'F2') {
                     e.preventDefault();
                     const input = document.getElementById('catalogSearchInput');
@@ -181,6 +193,21 @@
             });
 
             setupCategoryRibbonScroll();
+
+            const customerInput = document.getElementById('posCustomerSearch');
+            customerInput?.addEventListener('focus', () => {
+                customerInput.select();
+                openCustomerCombobox();
+            });
+            customerInput?.addEventListener('keydown', (event) => onCustomerComboboxKeydown(event));
+
+            listen(document, 'click', (event) => {
+                const target = event.target;
+                if (!customerComboboxOpen || target.closest?.('.pos-customer-combobox')) {
+                    return;
+                }
+                closeCustomerCombobox({ restoreSelection: true });
+            });
         }
 
         // ─── Category ribbon: wheel, drag-to-scroll, and nav arrows ───────────────────
@@ -274,7 +301,163 @@
             return customerSearch === '' || normalizeSearchText(`${customer.name} ${customer.phone ?? ''}`).includes(customerSearch);
         }
 
-        function loadCustomersDropdown(selectedId = null) {
+        function customerCreditTag(customer) {
+            if (customer.credit_balance > 0) {
+                return `[عليه آجل: ${fmt(customer.credit_balance)}]`;
+            }
+            if (customer.credit_balance < 0) {
+                return `[له رصيد: ${fmt(Math.abs(customer.credit_balance))}]`;
+            }
+            return '';
+        }
+
+        function customerLabel(customer) {
+            const phone = customer.phone ? ` — ${customer.phone}` : '';
+            const creditTag = customerCreditTag(customer);
+            return `${customer.name}${phone}${creditTag ? ` ${creditTag}` : ''}`;
+        }
+
+        function customerEntries(selectedId) {
+            const entries = [{
+                id: WALK_IN,
+                label: 'عميل نقدي مباشر بالمعرض / الورشة',
+                baseLabel: 'عميل نقدي مباشر بالمعرض / الورشة',
+                creditTag: '',
+            }];
+            POS_DATA.customers.forEach(customer => {
+                if (!customerMatchesSearch(customer) && String(customer.id) !== String(selectedId)) {
+                    return;
+                }
+                entries.push({
+                    id: String(customer.id),
+                    label: customerLabel(customer),
+                    baseLabel: `${customer.name}${customer.phone ? ` — ${customer.phone}` : ''}`,
+                    creditTag: customerCreditTag(customer),
+                });
+            });
+            return entries;
+        }
+
+        function selectedCustomerLabel() {
+            const selectedId = document.getElementById('posCustomerSelect')?.value || WALK_IN;
+            if (selectedId === WALK_IN) {
+                return 'عميل نقدي مباشر بالمعرض / الورشة';
+            }
+            const customer = findCustomer(selectedId);
+            return customer ? customerLabel(customer) : 'عميل نقدي مباشر بالمعرض / الورشة';
+        }
+
+        function syncCustomerSearchLabel() {
+            const input = document.getElementById('posCustomerSearch');
+            if (input) {
+                input.value = selectedCustomerLabel();
+                input.title = input.value;
+            }
+        }
+
+        function renderCustomerOptions() {
+            const listbox = document.getElementById('posCustomerOptions');
+            const select = document.getElementById('posCustomerSelect');
+            if (!listbox || !select) {
+                return;
+            }
+
+            const entries = customerEntries(select.value || WALK_IN);
+            listbox.innerHTML = entries.map((entry, index) => {
+                const isSelected = String(entry.id) === String(select.value);
+                const isActive = index === customerActiveIndex;
+                const suffix = entry.creditTag ? `<span class="pos-customer-credit-tag">${esc(entry.creditTag)}</span>` : '';
+                return `<div class="pos-customer-option ${isActive ? 'active' : ''}" role="option" aria-selected="${isSelected}" data-action="pos.customer-pick" data-action-on="mousedown" data-id="${esc(entry.id)}">${esc(entry.baseLabel)}${suffix}</div>`;
+            }).join('');
+        }
+
+        function setCustomerComboboxOpen(open) {
+            const input = document.getElementById('posCustomerSearch');
+            const listbox = document.getElementById('posCustomerOptions');
+            customerComboboxOpen = open;
+            if (input) {
+                input.setAttribute('aria-expanded', String(open));
+            }
+            if (listbox) {
+                listbox.classList.toggle('d-none', !open);
+            }
+        }
+
+        function openCustomerCombobox() {
+            customerActiveIndex = -1;
+            renderCustomerOptions();
+            setCustomerComboboxOpen(true);
+        }
+
+        function closeCustomerCombobox({ restoreSelection = false } = {}) {
+            if (restoreSelection) {
+                customerSearch = '';
+                syncCustomerSearchLabel();
+            }
+            customerActiveIndex = -1;
+            setCustomerComboboxOpen(false);
+        }
+
+        function selectCustomer(customerId) {
+            const select = document.getElementById('posCustomerSelect');
+            if (!select) {
+                return;
+            }
+            select.value = String(customerId);
+            customerSearch = '';
+            onCustomerSelected();
+            syncCustomerSearchLabel();
+            closeCustomerCombobox();
+        }
+
+        function onCustomerComboboxKeydown(event) {
+            const select = document.getElementById('posCustomerSelect');
+            if (!select) {
+                return;
+            }
+            const entries = customerEntries(select.value || WALK_IN);
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!customerComboboxOpen) {
+                    openCustomerCombobox();
+                }
+                const currentIndex = customerActiveIndex >= 0
+                    ? customerActiveIndex
+                    : Math.max(0, entries.findIndex(entry => String(entry.id) === String(select.value)));
+                customerActiveIndex = Math.min(entries.length - 1, currentIndex + 1);
+                renderCustomerOptions();
+                return;
+            }
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!customerComboboxOpen) {
+                    openCustomerCombobox();
+                }
+                const currentIndex = customerActiveIndex >= 0
+                    ? customerActiveIndex
+                    : Math.max(0, entries.findIndex(entry => String(entry.id) === String(select.value)));
+                customerActiveIndex = Math.max(0, currentIndex - 1);
+                renderCustomerOptions();
+                return;
+            }
+            if (event.key === 'Enter' && customerComboboxOpen) {
+                event.preventDefault();
+                // Typing a name and pressing Enter takes the first match, not the walk-in row above it.
+                // The current customer stays listed while filtering, so it cannot simply be entries[1].
+                const firstMatch = customerSearch !== '' ? POS_DATA.customers.find(customerMatchesSearch) : null;
+                const chosen = customerActiveIndex >= 0 ? entries[customerActiveIndex] : firstMatch;
+                if (chosen) {
+                    selectCustomer(chosen.id);
+                }
+                return;
+            }
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                closeCustomerCombobox({ restoreSelection: true });
+            }
+        }
+
+        function loadCustomersDropdown(selectedId = null, syncSearchLabel = true) {
             const select = document.getElementById('posCustomerSelect');
             if (!select) return;
 
@@ -285,17 +468,22 @@
                 // The search narrows the list, but never drops the customer already chosen.
                 if (!customerMatchesSearch(c) && String(c.id) !== prevVal) return;
                 const phoneText = c.phone ? ` — ${esc(c.phone)}` : '';
-                const creditTag = c.credit_balance > 0
-                    ? ` [عليه آجل: ${fmt(c.credit_balance)}]`
-                    : (c.credit_balance < 0 ? ` [له رصيد: ${fmt(Math.abs(c.credit_balance))}]` : '');
+                const creditTag = customerCreditTag(c);
                 html += `<option value="${c.id}">${esc(c.name)}${phoneText}${esc(creditTag)}</option>`;
             });
 
             select.innerHTML = html;
-            if (prevVal && select.querySelector(`option[value="${CSS.escape(prevVal)}"]`)) {
+            const canKeepSelection = prevVal === WALK_IN || POS_DATA.customers.some(customer => String(customer.id) === String(prevVal));
+            if (canKeepSelection) {
                 select.value = prevVal;
+            } else {
+                select.value = WALK_IN;
             }
             onCustomerSelected();
+            if (syncSearchLabel) {
+                syncCustomerSearchLabel();
+            }
+            renderCustomerOptions();
         }
 
         function onCustomerSelected() {
@@ -308,7 +496,7 @@
             display.classList.remove('d-none');
 
             if (custId === WALK_IN) {
-                display.textContent = 'عميل نقدي فوري بالمركز';
+                display.textContent = 'بدون مركبة';
                 renderPaymentSection();
                 return;
             }
@@ -372,9 +560,9 @@
                     <div class="col-6 col-sm-6 col-md-6 col-xl-4 col-xxl-3">
                         <div class="pos-product-card pos-skeleton-card">
                             <div class="pos-skeleton-line w-50 mb-2"></div>
-                            <div class="pos-skeleton-line w-100 mb-2" style="height:14px;"></div>
+                            <div class="pos-skeleton-line pos-skeleton-line-tall w-100 mb-2"></div>
                             <div class="pos-skeleton-line w-75 mb-3"></div>
-                            <div class="pos-skeleton-line w-25" style="height:16px;"></div>
+                            <div class="pos-skeleton-line pos-skeleton-line-short w-25"></div>
                         </div>
                     </div>
                 `;
@@ -386,22 +574,33 @@
             document.getElementById('catalogLoadMoreSentinel')?.classList.toggle('d-none', !hasMore);
         }
 
-        function setLoadMoreLoading(loading) {
-            const btn = document.getElementById('catalogLoadMoreBtn');
-            if (!btn) return;
-            btn.disabled = loading;
-            btn.innerHTML = loading
-                ? '<span class="spinner-border spinner-border-sm me-1"></span> جاري التحميل...'
-                : '<i class="ri-add-line me-1"></i> تحميل المزيد';
+        // A quiet line under the list; there is nothing for the cashier to press.
+        function setLoadMoreStatus(status) {
+            const line = document.getElementById('catalogLoadMoreStatus');
+            if (!line) return;
+            const messages = {
+                loading: '<span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span> جاري تحميل المزيد...',
+                error: '<i class="ri-error-warning-line me-1" aria-hidden="true"></i> تعذر تحميل باقي الأصناف، جاري إعادة المحاولة...',
+            };
+            line.innerHTML = messages[status] || '';
+        }
+
+        // Keeps the already-listed products when a later page repeats one.
+        function appendCatalogResults(products) {
+            const shownIds = new Set(currentResults.map(p => p.id));
+            currentResults = currentResults.concat(products.filter(p => !shownIds.has(p.id)));
         }
 
         /**
          * Loads a catalog page. reset=true starts a fresh search/category/page-1 and replaces the grid;
-         * reset=false appends the next page onto what's already shown (infinite scroll / "تحميل المزيد").
+         * reset=false appends the next page onto what's already shown (infinite scroll).
          */
         async function loadCatalogPage({ reset = false } = {}) {
-            if (isFetchingCatalog) return;
+            if (isFetchingCatalog && !reset) return;
+            const requestId = ++catalogRequestId;
             isFetchingCatalog = true;
+            clearTimeout(catalogRetryTimer);
+            let loadedNextPage = false;
 
             if (reset) {
                 currentQuery = (document.getElementById('catalogSearchInput')?.value || '').trim();
@@ -411,18 +610,32 @@
                 toggleLoadMore(false);
             } else {
                 currentPage += 1;
-                setLoadMoreLoading(true);
+                setLoadMoreStatus('loading');
             }
 
             try {
                 const json = await fetchCatalogPage({ query: currentQuery, category: currentCategory, page: currentPage, perPage: 36 });
+                if (requestId !== catalogRequestId) return;
                 currentLastPage = json.meta.last_page;
-                currentResults = reset ? json.data : currentResults.concat(json.data);
+                if (reset) {
+                    currentResults = json.data;
+                } else {
+                    appendCatalogResults(json.data);
+                }
                 renderCatalog();
                 toggleLoadMore(json.meta.has_more);
+                showSuggestionsIfStillTyping(reset, json.data);
+                setLoadMoreStatus('');
+                loadedNextPage = json.meta.has_more;
             } catch (e) {
+                if (requestId !== catalogRequestId) return;
                 console.error('POS catalog fetch error:', e);
-                if (reset) {
+                if (!reset) {
+                    // The failed page was not shown: step back so it is requested again, not skipped.
+                    currentPage -= 1;
+                    setLoadMoreStatus('error');
+                    catalogRetryTimer = setTimeout(loadMoreIfSentinelInView, 5000);
+                } else {
                     document.getElementById('posCatalogGrid').innerHTML = `
                         <div class="col-12 text-center py-5 text-danger fs-13">
                             <i class="ri-error-warning-line fs-24 d-block mb-1"></i>
@@ -431,21 +644,40 @@
                     `;
                 }
             } finally {
-                isFetchingCatalog = false;
-                setLoadMoreLoading(false);
+                if (requestId === catalogRequestId) {
+                    isFetchingCatalog = false;
+                }
+            }
+
+            // The observer only fires when the sentinel enters view: a short page can leave it there.
+            if (loadedNextPage && requestId === catalogRequestId) {
+                loadMoreIfSentinelInView();
             }
         }
 
         function loadNextCatalogPage() {
+            if (isFetchingCatalog) return;
             if (isShowingFeatured) {
-                // The initial screen is a curated "fast movers" shortlist ordered by popularity, not
-                // page 1 of the real catalog — scrolling past it switches to the real, consistently
-                // ordered, paginated catalog instead of appending onto an unrelated set.
-                loadCatalogPage({ reset: true });
+                // The first screen is a "fast movers" shortlist, not page 1 of the catalog. Scrolling
+                // past it continues into the full catalog under the same rows, without a jump.
+                isShowingFeatured = false;
+                currentPage = 0;
+                loadCatalogPage({ reset: false });
                 return;
             }
-            if (isFetchingCatalog || currentPage >= currentLastPage) return;
+            if (currentPage >= currentLastPage) return;
             loadCatalogPage({ reset: false });
+        }
+
+        function loadMoreIfSentinelInView() {
+            const sentinel = document.getElementById('catalogLoadMoreSentinel');
+            const root = document.getElementById('posCatalogScrollContainer');
+            const sentinelBox = sentinel?.getBoundingClientRect?.();
+            const rootBox = root?.getBoundingClientRect?.();
+            if (!sentinelBox || !rootBox || sentinel.classList.contains('d-none')) return;
+            if (sentinelBox.top <= rootBox.bottom + INFINITE_SCROLL_MARGIN_PX) {
+                loadNextCatalogPage();
+            }
         }
 
         function setupInfiniteScroll() {
@@ -454,8 +686,10 @@
             if (!sentinel || !root || !('IntersectionObserver' in window)) return;
             catalogLoadMoreObserver = new IntersectionObserver((entries) => {
                 if (entries[0]?.isIntersecting) loadNextCatalogPage();
-            }, { root, rootMargin: '200px' });
+            }, { root, rootMargin: `${INFINITE_SCROLL_MARGIN_PX}px` });
             catalogLoadMoreObserver.observe(sentinel);
+            // The sentinel starts hidden, and a hidden element never intersects.
+            toggleLoadMore(isShowingFeatured);
         }
 
         function setViewMode(mode) {
@@ -485,6 +719,7 @@
                 input.value = '';
                 input.focus();
                 keystrokeIntervals = [];
+                hideQuickAddResults();
                 loadCatalogPage({ reset: true });
             }
         }
@@ -507,6 +742,8 @@
             clearTimeout(scannerSettleTimer);
 
             const value = input.value.trim();
+            input.closest('.pos-product-search-wrap')?.classList.toggle('has-value', value !== '');
+            hideQuickAddResults();
             if (!value) {
                 loadCatalogPage({ reset: true });
                 return;
@@ -535,7 +772,11 @@
                         playBeep(1050, 0.1);
                         showBarcodeNotification(prod);
                         const input = document.getElementById('catalogSearchInput');
-                        if (input) input.value = '';
+                        if (input) {
+                            input.value = '';
+                            input.closest('.pos-product-search-wrap')?.classList.remove('has-value');
+                        }
+                        hideQuickAddResults();
                         keystrokeIntervals = [];
                     }
                     return;
@@ -605,30 +846,23 @@
             setTimeout(() => toast.remove(), 1800);
         }
 
-        // ─── Quick-add bar: lightweight async autocomplete (replaces the old 7,340-option <select>) ───
-        let quickAddDebounceTimer = null;
+        // ─── Catalog-search suggestions: reuse the debounced catalog response; no second request. ───
         let quickAddResults = [];
         let quickAddActiveIndex = -1;
 
-        function onQuickAddInput() {
-            clearTimeout(quickAddDebounceTimer);
-            const value = (document.getElementById('quickAddSearchInput')?.value || '').trim();
-            if (!value) {
-                hideQuickAddResults();
-                return;
+        // A category click, a cleared box or a reply arriving after the cashier moved on opens nothing.
+        function showSuggestionsIfStillTyping(isNewSearch, products) {
+            const input = document.getElementById('catalogSearchInput');
+            const typed = (input?.value || '').trim();
+            if (isNewSearch && typed !== '' && typed === currentQuery && document.activeElement === input) {
+                showQuickAddResults(products);
             }
-            quickAddDebounceTimer = setTimeout(() => runQuickAddSearch(value), 250);
         }
 
-        async function runQuickAddSearch(value) {
-            try {
-                const json = await fetchCatalogPage({ query: value, perPage: 8 });
-                quickAddResults = json.data;
-                quickAddActiveIndex = -1;
-                renderQuickAddResults();
-            } catch (e) {
-                hideQuickAddResults();
-            }
+        function showQuickAddResults(products) {
+            quickAddResults = products.slice(0, 8);
+            quickAddActiveIndex = -1;
+            renderQuickAddResults();
         }
 
         function renderQuickAddResults() {
@@ -654,9 +888,14 @@
         }
 
         function selectQuickAddResult(productId) {
-            addToCart(productId);
-            const input = document.getElementById('quickAddSearchInput');
-            if (input) input.value = '';
+            if (!addToCart(productId)) {
+                return;
+            }
+            const input = document.getElementById('catalogSearchInput');
+            if (input) {
+                input.value = '';
+                input.closest('.pos-product-search-wrap')?.classList.remove('has-value');
+            }
             hideQuickAddResults();
             input?.focus();
         }
@@ -671,26 +910,31 @@
             quickAddActiveIndex = -1;
         }
 
-        function onQuickAddBlur() {
-            // Delayed so a click on a result (onmousedown fires before blur) still registers.
+        function onCatalogSearchBlur() {
+            // Delayed so a result's mousedown action runs before the list closes.
             setTimeout(hideQuickAddResults, 150);
         }
 
-        function onQuickAddKeydown(e) {
-            if (quickAddResults.length === 0) return;
+        function onCatalogSearchKeydown(e) {
             if (e.key === 'ArrowDown') {
                 e.preventDefault();
+                if (quickAddResults.length === 0) return;
                 quickAddActiveIndex = Math.min(quickAddResults.length - 1, quickAddActiveIndex + 1);
                 renderQuickAddResults();
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
+                if (quickAddResults.length === 0) return;
                 quickAddActiveIndex = Math.max(0, quickAddActiveIndex - 1);
                 renderQuickAddResults();
             } else if (e.key === 'Enter') {
-                e.preventDefault();
-                const target = quickAddActiveIndex >= 0 ? quickAddResults[quickAddActiveIndex] : quickAddResults[0];
-                if (target) selectQuickAddResult(target.id);
+                if (quickAddActiveIndex >= 0) {
+                    e.preventDefault();
+                    selectQuickAddResult(quickAddResults[quickAddActiveIndex].id);
+                    return;
+                }
+                handleBarcodeEnter(e);
             } else if (e.key === 'Escape') {
+                e.preventDefault();
                 hideQuickAddResults();
             }
         }
@@ -770,7 +1014,7 @@
 
                 grid.innerHTML = `
                     <div class="col-12">
-                        <div class="table-responsive rounded border shadow-sm" style="background-color: var(--vz-card-bg, #ffffff);">
+                        <div class="table-responsive rounded border shadow-sm pos-catalog-list-shell">
                             <table class="table table-hover pos-catalog-table align-middle mb-0">
                                 <thead>
                                     <tr>
@@ -778,7 +1022,7 @@
                                         <th>النوع / السعة</th>
                                         <th class="text-center">المخزن</th>
                                         <th class="text-end">السعر قطاعي</th>
-                                        <th class="text-center" style="width: 100px;">إضافة للسلة</th>
+                                        <th class="text-center pos-catalog-add-column">إضافة للسلة</th>
                                     </tr>
                                 </thead>
                                 <tbody>${rows}</tbody>
@@ -807,7 +1051,7 @@
                                 </div>
                                 <h6 class="fw-extrabold text-dark fs-12 fs-sm-13 mb-1 mb-sm-2 lh-base text-truncate" title="${esc(p.name)}">${esc(p.name)}</h6>
                                 <div class="d-flex justify-content-between align-items-center mb-1 mb-sm-2 bg-light p-1 px-1 px-sm-2 rounded border">
-                                    <span class="text-secondary font-monospace fs-9 fs-sm-10 text-truncate" style="max-width: 50%;" title="باركود الصنف">
+                                    <span class="text-secondary font-monospace fs-9 fs-sm-10 text-truncate pos-catalog-sku" title="باركود الصنف">
                                         <i class="ri-barcode-line text-dark me-1"></i>${esc(p.barcode || p.sku || 'بدون')}
                                     </span>
                                     ${stockBadgeHtml(p, false)}
@@ -991,13 +1235,13 @@
                                 ${p.is_battery ? '' : `
                                 <div class="btn-group btn-group-sm border rounded cart-qty-group">
                                     <button type="button" class="btn btn-sm btn-light py-0 px-1 fs-11 text-muted" data-action="pos.qty" data-key="${line.key}" data-delta="-1" title="تقليل">-</button>
-                                    <input type="number" class="form-control form-control-sm border-0 rounded-0 font-monospace fw-bold fs-11 px-1 py-0 text-center bg-white"
-                                           style="width: 62px;" inputmode="decimal" aria-label="الكمية (${esc(unitLabel(p))})"
+                                    <input type="number" class="form-control form-control-sm border-0 rounded-0 font-monospace fw-bold fs-11 px-1 py-0 text-center bg-white cart-qty-input"
+                                           inputmode="decimal" aria-label="الكمية (${esc(unitLabel(p))})"
                                            value="${esc(qtyText)}" min="${p.allows_fraction ? '0.001' : '1'}" step="${p.allows_fraction ? 'any' : '1'}"
                                            data-action="pos.qty-input" data-action-on="change" data-key="${line.key}">
                                     <button type="button" class="btn btn-sm btn-light py-0 px-1 fs-11 text-muted" data-action="pos.qty" data-key="${line.key}" data-delta="1" title="زيادة">+</button>
                                 </div>`}
-                                <span class="font-monospace fw-bold text-success fs-12 ms-1 text-end" style="min-width: 65px;">${esc(fmt(lineTotal))}</span>
+                                <span class="font-monospace fw-bold text-success fs-12 ms-1 text-end cart-line-total">${esc(fmt(lineTotal))}</span>
                                 <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-1" data-action="pos.remove" data-key="${line.key}" title="حذف">
                                     <i class="ri-delete-bin-line fs-13"></i>
                                 </button>
@@ -1584,17 +1828,27 @@
             resetPaymentSection();
             renderCart();
             renderCatalog();
-            document.getElementById('quickAddSearchInput').value = '';
+            const catalogSearchInput = document.getElementById('catalogSearchInput');
+            if (catalogSearchInput) {
+                catalogSearchInput.value = '';
+                catalogSearchInput.closest('.pos-product-search-wrap')?.classList.remove('has-value');
+            }
             hideQuickAddResults();
         }
 
         Admin.actions.registerAll({
             // header bar
-            'pos.customer': () => onCustomerSelected(),
+            'pos.customer': () => {
+                onCustomerSelected();
+                syncCustomerSearchLabel();
+            },
             'pos.customer-search': (input) => {
                 customerSearch = normalizeSearchText(input.value);
-                loadCustomersDropdown();
+                customerActiveIndex = -1;
+                loadCustomersDropdown(null, false);
+                setCustomerComboboxOpen(true);
             },
+            'pos.customer-pick': (el) => selectCustomer(el.dataset.id),
             'pos.sync-tech': (select) => {
                 const other = document.getElementById(select.dataset.target);
                 if (other) other.value = select.value;
@@ -1605,9 +1859,7 @@
             'pos.view': (el) => setViewMode(el.dataset.mode),
             'pos.ribbon': (el) => scrollCategoryRibbon(Number(el.dataset.direction)),
             'pos.category': (el) => filterByCategory(el.dataset.category),
-            'pos.quick-add': () => onQuickAddInput(),
             'pos.quick-pick': (el) => selectQuickAddResult(Number(el.dataset.id)),
-            'pos.load-more': () => loadNextCatalogPage(),
             // catalog cards / rows
             'pos.add': (el) => addToCart(Number(el.dataset.id)),
             'pos.noop': () => {},
@@ -1633,9 +1885,8 @@
         });
 
         // Second listeners on elements whose primary event is a data-action.
-        document.getElementById('catalogSearchInput')?.addEventListener('keydown', (e) => handleBarcodeEnter(e));
-        document.getElementById('quickAddSearchInput')?.addEventListener('keydown', (e) => onQuickAddKeydown(e));
-        document.getElementById('quickAddSearchInput')?.addEventListener('blur', () => onQuickAddBlur());
+        document.getElementById('catalogSearchInput')?.addEventListener('keydown', (e) => onCatalogSearchKeydown(e));
+        document.getElementById('catalogSearchInput')?.addEventListener('blur', () => onCatalogSearchBlur());
         document.getElementById('paidNowInput')?.addEventListener('keydown', (e) => blockNonNumericKeys(e));
         document.getElementById('cashReceivedInput')?.addEventListener('keydown', (e) => blockNonNumericKeys(e));
 
@@ -1643,7 +1894,7 @@
             catalogLoadMoreObserver?.disconnect();
             clearTimeout(catalogSearchDebounceTimer);
             clearTimeout(scannerSettleTimer);
-            clearTimeout(quickAddDebounceTimer);
+            clearTimeout(catalogRetryTimer);
         });
 
         init();

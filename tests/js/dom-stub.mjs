@@ -11,14 +11,34 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
     function element(id) {
         if (!elements[id]) {
             const handlers = {};
+            const attributes = {};
+            const classes = new Set();
             elements[id] = {
                 id, value: '', textContent: '', innerHTML: '', dataset: {}, style: {}, options: [],
-                setAttribute() {}, getAttribute: () => null,
-                classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+                setAttribute: (name, value) => { attributes[name] = String(value); },
+                getAttribute: (name) => attributes[name] || null,
+                classList: {
+                    add: (...names) => names.forEach((name) => classes.add(name)),
+                    remove: (...names) => names.forEach((name) => classes.delete(name)),
+                    toggle: (name, force) => {
+                        const shouldAdd = force === undefined ? !classes.has(name) : force;
+                        if (shouldAdd) classes.add(name);
+                        else classes.delete(name);
+                        return shouldAdd;
+                    },
+                    contains: (name) => classes.has(name),
+                },
                 addEventListener: (type, fn) => { (handlers[type] ||= []).push(fn); },
                 fire: (type, extra = {}) => (handlers[type] || []).forEach((fn) => fn({ type, preventDefault() {}, ...extra })),
                 querySelector: () => null,
                 querySelectorAll: () => [],
+                closest: () => null,
+                focus() {
+                    this.focused = true;
+                    document.activeElement = this;
+                },
+                select() { this.selected = true; },
+                remove() {},
             };
         }
         return elements[id];
@@ -30,6 +50,8 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
         removeEventListener: (type, fn) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); },
         listeners,
         getElementById: element,
+        createElement: () => element(`generated-${Object.keys(elements).length}`),
+        body: { appendChild() {} },
         querySelector: (sel) => (sel.startsWith('meta[name="csrf-token"]') ? { getAttribute: () => 'csrf-test' } : null),
         querySelectorAll: () => [],
     };
@@ -44,6 +66,7 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
 
     const context = vm.createContext({
         window, document, console, URLSearchParams, Promise, JSON, Math, Date, String, Number, Object, Array,
+        performance: { now: () => Date.now() },
         CSS: { escape: (s) => s },
         setTimeout: (fn) => { fn(); return 0; },
         setInterval: (fn, ms) => { calls.intervals.push(ms); return calls.intervals.length; },

@@ -1,63 +1,48 @@
-<!-- 2. Search Bar, Category Ribbon & Instant Quick Add Bar -->
-<div class="p-2 px-3 border-bottom bg-body">
-    <!-- Row 1: High-Speed Full Search Bar + View Toggle -->
-    <div class="d-flex align-items-center gap-2 mb-2">
-        <div class="input-group input-group-sm flex-grow-1">
-            <span class="input-group-text bg-light text-primary border-end-0">
-                <i class="ri-barcode-box-line me-1"></i> <i class="ri-search-line"></i>
+<!-- Product search and catalog navigation -->
+<div class="pos-catalog-navigation">
+    <div class="pos-product-search-row">
+        <div class="pos-product-search-wrap">
+            <i class="ri-barcode-box-line pos-product-search-icon" aria-hidden="true"></i>
+            <input type="text" class="form-control" id="catalogSearchInput" placeholder="امسح الباركود مباشرة، أو اكتب اسم الصنف/الماركة..." autocomplete="off" aria-label="البحث عن صنف أو مسح الباركود" data-action="pos.search">
+            <span class="pos-search-shortcuts" aria-hidden="true">
+                <kbd>F2</kbd><span>للتركيز</span>
+                <kbd>Enter</kbd><span>للإضافة</span>
+                <kbd>F4</kbd><span>لتفريغ الفاتورة</span>
             </span>
-            <input type="text" class="form-control fw-bold border-start-0 border-end-0" id="catalogSearchInput" placeholder="ابحث باسم الصنف، الماركة، أو امسح الباركود 📷 (Enter للإضافة)..." data-action="pos.search">
-            <button class="btn btn-light border border-start-0 text-muted" type="button" data-action="pos.clear-search" title="مسح البحث">
-                <i class="ri-close-line"></i>
-            </button>
+            <div id="quickAddResultsDropdown" class="d-none" role="listbox" aria-label="اقتراحات الأصناف"></div>
         </div>
-        <!-- View Mode Toggle: Grid vs Table List -->
-        <div class="btn-group btn-group-sm shrink-0" role="group">
-            <button type="button" class="btn btn-light border active px-2" id="viewModeGridBtn" data-action="pos.view" data-mode="grid" title="عرض بطاقات كروت">
-                <i class="ri-grid-fill"></i>
+        <button class="btn btn-light border pos-search-clear-button" type="button" data-action="pos.clear-search" title="مسح البحث" aria-label="مسح البحث">
+            <i class="ri-close-line" aria-hidden="true"></i>
+        </button>
+        <div class="btn-group pos-view-toggle" role="group" aria-label="طريقة عرض الأصناف">
+            <button type="button" class="btn btn-light border" id="viewModeGridBtn" data-action="pos.view" data-mode="grid" title="عرض بطاقات">
+                <i class="ri-grid-fill" aria-hidden="true"></i>
             </button>
-            <button type="button" class="btn btn-light border px-2" id="viewModeListBtn" data-action="pos.view" data-mode="list" title="عرض جدول مدمج سريع">
-                <i class="ri-list-check"></i>
+            <button type="button" class="btn btn-primary border active" id="viewModeListBtn" data-action="pos.view" data-mode="list" title="عرض قائمة">
+                <i class="ri-list-check" aria-hidden="true"></i>
             </button>
         </div>
     </div>
 
-    <!-- Row 2: Fluid Horizontal Scrollable Category Ribbon (server-driven: real categories + cached counts) -->
-    <div class="pos-category-nav-row mb-2">
+    <div class="pos-category-nav-row">
         <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" data-action="pos.ribbon" data-direction="-1" title="للخلف" aria-label="تمرير القائمة للخلف">
             <i class="ri-arrow-left-s-line"></i>
         </button>
         <div class="pos-category-scroll-container" id="categoryTabsContainer">
-            <button type="button" class="btn btn-sm btn-primary pos-category-pill text-nowrap" id="cat-tab-all" data-slug="all" data-action="pos.category" data-category="all">
-                الكل (<span id="pillCount-all">{{ $categories->sum('count') }}</span>)
+            <button type="button" class="btn btn-primary pos-category-pill" id="cat-tab-all" data-slug="all" data-action="pos.category" data-category="all">
+                الكل <span class="pos-pill-count">(<span id="pillCount-all">{{ $categories->sum('count') }}</span>)</span>
             </button>
             @foreach ($categories as $cat)
-                <button type="button" class="btn btn-sm btn-soft-secondary pos-category-pill text-nowrap" id="cat-tab-{{ $cat['slug'] }}" data-slug="{{ $cat['slug'] }}" data-action="pos.category" data-category="{{ $cat['slug'] }}">
-                    {{ $cat['icon'] }} {{ $cat['name'] }} (<span id="pillCount-{{ $cat['slug'] }}">{{ $cat['count'] }}</span>)
+                <button type="button" class="btn btn-soft-secondary pos-category-pill" id="cat-tab-{{ $cat['slug'] }}" data-slug="{{ $cat['slug'] }}" data-action="pos.category" data-category="{{ $cat['slug'] }}">
+                    @if ($cat['icon'])
+                        <span aria-hidden="true">{{ $cat['icon'] }}</span>
+                    @endif
+                    {{ $cat['name'] }} <span class="pos-pill-count">(<span id="pillCount-{{ $cat['slug'] }}">{{ $cat['count'] }}</span>)</span>
                 </button>
             @endforeach
         </div>
         <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" data-action="pos.ribbon" data-direction="1" title="للأمام" aria-label="تمرير القائمة للأمام">
             <i class="ri-arrow-right-s-line"></i>
         </button>
-    </div>
-
-    <!-- Row 3: Instant Quick-Add Bar (One-Place Rapid Entry) — lightweight async autocomplete, not a 7,340-option <select> -->
-    <div class="p-2 bg-light rounded border d-flex flex-wrap align-items-center justify-content-between gap-2">
-        <div class="d-flex align-items-center gap-2 flex-grow-1 position-relative" style="min-width: 240px;">
-            <span class="fs-11 fw-bold text-dark text-nowrap"><i class="ri-flashlight-line text-warning me-1"></i>إضافة سريعة:</span>
-            <div class="flex-grow-1 position-relative">
-                <input type="text" class="form-control form-select-sm fw-bold fs-11" id="quickAddSearchInput" autocomplete="off"
-                       placeholder="-- اكتب للبحث السريع أو امسح الباركود لإضافة صنف مباشرة --"
-                       data-action="pos.quick-add">
-                <div id="quickAddResultsDropdown" class="d-none"></div>
-            </div>
-        </div>
-        <div class="d-none d-sm-flex align-items-center gap-1 text-muted fs-11 shrink-0">
-            <span>اختصار:</span>
-            <kbd class="bg-dark text-white px-1 rounded">F2</kbd> <span class="fs-10">بحث</span>
-            <span class="mx-1 text-black-50">|</span>
-            <kbd class="bg-dark text-white px-1 rounded">F4</kbd> <span class="fs-10">تفريغ</span>
-        </div>
     </div>
 </div>

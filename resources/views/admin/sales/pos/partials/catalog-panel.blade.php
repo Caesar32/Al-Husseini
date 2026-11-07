@@ -2,7 +2,7 @@
 <!-- RIGHT (RTL): Products & Services Catalog Panel (65% width)     -->
 <!-- ============================================================== -->
 <div class="col-xl-8 col-lg-7 pos-catalog-panel">
-    <div class="card shadow-sm border-0 h-100 d-flex flex-column overflow-hidden mb-0">
+    <div class="card shadow-sm border-0 h-100 d-flex flex-column pos-catalog-card mb-0">
         
         <!-- 1. Customer & Vehicle Header -->
         @include('admin.sales.pos.partials.header-bar')
@@ -15,11 +15,9 @@
             <div class="row g-2" id="posCatalogGrid">
                 <!-- Rendered dynamically by JavaScript -->
             </div>
-            <!-- Infinite scroll trigger: observed by IntersectionObserver; also a manual fallback button -->
-            <div id="catalogLoadMoreSentinel" class="text-center py-3 d-none">
-                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="catalogLoadMoreBtn" data-action="pos.load-more">
-                    <i class="ri-add-line me-1"></i> تحميل المزيد
-                </button>
+            <!-- Infinite scroll trigger, observed by IntersectionObserver: a status line, no button -->
+            <div id="catalogLoadMoreSentinel" class="pos-catalog-sentinel d-none">
+                <span id="catalogLoadMoreStatus" role="status"></span>
             </div>
         </div>
 

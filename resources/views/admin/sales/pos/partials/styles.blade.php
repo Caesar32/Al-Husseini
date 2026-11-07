@@ -1,4 +1,385 @@
 <style>
+    :root {
+        --pos-surface: var(--vz-card-bg, var(--vz-white, #fff));
+        --pos-muted: var(--vz-secondary-color, #878a99);
+        --pos-border: var(--vz-border-color, #e9ebec);
+        --pos-focus-ring: color-mix(in srgb, var(--vz-primary, #405189) 28%, transparent);
+        --pos-control-height: 36px;
+    }
+
+    body:has([data-page="pos"]) .app-search {
+        display: none !important;
+    }
+
+    .pos-catalog-panel {
+        container-type: inline-size;
+        min-width: 0;
+    }
+
+    .pos-catalog-card {
+        overflow: visible;
+    }
+
+    .card-header.pos-transaction-context {
+        position: relative;
+        z-index: 5;
+        padding: 5px 12px;
+        background: var(--pos-surface);
+        border-color: var(--pos-border);
+    }
+
+    .pos-transaction-grid {
+        display: grid;
+        grid-template-columns: minmax(420px, 2.4fr) minmax(150px, .7fr) minmax(170px, .8fr) auto;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+    }
+
+    .pos-context-field {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        min-width: 0;
+    }
+
+    /* This field is a <label>: Bootstrap's bottom margin would add 8px to the whole bar. */
+    .pos-technician-field {
+        margin-bottom: 0;
+    }
+
+    .pos-context-label {
+        color: var(--pos-muted);
+        flex: 0 0 auto;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .pos-context-label i {
+        color: var(--vz-primary);
+    }
+
+    .pos-customer-combobox {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .pos-customer-combobox .form-control,
+    .pos-technician-field .form-select,
+    .pos-vehicle-field .form-select {
+        min-height: var(--pos-control-height);
+        font-size: 12px;
+    }
+
+    .pos-source-select {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .pos-new-customer-button {
+        min-height: var(--pos-control-height);
+        height: var(--pos-control-height);
+        /* The layout pads every .btn more strongly than a page rule can, which made this bar 55px tall. */
+        padding-block: 0 !important;
+        padding-inline: 9px !important;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .pos-customer-options,
+    #quickAddResultsDropdown {
+        position: absolute;
+        right: 0;
+        left: 0;
+        z-index: 1060;
+        max-height: 300px;
+        overflow-y: auto;
+        background: var(--pos-surface);
+        border: 1px solid var(--pos-border);
+        border-radius: 8px;
+        box-shadow: var(--vz-box-shadow, 0 10px 28px rgba(0, 0, 0, .14));
+    }
+
+    .pos-customer-options {
+        top: calc(100% + 4px);
+    }
+
+    .pos-customer-option {
+        display: flex;
+        align-items: baseline;
+        gap: 6px;
+        width: 100%;
+        padding: 8px 10px;
+        color: var(--vz-body-color);
+        cursor: pointer;
+        text-align: right;
+    }
+
+    .pos-customer-option:hover,
+    .pos-customer-option.active,
+    .pos-customer-option[aria-selected="true"] {
+        background: var(--vz-light, #f3f6f9);
+    }
+
+    .pos-customer-credit-tag {
+        color: var(--pos-muted);
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .pos-vehicle-field {
+        min-height: var(--pos-control-height);
+        padding-inline: 8px;
+        background: var(--vz-light, #f3f6f9);
+        border: 1px solid var(--pos-border);
+        border-radius: var(--vz-border-radius, 4px);
+    }
+
+    .pos-vehicle-display {
+        overflow: hidden;
+        color: var(--pos-muted);
+        font-size: 12px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pos-required-marker {
+        color: var(--vz-danger);
+    }
+
+    .pos-context-meta {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        justify-content: flex-end;
+        padding-inline-end: 6px;
+        white-space: nowrap;
+    }
+
+    .pos-context-meta .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-height: 28px;
+    }
+
+    /* A long cashier name must not push the badges out of the panel. */
+    .pos-cashier-name {
+        max-width: 130px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .pos-catalog-navigation {
+        position: relative;
+        z-index: 4;
+        display: grid;
+        /* minmax(0, ...): an auto column grows to the width of every category pill and overflows the cart. */
+        grid-template-columns: minmax(0, 1fr);
+        gap: 7px;
+        padding: 8px 12px;
+        background: var(--pos-surface);
+        border-bottom: 1px solid var(--pos-border);
+    }
+
+    .pos-product-search-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .pos-product-search-wrap {
+        position: relative;
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .pos-product-search-wrap .form-control {
+        min-height: 44px;
+        padding-inline: 38px 262px;
+        font-weight: 700;
+    }
+
+    .pos-product-search-icon {
+        position: absolute;
+        top: 50%;
+        right: 13px;
+        z-index: 1;
+        color: var(--vz-primary);
+        pointer-events: none;
+        transform: translateY(-50%);
+    }
+
+    .pos-search-shortcuts {
+        position: absolute;
+        top: 50%;
+        left: 10px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        color: var(--pos-muted);
+        font-size: 10px;
+        pointer-events: none;
+        transform: translateY(-50%);
+        white-space: nowrap;
+    }
+
+    .pos-search-shortcuts kbd {
+        color: var(--vz-body-color);
+        background: var(--vz-light, #f3f6f9);
+        border: 1px solid var(--pos-border);
+        box-shadow: none;
+    }
+
+    .pos-product-search-wrap:focus-within .pos-search-shortcuts,
+    .pos-product-search-wrap.has-value .pos-search-shortcuts {
+        display: none;
+    }
+
+    .pos-search-clear-button,
+    .pos-view-toggle .btn,
+    .pos-category-nav-arrow {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: var(--pos-control-height);
+        min-height: var(--pos-control-height);
+    }
+
+    #quickAddResultsDropdown {
+        top: calc(100% + 4px);
+    }
+
+    .pos-catalog-panel :is(input, select, button):focus-visible,
+    .pos-customer-option:focus-visible {
+        outline: 0;
+        box-shadow: 0 0 0 3px var(--pos-focus-ring);
+    }
+
+    /* The one-row bar needs about 990px with the session badges; below that they would leave the panel. */
+    @container (max-width: 1040px) {
+        /* The customer takes a whole row so its name is never cut; vehicle and technician share the next. */
+        .pos-transaction-grid {
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        }
+
+        .pos-customer-field {
+            grid-column: 1 / -1;
+        }
+
+        .pos-context-meta {
+            display: none;
+        }
+    }
+
+    @container (max-width: 900px) {
+        /* Keys only: the words would run into the placeholder at this width. */
+        .pos-search-shortcuts span {
+            display: none;
+        }
+
+        .pos-product-search-wrap .form-control {
+            padding-inline: 38px 126px;
+        }
+    }
+
+    @container (max-width: 600px) {
+        .pos-transaction-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .pos-context-field {
+            width: 100%;
+        }
+
+        /* Full-width customer and search boxes on a phone; the buttons move to the next row. */
+        .pos-customer-field,
+        .pos-product-search-row {
+            flex-wrap: wrap;
+        }
+
+        .pos-customer-field .pos-context-label {
+            display: none;
+        }
+
+        .pos-customer-combobox,
+        .pos-product-search-wrap {
+            flex: 1 1 100%;
+        }
+
+        .pos-new-customer-button {
+            flex: 1 1 100%;
+            justify-content: center;
+        }
+
+        .pos-product-search-row {
+            align-items: stretch;
+        }
+
+        .pos-search-clear-button {
+            flex: 1 1 auto;
+        }
+
+        .pos-search-shortcuts {
+            display: none;
+        }
+
+        .pos-product-search-wrap .form-control {
+            padding-left: 38px;
+        }
+    }
+
+    [data-bs-theme="dark"] .pos-search-clear-button,
+    [data-bs-theme="dark"] .pos-view-toggle .btn:not(.active) {
+        color: var(--vz-body-color);
+        background: var(--pos-surface);
+    }
+
+    .pos-pill-count {
+        white-space: nowrap;
+    }
+
+    /* Needs a height to be observed; stays almost invisible until there is a status to show. */
+    .pos-catalog-sentinel {
+        min-height: 12px;
+        padding-block: 4px;
+        color: var(--pos-muted);
+        font-size: 12px;
+        text-align: center;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+        .pos-customer-option,
+        .pos-category-pill,
+        .pos-search-clear-button,
+        .pos-view-toggle .btn {
+            transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease, color 120ms ease;
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .pos-catalog-panel .pos-product-card,
+        .pos-catalog-panel .pos-category-pill,
+        .pos-catalog-panel .pos-customer-option,
+        .pos-catalog-panel .pos-skeleton-line {
+            animation: none;
+            transition: none;
+        }
+
+        .pos-category-scroll-container {
+            scroll-behavior: auto;
+        }
+    }
+
     /* Compact cart controls (cart-panel.blade.php) */
     .input-group.pos-scrap-count-group { width: 75px; }
     .input-group.pos-scrap-capacity-group { width: 70px; }
@@ -47,7 +428,7 @@
             height: 100% !important;
             display: flex;
             flex-direction: column;
-            overflow: hidden;
+            overflow: visible;
         }
         .pos-catalog-scroll {
             flex: 1;
@@ -158,11 +539,10 @@
         overflow-y: hidden;
         white-space: nowrap;
         -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin; /* Firefox: slim, visible scrollbar instead of hidden */
-        scrollbar-color: rgba(64, 81, 137, 0.35) transparent;
+        scrollbar-width: none;
         scroll-behavior: smooth;
         cursor: grab;
-        padding: 2px 1px 6px 1px;
+        padding: 2px 1px;
     }
     .pos-category-scroll-container:active,
     .pos-category-scroll-container.is-dragging {
@@ -170,15 +550,7 @@
         scroll-behavior: auto; /* smooth-scroll fights an active drag; disable it mid-drag */
     }
     .pos-category-scroll-container::-webkit-scrollbar {
-        height: 4px;
-        display: block; /* Chrome, Safari, Opera: slim visible scrollbar instead of hidden */
-    }
-    .pos-category-scroll-container::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .pos-category-scroll-container::-webkit-scrollbar-thumb {
-        background: rgba(64, 81, 137, 0.35);
-        border-radius: 4px;
+        display: none;
     }
     .pos-category-nav-row {
         display: flex;
@@ -198,7 +570,7 @@
         line-height: 1;
     }
     .pos-category-nav-arrow:disabled {
-        opacity: 0.35;
+        display: none;
     }
     .pos-category-pill {
         flex-shrink: 0;
@@ -209,10 +581,10 @@
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        transition: all 0.15s ease-in-out;
+        transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
     }
     .pos-category-pill:hover {
-        transform: translateY(-1px);
+        border-color: var(--vz-primary);
     }
     .pos-category-pill.active, .pos-category-pill.btn-primary {
         box-shadow: 0 2px 8px rgba(64, 81, 137, 0.28);
@@ -286,7 +658,7 @@
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
         user-select: none;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
     }
@@ -326,7 +698,7 @@
         z-index: 3;
     }
 
-    /* Quick-add autocomplete dropdown (replaces the old 7,340-option <select>) */
+    /* Product-search autocomplete dropdown (replaces the old 7,340-option <select>) */
     #quickAddResultsDropdown {
         position: absolute;
         top: calc(100% + 4px);
@@ -371,6 +743,13 @@
         background-size: 400% 100%;
         animation: pos-skeleton-shimmer 1.4s ease infinite;
     }
+    .pos-skeleton-line-tall { height: 14px; }
+    .pos-skeleton-line-short { height: 16px; }
+    .pos-catalog-list-shell { background-color: var(--vz-card-bg, #ffffff); }
+    .pos-catalog-add-column { width: 100px; }
+    .pos-catalog-sku { max-width: 50%; }
+    .cart-qty-input { width: 62px; }
+    .cart-line-total { min-width: 65px; }
     @keyframes pos-skeleton-shimmer {
         0% { background-position: 100% 50%; }
         100% { background-position: 0 50%; }
@@ -697,10 +1076,9 @@
 
     /* Quick Add Bar & Search Row */
     [data-bs-theme="dark"] #catalogSearchInput,
-    [data-bs-theme="dark"] #posCustomerSelect,
+    [data-bs-theme="dark"] #posCustomerSearch,
     [data-bs-theme="dark"] #posTechnicianSelect,
     [data-bs-theme="dark"] #posTechnicianSelectCart,
-    [data-bs-theme="dark"] #quickAddSearchInput,
     [data-bs-theme="dark"] #scrapCapacityInput,
     [data-bs-theme="dark"] #scrapPriceInput,
     [data-bs-theme="dark"] #scrapCountInput,
@@ -714,9 +1092,9 @@
         color: #878a99 !important;
     }
     [data-bs-theme="dark"] #catalogSearchInput:focus,
-    [data-bs-theme="dark"] #posCustomerSelect:focus,
+    [data-bs-theme="dark"] #posCustomerSearch:focus,
     [data-bs-theme="dark"] #posTechnicianSelect:focus,
-    [data-bs-theme="dark"] #quickAddSearchInput:focus {
+    [data-bs-theme="dark"] #posTechnicianSelectCart:focus {
         background-color: #212529 !important;
         color: #ffffff !important;
         border-color: var(--vz-primary) !important;
@@ -737,12 +1115,6 @@
     [data-bs-theme="dark"] .pos-skeleton-card .pos-skeleton-line {
         background: linear-gradient(90deg, #262a2e 25%, #32383e 37%, #262a2e 63%) !important;
         background-size: 400% 100% !important;
-    }
-    [data-bs-theme="dark"] .pos-category-scroll-container {
-        scrollbar-color: rgba(141, 162, 251, 0.35) transparent;
-    }
-    [data-bs-theme="dark"] .pos-category-scroll-container::-webkit-scrollbar-thumb {
-        background: rgba(141, 162, 251, 0.35);
     }
     [data-bs-theme="dark"] .pos-category-nav-arrow {
         background-color: #262a2e !important;

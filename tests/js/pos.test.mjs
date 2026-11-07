@@ -2,6 +2,7 @@
 // data-action buttons drive the cart, and its document/window listeners are released on leave.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createBrowser } from './dom-stub.mjs';
 
 const EVIL = '<img src=x onerror=alert(1)>';
@@ -201,10 +202,163 @@ function searchCustomers(b, value) {
 }
 
 const customerOptions = (b) => b.element('posCustomerSelect').innerHTML;
+
+function typeCatalogSearch(b, value) {
+    const input = b.element('catalogSearchInput');
+    input.focus();
+    input.value = value;
+    const target = {
+        tagName: 'INPUT',
+        value,
+        dataset: { action: 'pos.search' },
+        getAttribute: (name) => (name === 'type' ? 'text' : null),
+        closest(sel) {
+            return sel === '[data-action]' ? this : null;
+        },
+    };
+    (b.document.listeners.input || []).forEach((fn) => fn({ type: 'input', target, preventDefault() {} }));
+    return input;
+}
+
+function bootWithSearchResponse(products = PRODUCTS, customers = CUSTOMERS) {
+    const response = {
+        data: products,
+        meta: { last_page: 1, has_more: false },
+        category_counts: {},
+    };
+    const config = { ...CONFIG, data: { ...CONFIG.data, products, customers } };
+    const b = createBrowser({
+        fetchResponses: { '/pos/products/search': response },
+        globals: { localStorage: { getItem: () => null, setItem() {} } },
+    });
+    b.load('public/assets/js/admin/pos/math.js');
+    b.context.PosMath = b.window.PosMath;
+    b.load('public/assets/js/admin/pos/pos.js');
+    const root = { dataset: { page: 'pos', config: JSON.stringify(config) } };
+    const original = b.document.querySelectorAll;
+    b.document.querySelectorAll = (sel) => (sel === '[data-page]' ? [root] : original(sel));
+    b.Admin.page.boot();
+    return b;
+}
 const CUSTOMERS = [
     { id: 41, name: 'أحمد الورشة', phone: null, credit_limit: 0, credit_balance: 250, vehicles: [] },
     { id: 42, name: 'شركة النور', phone: '01099990004', credit_limit: 0, credit_balance: -100, vehicles: [] },
 ];
+
+test('catalog typing opens reusable suggestions and ArrowDown plus Enter adds the highlighted item', async () => {
+    const product = { ...FILTER, id: 91 };
+    const b = bootWithSearchResponse([product]);
+    const input = typeCatalogSearch(b, 'فلتر');
+    await b.flush();
+
+    assert.match(b.element('quickAddResultsDropdown').innerHTML, /فلتر/);
+    input.fire('keydown', { key: 'ArrowDown' });
+    input.fire('keydown', { key: 'Enter' });
+
+    assert.match(cartHtml(b), /data-action="pos.qty"/);
+    assert.equal(input.value, '');
+});
+
+test('Enter with no highlighted suggestion keeps the barcode path', async () => {
+    const product = { ...FILTER, id: 92, barcode: '123456' };
+    const b = bootWithSearchResponse([product]);
+    const input = typeCatalogSearch(b, '123456');
+    await b.flush();
+
+    input.fire('keydown', { key: 'Enter' });
+    await b.flush();
+
+    assert.match(cartHtml(b), /data-action="pos.qty"/);
+    assert.ok(b.calls.fetch.some((call) => call.url.includes('exact_barcode=1')));
+});
+
+test('a completed sale clears the catalog input without a removed quick-add control', async () => {
+    const product = { ...FILTER, id: 93 };
+    const config = { ...CONFIG, data: { ...CONFIG.data, products: [product] } };
+    const b = createBrowser({
+        fetchResponses: {
+            '/pos': {
+                success: true,
+                invoice_id: 1,
+                invoice_number: 'INV-1',
+                receipt_url: '/receipt/1',
+                warranty_cert_url: '/warranty/1',
+            },
+        },
+        globals: { localStorage: { getItem: () => null, setItem() {} } },
+    });
+    b.load('public/assets/js/admin/pos/math.js');
+    b.context.PosMath = b.window.PosMath;
+    b.load('public/assets/js/admin/pos/pos.js');
+    const root = { dataset: { page: 'pos', config: JSON.stringify(config) } };
+    const original = b.document.querySelectorAll;
+    b.document.querySelectorAll = (sel) => (sel === '[data-page]' ? [root] : original(sel));
+    b.Admin.page.boot();
+    b.window.crypto = { randomUUID: () => 'checkout-key' };
+    b.element('posTechnicianSelect').value = '1';
+    b.element('catalogSearchInput').value = 'ready';
+
+    b.click({ action: 'pos.add', id: '93' });
+    b.click({ action: 'pos.submit' });
+    await b.flush();
+
+    assert.equal(b.element('catalogSearchInput').value, '');
+    assert.equal(b.calls.swal.at(-1)[0].icon, 'success');
+});
+
+test('F2 focuses catalog search and F4 clears the cart', () => {
+    const b = boot([FILTER]);
+    b.click({ action: 'pos.add', id: '22' });
+
+    (b.document.listeners.keydown || []).forEach((fn) => fn({ key: 'F2', preventDefault() {} }));
+    (b.document.listeners.keydown || []).forEach((fn) => fn({ key: 'F4', preventDefault() {} }));
+
+    assert.equal(b.element('catalogSearchInput').focused, true);
+    assert.match(cartHtml(b), /السلة فارغة/);
+});
+
+test('the customer combobox shows the walk-in customer by default', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+
+    assert.equal(b.element('posCustomerSelect').value, 'WALK_IN');
+    assert.match(b.element('posCustomerSearch').value, /عميل نقدي/);
+});
+
+test('typing in the customer combobox filters the listbox', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+    const input = b.element('posCustomerSearch');
+    input.value = 'احمد';
+    searchCustomers(b, input.value);
+
+    assert.match(b.element('posCustomerOptions').innerHTML, /أحمد الورشة/);
+    assert.doesNotMatch(b.element('posCustomerOptions').innerHTML, /شركة النور/);
+});
+
+test('ArrowDown then Enter selects a filtered customer and updates its vehicle control', () => {
+    const customers = [{ ...CUSTOMERS[0], vehicles: [{ id: 71, car: 'Toyota', plate_number: 'ABC-71' }] }];
+    const b = bootWithCustomers(customers);
+    const input = b.element('posCustomerSearch');
+    input.value = 'احمد';
+    searchCustomers(b, input.value);
+
+    input.fire('keydown', { key: 'ArrowDown' });
+    input.fire('keydown', { key: 'Enter' });
+
+    assert.equal(b.element('posCustomerSelect').value, '41');
+    assert.match(input.value, /أحمد الورشة/);
+    assert.match(b.element('posVehicleSelect').innerHTML, /Toyota/);
+});
+
+test('Escape restores the selected customer label', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+    const input = b.element('posCustomerSearch');
+    input.value = 'احمد';
+    searchCustomers(b, input.value);
+
+    input.fire('keydown', { key: 'Escape' });
+
+    assert.match(input.value, /عميل نقدي/);
+});
 
 test('a customer with no phone shows no phone text, and balances say who owes whom', () => {
     const html = customerOptions(bootWithCustomers(CUSTOMERS));
@@ -228,4 +382,188 @@ test('the customer search narrows the list by name, ignoring spelling variants, 
 
     searchCustomers(b, '');
     assert.ok(customerOptions(b).includes('أحمد الورشة') && customerOptions(b).includes('شركة النور'));
+});
+
+test('typing a name and pressing Enter takes the first match, not the walk-in row', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+    const input = b.element('posCustomerSearch');
+    searchCustomers(b, 'شركة');
+    input.fire('focus');
+    searchCustomers(b, 'شركة');
+    input.fire('keydown', { key: 'Enter' });
+    assert.equal(b.element('posCustomerSelect').value, '42');
+});
+
+test('suggestions open only for what the cashier is still typing', async () => {
+    const product = { ...FILTER, id: 93 };
+    const b = bootWithSearchResponse([product]);
+    const dropdown = b.element('quickAddResultsDropdown');
+
+    // A category click reloads the catalog with an empty box: no suggestions.
+    b.click({ action: 'pos.category', category: 'filters' });
+    await b.flush();
+    assert.ok(!dropdown.innerHTML.includes('فلتر'), 'no suggestions on a category click');
+
+    // The reply arrives after the cashier left the box: no suggestions.
+    typeCatalogSearch(b, 'فلتر');
+    b.element('posCustomerSearch').focus();
+    await b.flush();
+    assert.ok(!dropdown.innerHTML.includes('quick-add-result-item'), 'no suggestions once focus moved on');
+
+    typeCatalogSearch(b, 'فلتر');
+    await b.flush();
+    assert.match(dropdown.innerHTML, /فلتر/, 'still typing: suggestions open');
+});
+
+test('Enter takes the typed match even when the current customer is listed before it', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+    const input = b.element('posCustomerSearch');
+
+    input.fire('focus');
+    searchCustomers(b, 'احمد');
+    input.fire('keydown', { key: 'Enter' });
+    assert.equal(b.element('posCustomerSelect').value, '41');
+
+    input.fire('focus');
+    searchCustomers(b, 'شركة');
+    input.fire('keydown', { key: 'Enter' });
+    assert.equal(b.element('posCustomerSelect').value, '42');
+});
+
+// Default view and seamless loading: there is no "load more" button, so scrolling must always work.
+function product(id, name = `صنف ${id}`) {
+    return { id, name, price: 10, stock: 5, is_battery: false, category: 'oils', unit: 'piece', unit_label: 'قطعة', step: 1, allows_fraction: false };
+}
+
+function pageResponse(data, hasMore = false, lastPage = 3) {
+    return { ok: true, json: async () => ({ data, meta: { last_page: lastPage, has_more: hasMore }, category_counts: {} }) };
+}
+
+function bootInfinite(fetchImpl, products = [product(1), product(2)]) {
+    const observers = [];
+    class FakeObserver {
+        constructor(callback) {
+            this.callback = callback;
+            observers.push(this);
+        }
+        observe() {}
+        disconnect() {}
+    }
+    const b = createBrowser({
+        globals: {
+            localStorage: { getItem: () => null, setItem() {} },
+            IntersectionObserver: FakeObserver,
+        },
+    });
+    b.context.fetch = fetchImpl;
+    b.window.IntersectionObserver = FakeObserver;
+    b.load('public/assets/js/admin/pos/math.js');
+    b.context.PosMath = b.window.PosMath;
+    b.load('public/assets/js/admin/pos/pos.js');
+    const config = { ...CONFIG, data: { ...CONFIG.data, products } };
+    const root = { dataset: { page: 'pos', config: JSON.stringify(config) } };
+    const original = b.document.querySelectorAll;
+    b.document.querySelectorAll = (sel) => (sel === '[data-page]' ? [root] : original(sel));
+    b.Admin.page.boot();
+    return { b, scrollToEnd: () => observers[0].callback([{ isIntersecting: true }]) };
+}
+
+const gridHtml = (b) => b.element('posCatalogGrid').innerHTML;
+
+test('the catalog opens as the list view', () => {
+    const { b } = bootInfinite(async () => pageResponse([]));
+    assert.match(gridHtml(b), /pos-catalog-table/);
+    assert.match(gridHtml(b), /صنف 1/);
+});
+
+test('the view toggle still switches to cards and back', () => {
+    const { b } = bootInfinite(async () => pageResponse([]));
+    b.click({ action: 'pos.view', mode: 'grid' });
+    assert.ok(!gridHtml(b).includes('pos-catalog-table'));
+    assert.ok(b.element('viewModeGridBtn').classList.contains('active'));
+    b.click({ action: 'pos.view', mode: 'list' });
+    assert.match(gridHtml(b), /pos-catalog-table/);
+    assert.ok(b.element('viewModeListBtn').classList.contains('active'));
+    assert.ok(!b.element('viewModeGridBtn').classList.contains('active'));
+});
+
+test('there is no load more button, and the sentinel is observable from the first screen', () => {
+    const { b } = bootInfinite(async () => pageResponse([]));
+    const blade = readFileSync('resources/views/admin/sales/pos/partials/catalog-panel.blade.php', 'utf8');
+    assert.ok(!blade.includes('catalogLoadMoreBtn') && !blade.includes('<button'));
+    assert.ok(!b.element('catalogLoadMoreSentinel').classList.contains('d-none'), 'a hidden sentinel never intersects');
+});
+
+test('scrolling past the first screen continues under the same rows, without duplicates', async () => {
+    const urls = [];
+    const { b, scrollToEnd } = bootInfinite(async (url) => {
+        urls.push(url);
+        return pageResponse([product(2), product(3)], true);
+    });
+
+    scrollToEnd();
+    assert.match(gridHtml(b), /صنف 1/, 'no skeleton replaces the list while loading');
+    assert.ok(!gridHtml(b).includes('pos-skeleton'));
+    await b.flush();
+
+    assert.match(urls[0], /page=1/);
+    assert.match(gridHtml(b), /صنف 1/);
+    assert.match(gridHtml(b), /صنف 3/);
+    assert.equal(gridHtml(b).match(/صنف 2/g).length, gridHtml(b).match(/صنف 1/g).length, 'a repeated product is listed once');
+
+    scrollToEnd();
+    await b.flush();
+    assert.match(urls[1], /page=2/);
+});
+
+test('a failed page is requested again, not skipped', async () => {
+    const urls = [];
+    let fail = true;
+    const { b, scrollToEnd } = bootInfinite(async (url) => {
+        urls.push(url);
+        if (fail) return { ok: false, json: async () => ({}) };
+        return pageResponse([product(3)], true);
+    });
+
+    scrollToEnd();
+    await b.flush();
+    assert.match(b.element('catalogLoadMoreStatus').innerHTML, /تعذر/);
+    assert.match(gridHtml(b), /صنف 1/, 'the list stays on screen');
+
+    fail = false;
+    scrollToEnd();
+    await b.flush();
+    assert.match(urls[1], /page=1/);
+    assert.match(gridHtml(b), /صنف 3/);
+    assert.equal(b.element('catalogLoadMoreStatus').innerHTML, '');
+});
+
+test('a category click wins over a page still loading in the background', async () => {
+    const pending = [];
+    const { b, scrollToEnd } = bootInfinite((url) => new Promise((resolve) => pending.push({ url, resolve })));
+
+    scrollToEnd();
+    b.click({ action: 'pos.category', category: 'filters' });
+    assert.equal(pending.length, 2, 'the click was not dropped');
+    assert.match(pending[1].url, /category=filters/);
+
+    pending[1].resolve(pageResponse([product(50, 'صنف الفلاتر')]));
+    await b.flush();
+    pending[0].resolve(pageResponse([product(60, 'صنف قديم')], true));
+    await b.flush();
+
+    assert.match(gridHtml(b), /صنف الفلاتر/);
+    assert.ok(!gridHtml(b).includes('صنف قديم'), 'the late background page is discarded');
+    assert.ok(b.element('catalogLoadMoreSentinel').classList.contains('d-none'), 'no more pages in this category');
+});
+
+test('search and F2 still work with the list view as default', async () => {
+    const { b } = bootInfinite(async () => pageResponse([product(70, 'زيت البحث')]));
+    typeCatalogSearch(b, 'زيت');
+    await b.flush();
+    assert.match(gridHtml(b), /pos-catalog-table/);
+    assert.match(gridHtml(b), /زيت البحث/);
+
+    (b.document.listeners.keydown || []).forEach((fn) => fn({ key: 'F2', preventDefault() {} }));
+    assert.equal(b.document.activeElement, b.element('catalogSearchInput'));
 });
