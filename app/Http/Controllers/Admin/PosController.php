@@ -114,7 +114,7 @@ class PosController extends Controller
         $exactBarcode = (bool) ($validated['exact_barcode'] ?? false);
 
         $products = Product::query()
-            ->select(['id', 'name', 'brand', 'sku', 'barcode', 'capacity_ah', 'retail_price', 'current_stock', 'category_id', 'is_battery', 'warranty_months', 'unit'])
+            ->select(['id', 'name', 'brand', 'sku', 'barcode', 'capacity_ah', 'retail_price', 'current_stock', 'category_id', 'is_battery', 'warranty_months', 'unit', 'package_size'])
             ->where('is_active', true)
             ->with('category:id,slug,name');
 
@@ -246,6 +246,8 @@ class PosController extends Controller
             'price'           => (float) $p->retail_price,
             'unit'            => $p->unit?->value,
             'unit_label'      => $p->unit?->label(),
+            'package_size'    => $p->packageSize(),
+            'package_label'   => $p->packageLabel(),
             'step'            => $p->unit?->stepperIncrement(),
             'allows_fraction' => (bool) $p->allowsFraction(),
             'warranty_months' => (int) $p->warranty_months,

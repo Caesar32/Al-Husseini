@@ -71,7 +71,7 @@ class SalesReturnService implements SalesReturnServiceInterface
 
                 $product = Product::where('id', $invItem->product_id)->lockForUpdate()->firstOrFail();
                 $qty = Quantity::fromMilli($qtyMilli);
-                $this->stock->move($product->id, $qty, StockMovementType::SaleReturn, $invoice, $cashierUserId);
+                $this->stock->move($product->id, Quantity::fromMilli($invItem->stockMilli($qtyMilli)), StockMovementType::SaleReturn, $invoice, $cashierUserId);
 
                 $invItem->update([
                     'returned_quantity' => Quantity::fromMilli(

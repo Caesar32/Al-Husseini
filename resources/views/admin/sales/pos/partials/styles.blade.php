@@ -28,12 +28,27 @@
         border-color: var(--pos-border);
     }
 
+    /* Fluid: what does not fit wraps to the next row, instead of leaving the panel. */
     .pos-transaction-grid {
-        display: grid;
-        grid-template-columns: minmax(420px, 2.4fr) minmax(150px, .7fr) minmax(170px, .8fr) auto;
+        display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         min-height: 36px;
+    }
+
+    .pos-customer-field {
+        flex: 3 1 400px;
+    }
+
+    .pos-vehicle-field,
+    .pos-technician-field {
+        flex: 1 1 165px;
+    }
+
+    .pos-context-meta {
+        flex: 0 1 auto;
+        margin-inline-start: auto;
     }
 
     .pos-context-field {
@@ -240,12 +255,33 @@
         box-shadow: none;
     }
 
-    .pos-product-search-wrap:focus-within .pos-search-shortcuts,
+    /* Hints while the box is empty, the clear button once it has text: they never share the space. */
     .pos-product-search-wrap.has-value .pos-search-shortcuts {
         display: none;
     }
 
-    .pos-search-clear-button,
+    .pos-product-search-wrap.has-value .form-control {
+        padding-inline-end: 46px;
+    }
+
+    .pos-search-clear-button.btn {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        display: none !important;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        min-height: 36px;
+        padding: 0 !important;
+        border: 0;
+        background: transparent;
+    }
+
+    .pos-product-search-wrap.has-value .pos-search-clear-button.btn {
+        display: inline-flex !important;
+    }
+
     .pos-view-toggle .btn,
     .pos-category-nav-arrow {
         display: inline-flex;
@@ -265,22 +301,6 @@
         box-shadow: 0 0 0 3px var(--pos-focus-ring);
     }
 
-    /* The one-row bar needs about 990px with the session badges; below that they would leave the panel. */
-    @container (max-width: 1040px) {
-        /* The customer takes a whole row so its name is never cut; vehicle and technician share the next. */
-        .pos-transaction-grid {
-            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        }
-
-        .pos-customer-field {
-            grid-column: 1 / -1;
-        }
-
-        .pos-context-meta {
-            display: none;
-        }
-    }
-
     @container (max-width: 900px) {
         /* Keys only: the words would run into the placeholder at this width. */
         .pos-search-shortcuts span {
@@ -293,12 +313,28 @@
     }
 
     @container (max-width: 600px) {
-        .pos-transaction-grid {
-            grid-template-columns: 1fr;
+        /* Customer on its row, vehicle and technician sharing the next; session badges give way. */
+        .pos-customer-field {
+            flex-basis: 100%;
         }
 
-        .pos-context-field {
-            width: 100%;
+        .pos-context-meta {
+            display: none;
+        }
+
+        .pos-search-shortcuts {
+            display: none;
+        }
+
+        .pos-product-search-wrap .form-control {
+            padding-inline-end: 46px;
+        }
+    }
+
+    @container (max-width: 420px) {
+        .pos-vehicle-field,
+        .pos-technician-field {
+            flex-basis: 100%;
         }
 
         /* Full-width customer and search boxes on a phone; the buttons move to the next row. */
@@ -325,9 +361,6 @@
             align-items: stretch;
         }
 
-        .pos-search-clear-button {
-            flex: 1 1 auto;
-        }
 
         .pos-search-shortcuts {
             display: none;
@@ -338,7 +371,6 @@
         }
     }
 
-    [data-bs-theme="dark"] .pos-search-clear-button,
     [data-bs-theme="dark"] .pos-view-toggle .btn:not(.active) {
         color: var(--vz-body-color);
         background: var(--pos-surface);
@@ -346,6 +378,33 @@
 
     .pos-pill-count {
         white-space: nowrap;
+    }
+
+    .pos-stock-breakdown {
+        display: block;
+        margin-top: 2px;
+        color: var(--pos-muted);
+        font-size: 10px;
+        white-space: nowrap;
+    }
+
+    .pos-liter-presets {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+    }
+
+    .pos-liter-presets-label {
+        color: var(--pos-muted);
+        font-size: 10px;
+        font-weight: 700;
+    }
+
+    .pos-liter-preset.btn {
+        padding: 1px 7px !important;
+        font-size: 10px;
     }
 
     /* Needs a height to be observed; stays almost invisible until there is a status to show. */

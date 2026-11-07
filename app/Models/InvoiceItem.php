@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ProductUnit;
 use App\Casts\QuantityCast;
 use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,22 @@ class InvoiceItem extends Model
      * Net line value after returned units (quantity - returned_quantity) at the line price.
      */
     public const NET_LINE_SQL = '(quantity - returned_quantity) * unit_price';
+
+    /** Stock this quantity moves, in thousandths: a line from before a liter conversion counts in packages. */
+    public function stockMilli(int $quantityMilli): int
+    {
+        return (int) round($quantityMilli * (float) ($this->stock_factor ?? 1));
+    }
+
+    /** The unit this line's quantity is in, which stays the package for a line from before a conversion. */
+    public function quantityUnitLabel(): string
+    {
+        if ((float) ($this->stock_factor ?? 1) > 1 && $this->product) {
+            return $this->product->packageLabel();
+        }
+
+        return ($this->product?->unit ?? ProductUnit::Piece)->label();
+    }
 
     protected function casts(): array
     {

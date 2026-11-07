@@ -17,6 +17,7 @@ class Product extends Model
 
     protected $fillable = [
         'category_id',
+        'package_size',
         'sku',
         'barcode',
         'name',
@@ -38,6 +39,42 @@ class Product extends Model
     protected $attributes = [
         'unit' => 'piece',
     ];
+
+    /** Liters in one sealed package; null when this is not a liter product sold from packages. */
+    public function packageSize(): ?float
+    {
+        $size = (float) $this->package_size;
+
+        return $this->unit === ProductUnit::Liter && $size > 0 ? $size : null;
+    }
+
+    public function packageLabel(): string
+    {
+        return (float) $this->package_size >= 100 ? 'برميل' : 'جركن';
+    }
+
+    /** Stock for warehouse staff: "931.5 لتر (ما يعادل 186 جركن و 1.5 لتر)". */
+    public function stockReadout(): string
+    {
+        $unit = ($this->unit ?? ProductUnit::Piece)->label();
+        $text = Quantity::format($this->current_stock).' '.$unit;
+        $size = $this->packageSize();
+        if ($size === null) {
+            return $text;
+        }
+
+        $stockMilli = Quantity::toMilli($this->current_stock);
+        $sizeMilli = Quantity::toMilli($size);
+        if ($stockMilli < $sizeMilli) {
+            return $text;
+        }
+
+        $packages = intdiv($stockMilli, $sizeMilli);
+        $restMilli = $stockMilli % $sizeMilli;
+        $rest = $restMilli > 0 ? ' و '.Quantity::format(Quantity::fromMilli($restMilli)).' '.$unit : '';
+
+        return $text.' (ما يعادل '.$packages.' '.$this->packageLabel().$rest.')';
+    }
 
     protected function casts(): array
     {

@@ -147,7 +147,7 @@
                                                 <span class="text-muted fs-12">-</span>
                                             @endif
                                         </td>
-                                        <td class="text-center fw-bold">{{ \App\Support\Quantity::format($item->quantity) }} <span class="fs-11 text-muted fw-normal">{{ ($item->product?->unit ?? \App\Enums\ProductUnit::Piece)->label() }}</span></td>
+                                        <td class="text-center fw-bold">{{ \App\Support\Quantity::format($item->quantity) }} <span class="fs-11 text-muted fw-normal">{{ $item->quantityUnitLabel() }}</span></td>
                                         <td class="text-end font-monospace"><x-money :amount="$item->unit_price" /></td>
                                         <td class="text-end font-monospace text-danger"><x-money :amount="$item->discount_amount ?? 0" /></td>
                                         <td class="text-end fw-bold font-monospace text-primary"><x-money :amount="$item->total_price" /></td>

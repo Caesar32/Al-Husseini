@@ -238,12 +238,15 @@
                 <tr>
                     <td>
                         <span class="fw-bold">{{ $item->product?->name }}</span>
+                        @if($item->product?->allowsFraction())
+                        <div class="fs-9">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->quantityUnitLabel() }} × {{ number_format($item->unit_price, 2) }} ج.م = {{ number_format($item->total_price, 2) }} ج.م</div>
+                        @endif
                         @if($item->battery_serial_number)
                         <div class="fs-9" style="color: #222;">سيريال: <strong>{{ $item->battery_serial_number }}</strong></div>
                         <div class="fs-9 text-muted">ضمان معتمد: {{ $item->warranty_duration_months }} شهراً</div>
                         @endif
                     </td>
-                    <td style="text-align: center;">{{ \App\Support\Quantity::format($item->quantity) }} {{ ($item->product?->unit ?? \App\Enums\ProductUnit::Piece)->label() }}</td>
+                    <td style="text-align: center;">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->quantityUnitLabel() }}</td>
                     <td style="text-align: left;" class="fw-bold">{{ number_format($item->total_price, 2) }}</td>
                 </tr>
                 @endforeach

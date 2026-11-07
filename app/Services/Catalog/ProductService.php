@@ -3,6 +3,7 @@
 namespace App\Services\Catalog;
 
 use App\Contracts\Catalog\ProductServiceInterface;
+use App\Contracts\Catalog\StockLedgerInterface;
 use App\Enums\ProductUnit;
 use App\Models\Product;
 use App\Support\Quantity;
@@ -22,8 +23,10 @@ class ProductService implements ProductServiceInterface
     private const EDITABLE_FIELDS = [
         'category_id', 'sku', 'barcode', 'name', 'brand', 'capacity_ah', 'voltage',
         'terminal_type', 'warranty_months', 'retail_price', 'wholesale_price',
-        'reorder_threshold', 'unit', 'is_battery', 'is_active',
+        'reorder_threshold', 'unit', 'package_size', 'is_battery', 'is_active',
     ];
+
+    public function __construct(private StockLedgerInterface $stock) {}
 
     public function getPaginatedProducts(array $filters = [], int $perPage = 20): LengthAwarePaginator
     {
@@ -119,7 +122,65 @@ class ProductService implements ProductServiceInterface
                 $this->assertNoFractionalQuantities($product);
             }
 
+            // A package size on a product still sold by the piece means "these are sealed packages,
+            // sell them by the liter": its figures change meaning, so the form's prices do not apply.
+            $size = (float) ($attributes['package_size'] ?? 0);
+            if ($size > 0 && ($attributes['unit'] ?? null) === ProductUnit::Liter->value && $product->unit !== ProductUnit::Liter) {
+                $product->update(array_diff_key($attributes, array_flip(['unit', 'package_size', 'retail_price', 'wholesale_price', 'reorder_threshold'])));
+                $this->convertToLiters($product->fresh(), $size);
+
+                return $product->fresh('category:id,name,slug');
+            }
+
             $product->update($attributes);
+
+            return $product->fresh('category:id,name,slug');
+        });
+    }
+
+    /**
+     * Turns a product sold in sealed packages into a liter product. Stock moves through the ledger;
+     * prices and cost become per liter. Old document lines keep their quantity and amounts, with a
+     * stock factor so that returning one still moves the liters it really was.
+     */
+    public function convertToLiters(Product $product, float $packageSize, ?int $userId = null): Product
+    {
+        return DB::transaction(function () use ($product, $packageSize, $userId) {
+            $product = Product::whereKey($product->id)->lockForUpdate()->firstOrFail();
+
+            if ($product->is_battery) {
+                throw new DomainException('البطاريات تُباع بالقطعة فقط.');
+            }
+            if ($product->unit !== ProductUnit::Piece) {
+                throw new DomainException("الصنف ({$product->name}) ليس بالقطعة، فلا يمكن تحويله.");
+            }
+            if ($packageSize <= 0) {
+                throw new DomainException('حجم العبوة يجب أن يكون أكبر من الصفر.');
+            }
+            $stockMilli = Quantity::toMilli($product->current_stock);
+            if ($stockMilli < 0) {
+                throw new DomainException("رصيد الصنف ({$product->name}) سالب: صحّحه بالجرد قبل التحويل.");
+            }
+
+            $product->update([
+                'unit' => ProductUnit::Liter->value,
+                'package_size' => $packageSize,
+                'retail_price' => round((float) $product->retail_price / $packageSize, 2),
+                'wholesale_price' => round((float) $product->wholesale_price / $packageSize, 2),
+                'cost_price' => round((float) $product->cost_price / $packageSize, 2),
+                'reorder_threshold' => Quantity::fromMilli((int) round(Quantity::toMilli($product->reorder_threshold) * $packageSize)),
+            ]);
+
+            foreach (['invoice_items', 'purchase_invoice_items'] as $table) {
+                DB::table($table)->where('product_id', $product->id)->update(['stock_factor' => $packageSize]);
+            }
+            DB::table('supplier_products')->where('product_id', $product->id)->update([
+                'last_purchase_price' => DB::raw('ROUND(last_purchase_price / '.$packageSize.', 2)'),
+            ]);
+
+            if ($stockMilli > 0) {
+                $this->stock->setTo($product->id, Quantity::fromMilli((int) round($stockMilli * $packageSize)), $product, $userId ?? auth()->id());
+            }
 
             return $product->fresh('category:id,name,slug');
         });
@@ -181,6 +242,11 @@ class ProductService implements ProductServiceInterface
         // Batteries are sold by the piece; the request rejects another unit only when one is sent.
         if (! empty($attributes['is_battery'])) {
             $attributes['unit'] = ProductUnit::Piece->value;
+        }
+
+        // A package size only means something for a liter product.
+        if (array_key_exists('unit', $attributes) && $attributes['unit'] !== ProductUnit::Liter->value) {
+            $attributes['package_size'] = null;
         }
 
         return $attributes;

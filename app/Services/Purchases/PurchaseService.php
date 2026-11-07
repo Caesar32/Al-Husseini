@@ -347,7 +347,7 @@ class PurchaseService implements PurchaseServiceInterface
                 $lines->first()?->product?->quantityMilliOrFail($item['quantity']);
 
                 $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
-                if (Quantity::toMilli($product->current_stock) < $qtyMilli) {
+                if (Quantity::toMilli($product->current_stock) < $this->stockMilliToReturn($lines, $qtyMilli)) {
                     throw new \DomainException(
                         'المخزون الحالي للصنف (' . $product->name . ') أقل من كمية المرتجع المطلوبة ('
                             . Quantity::format(Quantity::fromMilli($qtyMilli)) . ').'
@@ -373,19 +373,22 @@ class PurchaseService implements PurchaseServiceInterface
                         ),
                     ]);
 
-                    // Reverse the weighted average cost for the goods leaving stock.
+                    // Reverse the weighted average cost for the goods leaving stock. A line from
+                    // before a liter conversion is in packages: stock and cost count per liter.
+                    $stockTakeMilli = $line->stockMilli($takeMilli);
+                    $unitCost = (float) $line->unit_cost_price / max(1, (float) ($line->stock_factor ?? 1));
                     $newStock = $this->stock->move(
                         $product->id,
-                        -$take,
+                        -Quantity::fromMilli($stockTakeMilli),
                         StockMovementType::PurchaseReturn,
                         $invoice,
                         $userId,
-                        (float) $line->unit_cost_price
+                        round($unitCost, 2)
                     );
                     $newStockMilli = Quantity::toMilli($newStock);
                     $cost = (float) $product->cost_price;
                     if ($newStockMilli > 0) {
-                        $reversed = (($stockMilli * $cost) - ($takeMilli * (float) $line->unit_cost_price)) / $newStockMilli;
+                        $reversed = (($stockMilli * $cost) - ($stockTakeMilli * $unitCost)) / $newStockMilli;
                         if ($reversed >= 0) {
                             $cost = round($reversed, 2);
                         }
@@ -462,6 +465,21 @@ class PurchaseService implements PurchaseServiceInterface
             'total_adjustments' => (float) $totalAdjustments,
             'current_balance'   => (float) $supplier->current_balance,
         ];
+    }
+
+    /** Stock a purchase return would take, following the same line order as the return itself. */
+    private function stockMilliToReturn($lines, int $qtyMilli): int
+    {
+        $remainingMilli = $qtyMilli;
+        $stockMilli = 0;
+        foreach ($lines as $line) {
+            $availableMilli = max(0, Quantity::toMilli($line->quantity) - Quantity::toMilli($line->returned_quantity));
+            $takeMilli = min($remainingMilli, $availableMilli);
+            $stockMilli += $line->stockMilli($takeMilli);
+            $remainingMilli -= $takeMilli;
+        }
+
+        return $stockMilli;
     }
 
     private function paymentStatusFor(float $finalAmount, float $paidAmount, float $remainingAmount): string

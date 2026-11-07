@@ -9,11 +9,11 @@
                 <kbd>Enter</kbd><span>للإضافة</span>
                 <kbd>F4</kbd><span>لتفريغ الفاتورة</span>
             </span>
+            <button class="btn btn-light pos-search-clear-button" type="button" data-action="pos.clear-search" title="مسح البحث" aria-label="مسح البحث">
+                <i class="ri-close-line" aria-hidden="true"></i>
+            </button>
             <div id="quickAddResultsDropdown" class="d-none" role="listbox" aria-label="اقتراحات الأصناف"></div>
         </div>
-        <button class="btn btn-light border pos-search-clear-button" type="button" data-action="pos.clear-search" title="مسح البحث" aria-label="مسح البحث">
-            <i class="ri-close-line" aria-hidden="true"></i>
-        </button>
         <div class="btn-group pos-view-toggle" role="group" aria-label="طريقة عرض الأصناف">
             <button type="button" class="btn btn-light border" id="viewModeGridBtn" data-action="pos.view" data-mode="grid" title="عرض بطاقات">
                 <i class="ri-grid-fill" aria-hidden="true"></i>
@@ -25,7 +25,7 @@
     </div>
 
     <div class="pos-category-nav-row">
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" data-action="pos.ribbon" data-direction="-1" title="للخلف" aria-label="تمرير القائمة للخلف">
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" data-action="pos.ribbon" data-direction="1" title="للخلف" aria-label="تمرير القائمة للخلف">
             <i class="ri-arrow-left-s-line"></i>
         </button>
         <div class="pos-category-scroll-container" id="categoryTabsContainer">
@@ -41,7 +41,7 @@
                 </button>
             @endforeach
         </div>
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" data-action="pos.ribbon" data-direction="1" title="للأمام" aria-label="تمرير القائمة للأمام">
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" data-action="pos.ribbon" data-direction="-1" title="للأمام" aria-label="تمرير القائمة للأمام">
             <i class="ri-arrow-right-s-line"></i>
         </button>
     </div>

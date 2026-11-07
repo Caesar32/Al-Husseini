@@ -58,6 +58,7 @@ class ProductController extends Controller
                 'retail_price'    => (float) $p->retail_price,
                 'current_stock'   => Quantity::normalize($p->current_stock),
                 'unit'            => $p->unit?->value,
+                'package_size'    => $p->package_size !== null ? (float) $p->package_size : null,
                 'is_battery'      => (bool) $p->is_battery,
                 'warranty_months' => (int) $p->warranty_months,
                 'category_slug'   => $p->category?->slug,

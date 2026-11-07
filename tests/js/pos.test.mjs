@@ -567,3 +567,79 @@ test('search and F2 still work with the list view as default', async () => {
     (b.document.listeners.keydown || []).forEach((fn) => fn({ key: 'F2', preventDefault() {} }));
     assert.equal(b.document.activeElement, b.element('catalogSearchInput'));
 });
+
+// Oil sold by what was poured: a liter product from sealed 5 L jerrycans.
+const SHELL = { id: 81, name: 'شيل أصفر 15W-50', price: 195, stock: 931.5, is_battery: false, category: 'oils', unit: 'liter', unit_label: 'لتر', step: 0.25, allows_fraction: true, package_size: 5, package_label: 'جركن' };
+
+test('catalog stock shows liters and the jerrycans they equal', () => {
+    const b = boot([SHELL]);
+    const html = collectAll(b);
+    assert.match(html, /931\.5/);
+    assert.ok(html.includes('(ما يعادل 186 جركن و 1.5 لتر)'));
+});
+
+test('no breakdown below one package, or for a product without a package size', () => {
+    assert.ok(!collectAll(boot([{ ...SHELL, stock: 4 }])).includes('ما يعادل'));
+    assert.ok(!collectAll(boot([OIL])).includes('ما يعادل'));
+});
+
+test('adding oil starts as one full package and shows the liter presets', () => {
+    const b = boot([SHELL]);
+    b.click({ action: 'pos.add', id: '81' });
+    const html = cartHtml(b);
+    assert.ok(html.includes('value="5"'), 'a scan means one sealed jerrycan');
+    assert.ok(html.includes('اللترات المستخدمة (لتر)'));
+    for (const label of ['3.5 لتر', '4 لتر', '4.5 لتر', '5 لتر', 'جركن كامل']) {
+        assert.ok(html.includes(label), label);
+    }
+});
+
+test('a preset sets the liters poured, and the line total follows', () => {
+    const b = boot([SHELL]);
+    b.click({ action: 'pos.add', id: '81' });
+    const key = lineKey(b);
+
+    b.click({ action: 'pos.qty-preset', key, qty: '3.5' });
+    assert.ok(cartHtml(b).includes('value="3.5"'));
+    assert.ok(cartHtml(b).includes('682.5'), '3.5 × 195');
+
+    typeQty(b, key, '4.25');
+    assert.ok(cartHtml(b).includes('value="4.25"'), 'a typed decimal works too');
+    assert.ok(cartHtml(b).includes('828.75'), '4.25 × 195');
+});
+
+test('the stepper fine-tunes liters, adding from the catalog again adds another package', () => {
+    const b = boot([SHELL]);
+    b.click({ action: 'pos.add', id: '81' });
+    const key = lineKey(b);
+
+    b.click({ action: 'pos.qty', key, delta: '1' });
+    assert.ok(cartHtml(b).includes('value="5.25"'));
+    b.click({ action: 'pos.qty', key, delta: '-1' });
+    assert.ok(cartHtml(b).includes('value="5"'));
+
+    b.click({ action: 'pos.add', id: '81' });
+    assert.ok(cartHtml(b).includes('value="10"'));
+});
+
+test('liters are capped at the stock when selling below zero is off', () => {
+    const b = boot([{ ...SHELL, stock: 3 }]);
+    b.click({ action: 'pos.add', id: '81' });
+    assert.ok(cartHtml(b).includes('value="3"'), 'less than a full package left');
+    b.click({ action: 'pos.qty-preset', key: lineKey(b), qty: '4.5' });
+    assert.ok(cartHtml(b).includes('value="3"'));
+});
+
+test('a product still sold by the piece gets no liter presets', () => {
+    const b = boot([FILTER]);
+    b.click({ action: 'pos.add', id: '22' });
+    assert.ok(!cartHtml(b).includes('اللترات المستخدمة'));
+});
+
+test('a liter product without a package size has presets but no full package choice', () => {
+    const b = boot([OIL]);
+    b.click({ action: 'pos.add', id: '21' });
+    assert.ok(cartHtml(b).includes('اللترات المستخدمة'));
+    assert.ok(!cartHtml(b).includes('كامل'));
+    assert.ok(cartHtml(b).includes('value="0.25"'), 'still starts at one step');
+});

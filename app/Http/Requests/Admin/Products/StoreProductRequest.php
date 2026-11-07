@@ -59,6 +59,7 @@ class StoreProductRequest extends FormRequest
                     }
                 },
             ],
+            'package_size'      => ['nullable', 'numeric', 'gt:0', 'max:1000'],
             'is_battery'        => ['required', 'boolean'],
             'is_active'         => ['sometimes', 'boolean'],
         ];

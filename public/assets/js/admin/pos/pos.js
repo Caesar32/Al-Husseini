@@ -107,6 +107,44 @@
             return p.allows_fraction ? (Number(p.step) || 0.25) : 1;
         }
 
+        // Liters in one sealed package; null for anything not sold by the liter from packages.
+        function packageSize(p) {
+            const size = Number(p.package_size);
+            return p.unit === 'liter' && size > 0 ? size : null;
+        }
+
+        // "(ما يعادل 186 جركن و 1.5 لتر)" for warehouse staff, or nothing below one package.
+        function stockBreakdown(p) {
+            const size = packageSize(p);
+            if (size === null) return '';
+            const stockMilli = PosMath.toMilli(p.stock);
+            const sizeMilli = PosMath.toMilli(size);
+            if (stockMilli < sizeMilli) return '';
+            const packages = Math.floor(stockMilli / sizeMilli);
+            const restMilli = stockMilli - packages * sizeMilli;
+            const rest = restMilli > 0 ? ` و ${PosMath.formatQty(PosMath.fromMilli(restMilli))} ${unitLabel(p)}` : '';
+            return `(ما يعادل ${packages} ${p.package_label || 'جركن'}${rest})`;
+        }
+
+        // The quick choices for what was poured into the engine.
+        function literPresetsHtml(line, p) {
+            if (p.unit !== 'liter') return '';
+            const size = packageSize(p);
+            const current = PosMath.toMilli(line.qty);
+            const chip = (qty, label) => {
+                const isOn = PosMath.toMilli(qty) === current;
+                return `<button type="button" class="btn btn-sm pos-liter-preset ${isOn ? 'btn-primary' : 'btn-light border'}" data-action="pos.qty-preset" data-key="${line.key}" data-qty="${qty}">${esc(label)}</button>`;
+            };
+            const chips = [3.5, 4, 4.5, 5].map(qty => chip(qty, `${qty} لتر`));
+            if (size !== null) chips.push(chip(size, `${p.package_label || 'جركن'} كامل`));
+            return `
+                <div class="pos-liter-presets">
+                    <span class="pos-liter-presets-label">اللترات المستخدمة (لتر):</span>
+                    ${chips.join('')}
+                </div>
+            `;
+        }
+
         function stockText(p) {
             return `${PosMath.formatQty(p.stock)} ${unitLabel(p)}`;
         }
@@ -717,6 +755,7 @@
             const input = document.getElementById('catalogSearchInput');
             if (input) {
                 input.value = '';
+                input.closest('.pos-product-search-wrap')?.classList.remove('has-value');
                 input.focus();
                 keystrokeIntervals = [];
                 hideQuickAddResults();
@@ -949,7 +988,8 @@
             if (p.stock <= 5) {
                 return `<span class="badge bg-warning-subtle text-danger border border-warning ${cls}">متبقي ${esc(stockText(p))} فقط!</span>`;
             }
-            return `<span class="badge bg-success-subtle text-success border border-success-subtle ${cls}">المخزون: <strong>${esc(PosMath.formatQty(p.stock))}</strong> ${esc(unitLabel(p))}</span>`;
+            const breakdown = stockBreakdown(p);
+            return `<span class="badge bg-success-subtle text-success border border-success-subtle ${cls}">المخزون: <strong>${esc(PosMath.formatQty(p.stock))}</strong> ${esc(unitLabel(p))}</span>${breakdown ? `<small class="pos-stock-breakdown">${esc(breakdown)}</small>` : ''}`;
         }
 
         /** Renders whatever is currently loaded in `currentResults` (the active search/category/page set). */
@@ -1085,9 +1125,11 @@
 
             // A fractional product adds one step, or what is left when that is less (0.1 L of a 0.25 step).
             const available = remainingStock(prod);
-            let increment = prod.allows_fraction ? qtyStep(prod) : 1;
+            // A liter product from sealed packages starts as a full one, which is what a scan means.
+            const firstAmount = packageSize(prod) ?? qtyStep(prod);
+            let increment = prod.allows_fraction ? firstAmount : 1;
             if (!ALLOW_NEGATIVE_STOCK) {
-                increment = prod.allows_fraction ? Math.min(qtyStep(prod), available) : 1;
+                increment = prod.allows_fraction ? Math.min(firstAmount, available) : 1;
                 if (available <= 0 || PosMath.toMilli(increment) > PosMath.toMilli(available)) {
                     warnStockLimit(prod, 'تنبيه نفاذ المخزون!');
                     return false;
@@ -1122,6 +1164,11 @@
             if (!line) return;
 
             if (direction > 0) {
+                // The stepper fine-tunes liters; adding from the catalog again means another package.
+                if (packageSize(line.product) !== null) {
+                    setCartQty(lineKey, PosMath.fromMilli(PosMath.toMilli(line.qty) + PosMath.toMilli(qtyStep(line.product))));
+                    return;
+                }
                 // Same stock check and step as adding from the catalog (a battery gets its own line).
                 addToCart(line.product.id);
                 return;
@@ -1247,6 +1294,7 @@
                                 </button>
                             </div>
                         </div>
+                        ${literPresetsHtml(line, p)}
                         ${p.is_battery ? `
                         <div class="input-group input-group-sm cart-serial-group mt-1">
                             <span class="input-group-text"><i class="ri-barcode-line me-1"></i>سيريال *</span>
@@ -1867,6 +1915,7 @@
             'pos.clear-cart': () => clearCart(),
             'pos.qty': (el) => updateCartQty(Number(el.dataset.key), Number(el.dataset.delta)),
             'pos.qty-input': (input) => setCartQty(Number(input.dataset.key), input.value),
+            'pos.qty-preset': (el) => setCartQty(Number(el.dataset.key), el.dataset.qty),
             'pos.remove': (el) => removeCartItem(Number(el.dataset.key)),
             'pos.serial': (input) => setLineSerial(Number(input.dataset.key), input.value),
             'pos.trade-in': () => toggleTradeInFields(),

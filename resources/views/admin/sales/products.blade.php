@@ -192,7 +192,7 @@
                                             @if($isService)
                                                 <span class="badge bg-light text-muted border fs-11">خدمة ورشة</span>
                                             @else
-                                                <span class="badge {{ $product->current_stock > $product->reorder_threshold ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' }} font-monospace fs-12">{{ \App\Support\Quantity::format($product->current_stock) }} {{ $product->unit?->label() ?? 'قطعة' }}</span>
+                                                <span class="badge {{ $product->current_stock > $product->reorder_threshold ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning' }} font-monospace fs-12">{{ $product->stockReadout() }}</span>
                                             @endif
                                         </td>
                                         <td>
@@ -325,6 +325,11 @@
                                         <option value="{{ $unit->value }}" @selected($unit->value === 'piece')>{{ $unit->label() }}</option>
                                     @endforeach
                                 </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label fw-bold text-dark fs-13">حجم العبوة باللتر</label>
+                                <input type="number" class="form-control font-monospace" name="package_size" min="0.001" max="1000" step="any" placeholder="للزيوت، مثال: 5">
+                                <small class="text-muted fs-11 d-block">لصنف بالقطعة: يحوّل رصيده وأسعاره للتر.</small>
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label fw-bold text-dark fs-13">السعة / المواصفة</label>
