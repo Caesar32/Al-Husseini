@@ -18,10 +18,13 @@ class UpdateSupplierRequest extends FormRequest
         $supplier = $this->route('supplier');
         $supplierId = $supplier instanceof Supplier ? $supplier->id : $supplier;
 
+        // A legacy supplier has no phone on record: that must not block editing the rest of it.
+        $supplierHasPhone = ! ($supplier instanceof Supplier) || $supplier->phone !== null;
+
         return [
             'name'                => ['required', 'string', 'max:150'],
             'company_name'        => ['required', 'string', 'max:150'],
-            'phone'               => ['required', 'string', 'max:30', Rule::unique('suppliers', 'phone')->ignore($supplierId)],
+            'phone'               => [$supplierHasPhone ? 'required' : 'nullable', 'string', 'max:30', Rule::unique('suppliers', 'phone')->ignore($supplierId)],
             'alt_phone'           => ['nullable', 'string', 'max:30'],
             'email'               => ['nullable', 'email', 'max:100'],
             'tax_number'          => ['nullable', 'string', 'max:50'],

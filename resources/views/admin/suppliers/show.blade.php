@@ -80,7 +80,7 @@
                 <div class="card-body">
                     <p class="mb-2"><strong>شركة التوريد:</strong> {{ $supplier->company_name }}</p>
                     <p class="mb-2"><strong>المسؤول:</strong> {{ $supplier->name }}</p>
-                    <p class="mb-2"><strong>الهاتف:</strong> {{ $supplier->phone }}</p>
+                    <p class="mb-2"><strong>الهاتف:</strong> {{ $supplier->phone ?? 'غير مسجل' }}</p>
                     @if($supplier->alt_phone)<p class="mb-2"><strong>هاتف بديل:</strong> {{ $supplier->alt_phone }}</p>@endif
                     @if($supplier->email)<p class="mb-2"><strong>البريد:</strong> {{ $supplier->email }}</p>@endif
                     @if($supplier->tax_number)<p class="mb-2"><strong>الرقم الضريبي:</strong> {{ $supplier->tax_number }}</p>@endif

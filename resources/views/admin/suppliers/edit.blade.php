@@ -56,7 +56,7 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label required fw-semibold">رقم الهاتف الرئيسي <span class="text-danger">*</span></label>
-                                <input type="text" name="phone" class="form-control" value="{{ old('phone', $supplier->phone) }}" required>
+                                <input type="text" name="phone" class="form-control" value="{{ old('phone', $supplier->phone) }}" @required($supplier->phone !== null)>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold">هاتف إضافي / واتساب</label>
