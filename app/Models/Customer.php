@@ -73,6 +73,17 @@ class Customer extends Model
         return $this->hasMany(WarrantyClaim::class);
     }
 
+    /**
+     * Real customers, without the walk-in account. Spelled out because phone != x alone also drops
+     * every customer with no phone (NULL), which is all of the imported legacy ones.
+     */
+    public function scopeNotWalkIn(Builder $query): void
+    {
+        $query->where(function (Builder $q) {
+            $q->whereNull('phone')->orWhere('phone', '!=', \App\Services\Sales\CustomerService::WALK_IN_PHONE);
+        });
+    }
+
     public function scopeInDebt(Builder $query): void
     {
         $query->where('current_credit_balance', '>', 0);

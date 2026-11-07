@@ -74,7 +74,7 @@ class CustomerService implements CustomerServiceInterface
 
         return Customer::with('vehicles:id,customer_id,plate_number,car_brand,car_model,model_year')
             ->where('is_active', true)
-            ->where('phone', '!=', self::WALK_IN_PHONE)
+            ->notWalkIn()
             ->when($term !== '', function ($query) use ($term) {
                 $query->where(function ($q) use ($term) {
                     $q->where('name', 'like', "%{$term}%")

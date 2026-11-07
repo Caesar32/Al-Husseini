@@ -57,7 +57,7 @@ class CreditCustomerController extends Controller
         $collectedThisMonth = $this->collections->collectedBetween(now()->startOfMonth(), now()->endOfMonth());
         $collectionsCount   = $this->collections->countCollections();
         $totalCustomers     = Customer::where('is_active', true)
-            ->where('phone', '!=', \App\Services\Sales\CustomerService::WALK_IN_PHONE)
+            ->notWalkIn()
             ->count();
 
         if ($request->wantsJson()) {

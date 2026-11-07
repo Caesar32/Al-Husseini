@@ -12,7 +12,6 @@ use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Models\Product;
 use App\Models\ScrapPricingTier;
-use App\Services\Sales\CustomerService;
 use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -57,7 +56,7 @@ class PosController extends Controller
         $categories = $this->categoryStats();
 
         $customers = Customer::where('is_active', true)
-            ->where('phone', '!=', CustomerService::WALK_IN_PHONE)
+            ->notWalkIn()
             ->with('vehicles:id,customer_id,plate_number,car_brand,car_model')
             ->orderBy('name')
             ->get()

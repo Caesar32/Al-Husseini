@@ -2,8 +2,9 @@
 <div class="card-header bg-light border-bottom p-2 px-3">
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
         <!-- Customer Selection -->
-        <div class="d-flex align-items-center gap-1 flex-grow-1" style="min-width: 220px; max-width: 380px;">
+        <div class="d-flex align-items-center gap-1 flex-grow-1" style="min-width: 300px; max-width: 480px;">
             <span class="fs-12 fw-bold text-muted text-nowrap"><i class="ri-user-smile-line text-primary fs-14"></i> العميل:</span>
+            <input type="search" class="form-control form-control-sm fs-12" id="posCustomerSearch" placeholder="بحث بالاسم أو الهاتف" autocomplete="off" aria-label="بحث عن عميل" data-action="pos.customer-search">
             <select class="form-select form-select-sm fw-bold fs-12 border-primary" id="posCustomerSelect" data-action="pos.customer">
                 <option value="WALK_IN">عميل نقدي مباشر بالمعرض / الورشة</option>
             </select>

@@ -29,11 +29,11 @@ class StoreCustomerRequest extends FormRequest
      * current_credit_balance is never accepted. credit_limit requires credit.adjust_limit;
      * without it the field is rejected (not silently ignored) and the database default applies on create.
      */
-    public static function customerRules(?int $ignoreCustomerId, bool $canAdjustLimit): array
+    public static function customerRules(?int $ignoreCustomerId, bool $canAdjustLimit, bool $phoneRequired = true): array
     {
         return [
             'name'         => ['required', 'string', 'max:150'],
-            'phone'        => ['required', 'string', 'max:30', Rule::unique('customers', 'phone')->ignore($ignoreCustomerId)],
+            'phone'        => [$phoneRequired ? 'required' : 'nullable', 'string', 'max:30', Rule::unique('customers', 'phone')->ignore($ignoreCustomerId)],
             'national_id'  => ['nullable', 'string', 'max:30'],
             'tier'         => ['required', Rule::in(['standard', 'vip', 'fleet'])],
             'is_active'    => ['sometimes', 'boolean'],

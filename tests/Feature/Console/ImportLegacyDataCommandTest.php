@@ -731,6 +731,68 @@ test('a party on both sides nets out like the old program, and every party match
         ->and((float) legacySupplier('Both Sides')->current_balance)->toBe(135.0);
 });
 
+test('no placeholder customer is created when every invoice names its customer', function () {
+    runLegacyImport($this)->assertSuccessful();
+
+    expect(Customer::where('phone', '01099999999')->exists())->toBeFalse()
+        ->and(Invoice::where('invoice_number', 'INV-R-20')->firstOrFail()->customer->name)->toBe('Synthetic Customer');
+});
+
+test('an invoice naming nobody still has somewhere to go', function () {
+    legacyFixture($this->path, [
+        'retail' => [LEGACY_LINE_HEADER, ['20', '', 'Synthetic One', 1, 100, '2025-01-05']],
+    ]);
+
+    runLegacyImport($this)->assertSuccessful();
+
+    expect(Invoice::where('invoice_number', 'INV-R-20')->firstOrFail()->customer->phone)->toBe('01099999999');
+});
+
+test('imported customers are active, with no invented phone', function () {
+    legacyFixture($this->path, [
+        'contacts' => [['autono', 'kindtel', 'to', 'tel', 'tel2', 'tel3'], ['1', 'عميل', 'Book Customer', '', '', '']],
+    ]);
+
+    runLegacyImport($this)->assertSuccessful();
+
+    foreach (['Book Customer', 'Synthetic Customer'] as $name) {
+        $customer = Customer::where('name', $name)->firstOrFail();
+        expect($customer->phone)->toBeNull()
+            ->and((bool) $customer->is_active)->toBeTrue()
+            ->and(Customer::notWalkIn()->whereKey($customer->id)->exists())->toBeTrue();
+    }
+});
+
+test('a contact named with other digits is kept, because the old book really holds some', function () {
+    legacyFixture($this->path, [
+        'contacts' => [['autono', 'kindtel', 'to', 'tel', 'tel2', 'tel3'], ['1', 'عميل', '3', '', '', ''], ['2', 'مورد', '5', '', '', '']],
+    ]);
+
+    runLegacyImport($this)->assertSuccessful();
+
+    expect(Customer::where('name', '3')->exists())->toBeTrue()
+        ->and(Supplier::where('name', '5')->exists())->toBeTrue();
+});
+
+test('a name spaced differently across sheets is one customer, and a contact named 0 is no name', function () {
+    legacyFixture($this->path, [
+        'contacts' => [
+            ['autono', 'kindtel', 'to', 'tel', 'tel2', 'tel3'],
+            ['1', 'عميل', '  Spaced   Customer ', '', '', ''],
+            ['2', 'مورد', '0', '', '', ''],
+        ],
+        'retail' => [LEGACY_LINE_HEADER, ['20', 'Spaced Customer', 'Synthetic One', 1, 100, '2025-01-05']],
+        'retail_payments' => [['no_s', 'to', 'kst', 'da_s'], ['20', 'Spaced  Customer', 40, '2025-01-05']],
+    ]);
+
+    runLegacyImport($this)->assertSuccessful();
+
+    expect(Customer::where('name', 'like', '%Spaced%')->count())->toBe(1)
+        ->and((float) Customer::where('name', 'Spaced Customer')->value('current_credit_balance'))->toBe(60.0)
+        ->and(Supplier::where('name', '0')->exists())->toBeFalse()
+        ->and(reviewReasons())->toContain('contact without a name');
+});
+
 test('the review report holds no names of people', function () {
     runLegacyImport($this)->assertSuccessful();
 

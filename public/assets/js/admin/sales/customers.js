@@ -70,6 +70,8 @@
                 document.getElementById('customerModalTitle').textContent = customer ? 'تعديل بيانات العميل' : 'إضافة عميل جديد';
                 document.getElementById('custActiveGroup').classList.toggle('d-none', !customer);
                 document.getElementById('custVehicleGroup').classList.toggle('d-none', !!customer);
+                // A legacy customer has no phone on record: that must not block editing the rest of it.
+                customerForm.elements.phone.required = !customer || !!customer.phone;
                 if (customer) {
                     Object.keys(customer).forEach(function (key) {
                         const field = customerForm.elements[key];
@@ -165,7 +167,7 @@
                     body.innerHTML =
                         '<div class="p-3 bg-light rounded border mb-3"><div class="d-flex justify-content-between align-items-center">'
                         + '<div><h5 class="fw-bold mb-1 text-dark">' + escapeHtml(c.name) + '</h5>'
-                        + '<p class="text-muted mb-0 fs-13">هاتف: ' + escapeHtml(c.phone) + ' | التصنيف: ' + escapeHtml(tierLabels[c.tier] || c.tier) + '</p>'
+                        + '<p class="text-muted mb-0 fs-13">هاتف: ' + escapeHtml(c.phone || 'غير مسجل') + ' | التصنيف: ' + escapeHtml(tierLabels[c.tier] || c.tier) + '</p>'
                         + '<p class="text-muted mb-0 fs-12"><i class="ri-car-line me-1"></i>' + vehicles + '</p></div>'
                         + '<div class="text-end"><span class="fs-12 text-muted d-block">رصيد الآجل المتبقي:</span>'
                         + '<span class="badge ' + (Number(c.current_credit_balance) > 0 ? 'bg-danger' : 'bg-success') + ' fs-14 font-monospace">' + money(c.current_credit_balance) + '</span>'

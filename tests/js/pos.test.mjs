@@ -176,3 +176,56 @@ test('selling below zero on: a typed quantity is not capped at the stock', () =>
     typeQty(b, key, '5');
     assert.ok(cartHtml(b).includes('value="5"'), 'typed quantity kept');
 });
+
+// Legacy customers have no phone; the list must read cleanly and be searchable by name.
+function bootWithCustomers(customers) {
+    const config = { ...CONFIG, data: { ...CONFIG.data, customers } };
+    const b = createBrowser({ globals: { localStorage: { getItem: () => null, setItem() {} } } });
+    b.load('public/assets/js/admin/pos/math.js');
+    b.context.PosMath = b.window.PosMath;
+    b.load('public/assets/js/admin/pos/pos.js');
+    const root = { dataset: { page: 'pos', config: JSON.stringify(config) } };
+    const original = b.document.querySelectorAll;
+    b.document.querySelectorAll = (sel) => (sel === '[data-page]' ? [root] : original(sel));
+    b.Admin.page.boot();
+    return b;
+}
+
+function searchCustomers(b, value) {
+    const target = {
+        tagName: 'INPUT', value, dataset: { action: 'pos.customer-search' },
+        getAttribute: (name) => (name === 'type' ? 'search' : null),
+        closest(sel) { return sel === '[data-action]' ? this : null; },
+    };
+    (b.document.listeners.input || []).forEach((fn) => fn({ type: 'input', target, preventDefault() {} }));
+}
+
+const customerOptions = (b) => b.element('posCustomerSelect').innerHTML;
+const CUSTOMERS = [
+    { id: 41, name: 'أحمد الورشة', phone: null, credit_limit: 0, credit_balance: 250, vehicles: [] },
+    { id: 42, name: 'شركة النور', phone: '01099990004', credit_limit: 0, credit_balance: -100, vehicles: [] },
+];
+
+test('a customer with no phone shows no phone text, and balances say who owes whom', () => {
+    const html = customerOptions(bootWithCustomers(CUSTOMERS));
+    assert.ok(html.includes('أحمد الورشة'));
+    assert.ok(!html.includes('null') && !html.includes('أحمد الورشة —'), 'no empty phone text');
+    assert.ok(html.includes('شركة النور — 01099990004'));
+    assert.ok(html.includes('عليه آجل'));
+    assert.ok(html.includes('له رصيد'));
+});
+
+test('the customer search narrows the list by name, ignoring spelling variants, and keeps the walk-in option', () => {
+    const b = bootWithCustomers(CUSTOMERS);
+
+    searchCustomers(b, 'احمد');
+    assert.ok(customerOptions(b).includes('أحمد الورشة'), 'alef variant still matches');
+    assert.ok(!customerOptions(b).includes('شركة النور'));
+    assert.ok(customerOptions(b).includes('value="WALK_IN"'), 'walk-in stays available');
+
+    searchCustomers(b, '0109999');
+    assert.ok(customerOptions(b).includes('شركة النور'), 'search by phone');
+
+    searchCustomers(b, '');
+    assert.ok(customerOptions(b).includes('أحمد الورشة') && customerOptions(b).includes('شركة النور'));
+});

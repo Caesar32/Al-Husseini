@@ -575,6 +575,9 @@ class ImportLegacyDataCommand extends Command
                     foreach ($header as $i => $name) {
                         $assoc[$name] = $this->cellToString($cells[$i] ?? '');
                     }
+                    if (isset($assoc['to'])) {
+                        $assoc['to'] = $this->cleanName($assoc['to']);
+                    }
                     $assoc['__row'] = (string) $rowNum;
 
                     yield $assoc;
@@ -605,6 +608,12 @@ class ImportLegacyDataCommand extends Command
         } catch (RuntimeException) {
             return [];
         }
+    }
+
+    /** One name however it was spaced: every sheet reads a party through here, so they stay linked. */
+    private function cleanName(string $name): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', $name));
     }
 
     private function cellToString(mixed $cell): string
@@ -791,8 +800,6 @@ class ImportLegacyDataCommand extends Command
                 'is_active' => true,
             ]);
         });
-
-        $this->posCustomer();
     }
 
     /** @param list<string> $names collects the names read, for the reconciliation */
@@ -806,7 +813,8 @@ class ImportLegacyDataCommand extends Command
 
                 $this->tally($metric);
                 $name = trim($row['to'] ?? '');
-                if ($name === '') {
+                // The address book holds one blank row, as "0". Other digit-only names stay: some have documents.
+                if ($name === '' || $name === '0') {
                     $this->flag('contacts', $row, 'contact without a name', 0, [$metric => 1]);
 
                     continue;
@@ -826,6 +834,7 @@ class ImportLegacyDataCommand extends Command
         $this->info("Contacts ({$kind}): ".count($names).' upserted.');
     }
 
+    /** Only for an invoice naming nobody: real exports have none, so this account normally never exists. */
     private function posCustomer(): Customer
     {
         return Customer::firstOrCreate(['phone' => self::POS_CUSTOMER_PHONE], [
@@ -1568,12 +1577,11 @@ class ImportLegacyDataCommand extends Command
     {
         $groups = $this->readDocumentLines(self::FILE_RETAIL, self::SHEET_RETAIL_LINES, 'retail', 'retail lines');
         $productIds = $this->productIdsForDocuments($groups, 'retail lines');
-        $pos = $this->posCustomer();
 
         foreach (array_chunk($groups, $this->chunk, true) as $chunk) {
-            $this->transact(function () use ($chunk, $productIds, $pos) {
+            $this->transact(function () use ($chunk, $productIds) {
                 foreach ($chunk as $number => $lines) {
-                    $this->createRetailInvoice((string) $number, $lines, $productIds, $pos);
+                    $this->createRetailInvoice((string) $number, $lines, $productIds);
                 }
             });
         }
@@ -1581,7 +1589,7 @@ class ImportLegacyDataCommand extends Command
         $this->info('Retail invoices: '.count($groups).' documents read.');
     }
 
-    private function createRetailInvoice(string $number, array $lines, array $productIds, Customer $pos): void
+    private function createRetailInvoice(string $number, array $lines, array $productIds): void
     {
         $invoiceNumber = 'INV-R-'.$number;
         if (Invoice::where('invoice_number', $invoiceNumber)->exists()) {
@@ -1598,7 +1606,7 @@ class ImportLegacyDataCommand extends Command
         }
 
         $name = trim($lines[0]['to'] ?? '');
-        $customer = $name === '' ? $pos : Customer::firstOrCreate(['name' => $name], [
+        $customer = $name === '' ? $this->posCustomer() : Customer::firstOrCreate(['name' => $name], [
             'phone' => null,
             'tier' => 'standard',
             'credit_limit' => 0,

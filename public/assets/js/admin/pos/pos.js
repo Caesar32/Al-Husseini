@@ -26,6 +26,7 @@
         // Settings page, allow_negative_stock: sell ahead of the stock until the physical count.
         const ALLOW_NEGATIVE_STOCK = config.allowNegativeStock === true;
 
+        let customerSearch = '';
         let currentCategory = 'all';
         let catalogViewMode = 'grid'; // 'grid' or 'list'
         // Cart lines: { key, product, qty, serial }. Each battery unit is its own line (qty 1) because
@@ -264,6 +265,15 @@
             });
         }
 
+        // Spelling variants of a letter should not hide a customer from the search.
+        function normalizeSearchText(text) {
+            return String(text ?? '').trim().toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي');
+        }
+
+        function customerMatchesSearch(customer) {
+            return customerSearch === '' || normalizeSearchText(`${customer.name} ${customer.phone ?? ''}`).includes(customerSearch);
+        }
+
         function loadCustomersDropdown(selectedId = null) {
             const select = document.getElementById('posCustomerSelect');
             if (!select) return;
@@ -272,8 +282,13 @@
             let html = `<option value="${WALK_IN}">عميل نقدي مباشر بالمعرض / الورشة</option>`;
 
             POS_DATA.customers.forEach(c => {
-                const creditTag = c.credit_balance > 0 ? ` [عليه آجل: ${fmt(c.credit_balance)}]` : '';
-                html += `<option value="${c.id}">${esc(c.name)} — ${esc(c.phone)}${esc(creditTag)}</option>`;
+                // The search narrows the list, but never drops the customer already chosen.
+                if (!customerMatchesSearch(c) && String(c.id) !== prevVal) return;
+                const phoneText = c.phone ? ` — ${esc(c.phone)}` : '';
+                const creditTag = c.credit_balance > 0
+                    ? ` [عليه آجل: ${fmt(c.credit_balance)}]`
+                    : (c.credit_balance < 0 ? ` [له رصيد: ${fmt(Math.abs(c.credit_balance))}]` : '');
+                html += `<option value="${c.id}">${esc(c.name)}${phoneText}${esc(creditTag)}</option>`;
             });
 
             select.innerHTML = html;
@@ -1576,6 +1591,10 @@
         Admin.actions.registerAll({
             // header bar
             'pos.customer': () => onCustomerSelected(),
+            'pos.customer-search': (input) => {
+                customerSearch = normalizeSearchText(input.value);
+                loadCustomersDropdown();
+            },
             'pos.sync-tech': (select) => {
                 const other = document.getElementById(select.dataset.target);
                 if (other) other.value = select.value;

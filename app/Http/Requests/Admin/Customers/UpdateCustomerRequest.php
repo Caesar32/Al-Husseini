@@ -15,9 +15,13 @@ class UpdateCustomerRequest extends FormRequest
 
     public function rules(): array
     {
+        $customer = $this->route('customer');
+
+        // A legacy customer has no phone on record: that must not block editing the rest of it.
         return StoreCustomerRequest::customerRules(
-            $this->route('customer')?->id,
-            (bool) $this->user()?->can('credit.adjust_limit')
+            $customer?->id,
+            (bool) $this->user()?->can('credit.adjust_limit'),
+            $customer?->phone !== null
         );
     }
 
