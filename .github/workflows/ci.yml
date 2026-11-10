@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   tests:
@@ -70,5 +70,17 @@ jobs:
           php artisan route:clear
           php artisan view:clear
 
+      - name: Execute JavaScript tests
+        run: node --test tests/js/*.test.mjs
+
       - name: Execute Pest / PHPUnit Test Suite
         run: php artisan test
+
+  deploy:
+    name: Deploy to production
+    needs: tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/deploy.yml
+    secrets: inherit

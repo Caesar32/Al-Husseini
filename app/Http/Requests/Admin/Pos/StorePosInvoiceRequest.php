@@ -12,6 +12,7 @@ use App\Rules\ValidQuantityRule;
 use App\Support\Quantity;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StorePosInvoiceRequest extends FormRequest
@@ -26,7 +27,15 @@ class StorePosInvoiceRequest extends FormRequest
         return [
             'branch_id'             => ['nullable', 'exists:branches,id', new \App\Rules\WithinUserBranch()],
             'customer_id'           => ['nullable', 'exists:customers,id'],
-            'customer_vehicle_id'   => ['nullable', 'exists:customer_vehicles,id'],
+            // The vehicle must belong to the customer on this sale; a walk-in sale carries no vehicle.
+            'customer_vehicle_id'   => ['nullable', Rule::exists('customer_vehicles', 'id')->where(function ($query) {
+                $customerId = $this->input('customer_id');
+                if (is_scalar($customerId) && $customerId !== '') {
+                    $query->where('customer_id', $customerId);
+                } else {
+                    $query->whereRaw('1 = 0');
+                }
+            })],
             'technician_id'         => ['required', 'exists:employees,id'],
 
             // Items
@@ -317,6 +326,7 @@ class StorePosInvoiceRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'customer_vehicle_id.exists'        => 'المركبة المختارة لا تخص هذا العميل.',
             'technician_id.required'            => 'يجب اختيار الفني / العامل المسؤول عن التركيب.',
             'technician_id.exists'              => 'الفني المختار غير مسجل بالنظام.',
             'items.required'                    => 'يجب إضافة منتج واحد على الأقل في الفاتورة.',

@@ -25,8 +25,8 @@
     </div>
 
     <div class="pos-category-nav-row">
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollLeftBtn" data-action="pos.ribbon" data-direction="1" title="للخلف" aria-label="تمرير القائمة للخلف">
-            <i class="ri-arrow-left-s-line"></i>
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollBackBtn" data-action="pos.ribbon" data-direction="back" title="للخلف" aria-label="تمرير القائمة للخلف">
+            <i class="ri-arrow-right-s-line"></i>
         </button>
         <div class="pos-category-scroll-container" id="categoryTabsContainer">
             <button type="button" class="btn btn-primary pos-category-pill" id="cat-tab-all" data-slug="all" data-action="pos.category" data-category="all">
@@ -41,8 +41,8 @@
                 </button>
             @endforeach
         </div>
-        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollRightBtn" data-action="pos.ribbon" data-direction="-1" title="للأمام" aria-label="تمرير القائمة للأمام">
-            <i class="ri-arrow-right-s-line"></i>
+        <button type="button" class="btn btn-sm btn-light border pos-category-nav-arrow" id="catScrollForwardBtn" data-action="pos.ribbon" data-direction="forward" title="للأمام" aria-label="تمرير القائمة للأمام">
+            <i class="ri-arrow-left-s-line"></i>
         </button>
     </div>
 </div>

@@ -14,9 +14,9 @@ const CONFIG = {
     routes: { store: '/pos', customerStore: '/customers', invoiceShow: '/invoices/__ID__', productsSearch: '/pos/products/search' },
 };
 
-function boot(products = PRODUCTS) {
+function boot(products = PRODUCTS, globals = {}) {
     const config = { ...CONFIG, data: { ...CONFIG.data, products } };
-    const b = createBrowser({ globals: { localStorage: { getItem: () => null, setItem() {} } } });
+    const b = createBrowser({ globals: { localStorage: { getItem: () => null, setItem() {} }, ...globals } });
     b.load('public/assets/js/admin/pos/math.js');
     b.context.PosMath = b.window.PosMath;
     b.load('public/assets/js/admin/pos/pos.js');
@@ -57,6 +57,57 @@ test('leaving the page removes the document and window listeners it added', () =
     assert.equal((b.document.listeners.keydown || []).length, before - 1);
     assert.equal((b.window.listeners.resize || []).length, 0);
     assert.equal((b.window.listeners.mousemove || []).length, 0);
+});
+
+test('wheel down moves the category ribbon forward in both directions', () => {
+    const rtl = boot(PRODUCTS, { getComputedStyle: () => ({ direction: 'rtl' }) });
+    rtl.element('categoryTabsContainer').fire('wheel', { deltaY: 1 });
+    assert.equal(rtl.element('categoryTabsContainer').scrollLeft, -120);
+
+    const fallback = boot();
+    fallback.element('categoryTabsContainer').fire('wheel', { deltaY: 1 });
+    assert.equal(fallback.element('categoryTabsContainer').scrollLeft, -120);
+
+    const ltr = boot(PRODUCTS, { getComputedStyle: () => ({ direction: 'ltr' }) });
+    ltr.element('categoryTabsContainer').fire('wheel', { deltaY: 1 });
+    assert.equal(ltr.element('categoryTabsContainer').scrollLeft, 120);
+});
+
+test('category ribbon actions use semantic forward and back directions', () => {
+    const b = boot(PRODUCTS, { getComputedStyle: () => ({ direction: 'rtl' }) });
+    const ribbon = b.element('categoryTabsContainer');
+
+    b.click({ action: 'pos.ribbon', direction: 'forward' });
+    assert.equal(ribbon.scrollByCalls.at(-1).left, -160);
+    assert.equal(ribbon.scrollByCalls.at(-1).behavior, 'smooth');
+
+    b.click({ action: 'pos.ribbon', direction: 'back' });
+    assert.equal(ribbon.scrollByCalls.at(-1).left, 160);
+    assert.equal(ribbon.scrollByCalls.at(-1).behavior, 'smooth');
+});
+
+test('category ribbon arrows reflect overflow and scroll boundaries', () => {
+    const b = boot(PRODUCTS, { getComputedStyle: () => ({ direction: 'rtl' }) });
+    const ribbon = b.element('categoryTabsContainer');
+    const back = b.element('catScrollBackBtn');
+    const forward = b.element('catScrollForwardBtn');
+    ribbon.scrollWidth = 1000;
+    ribbon.clientWidth = 400;
+
+    ribbon.scrollLeft = 0;
+    ribbon.fire('scroll');
+    assert.ok(back.classList.contains('invisible'));
+    assert.ok(!forward.classList.contains('invisible'));
+
+    ribbon.scrollLeft = -600;
+    ribbon.fire('scroll');
+    assert.ok(forward.classList.contains('invisible'));
+    assert.ok(!back.classList.contains('invisible'));
+
+    ribbon.scrollWidth = 400;
+    ribbon.fire('scroll');
+    assert.ok(back.classList.contains('d-none'));
+    assert.ok(forward.classList.contains('d-none'));
 });
 
 const OIL = { id: 21, name: 'زيت محرك', price: 120.5, stock: 2.5, is_battery: false, category: 'oils', unit: 'liter', unit_label: 'لتر', step: 0.25, allows_fraction: true };

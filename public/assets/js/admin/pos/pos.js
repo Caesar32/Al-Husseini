@@ -249,17 +249,21 @@
         }
 
         // ─── Category ribbon: wheel, drag-to-scroll, and nav arrows ───────────────────
+        /** The page is Arabic (RTL); fall back to that when the direction cannot be read. */
+        function ribbonForwardSign(ribbon) {
+            const dir = typeof getComputedStyle === 'function' ? getComputedStyle(ribbon).direction : 'rtl';
+            return dir === 'ltr' ? 1 : -1;
+        }
+
         function setupCategoryRibbonScroll() {
             const ribbon = document.getElementById('categoryTabsContainer');
             if (!ribbon) return;
 
-            // Mouse wheel -> horizontal scroll (deltaY is normally vertical-only on a horizontal strip).
-            // If this feels reversed in testing, flip the two signs below — RTL scrollLeft direction is
-            // a genuine per-browser judgment call, not something that can be verified without a browser.
+            // Mouse wheel -> horizontal scroll. Wheel down moves forward: in RTL that is a negative scrollLeft.
             ribbon.addEventListener('wheel', (e) => {
                 if (e.deltaY === 0) return;
                 e.preventDefault();
-                ribbon.scrollLeft += (e.deltaY > 0 ? 120 : -120);
+                ribbon.scrollLeft += ribbonForwardSign(ribbon) * (e.deltaY > 0 ? 120 : -120);
             }, { passive: false });
 
             // Click-and-drag panning (desktop): content follows the cursor, like a touch drag.
@@ -303,22 +307,27 @@
             updateCategoryNavArrows(ribbon);
         }
 
-        /** Nav arrow buttons: ‹ always pans physically left, › always pans physically right. */
+        /** Nav arrows: "forward" moves away from the first pill, "back" returns to it, in either direction. */
         function scrollCategoryRibbon(direction) {
             const ribbon = document.getElementById('categoryTabsContainer');
             if (!ribbon) return;
-            ribbon.scrollBy({ left: direction * 160, behavior: 'smooth' });
+            const step = ribbonForwardSign(ribbon) * 160;
+            ribbon.scrollBy({ left: direction === 'forward' ? step : -step, behavior: 'smooth' });
         }
 
-        /** Arrows are only shown when the ribbon actually overflows its container. */
+        /** Arrows show only when the ribbon overflows; the one that cannot move any further is hidden but keeps its place. */
         function updateCategoryNavArrows(ribbon) {
-            const leftBtn = document.getElementById('catScrollLeftBtn');
-            const rightBtn = document.getElementById('catScrollRightBtn');
-            if (!leftBtn || !rightBtn) return;
+            const backBtn = document.getElementById('catScrollBackBtn');
+            const forwardBtn = document.getElementById('catScrollForwardBtn');
+            if (!backBtn || !forwardBtn) return;
 
-            const hasOverflow = ribbon.scrollWidth > ribbon.clientWidth + 1;
-            leftBtn.classList.toggle('d-none', !hasOverflow);
-            rightBtn.classList.toggle('d-none', !hasOverflow);
+            const maxScroll = ribbon.scrollWidth - ribbon.clientWidth;
+            const hasOverflow = maxScroll > 1;
+            const position = Math.abs(ribbon.scrollLeft);
+            backBtn.classList.toggle('d-none', !hasOverflow);
+            forwardBtn.classList.toggle('d-none', !hasOverflow);
+            backBtn.classList.toggle('invisible', hasOverflow && position < 1);
+            forwardBtn.classList.toggle('invisible', hasOverflow && position >= maxScroll - 1);
         }
 
         // ─── Customers & vehicles ────────────────────────────────────────────────────
@@ -1905,7 +1914,7 @@
             'pos.search': () => onCatalogSearchInput(),
             'pos.clear-search': () => clearCatalogSearch(),
             'pos.view': (el) => setViewMode(el.dataset.mode),
-            'pos.ribbon': (el) => scrollCategoryRibbon(Number(el.dataset.direction)),
+            'pos.ribbon': (el) => scrollCategoryRibbon(el.dataset.direction),
             'pos.category': (el) => filterByCategory(el.dataset.category),
             'pos.quick-pick': (el) => selectQuickAddResult(Number(el.dataset.id)),
             // catalog cards / rows

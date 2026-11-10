@@ -14,7 +14,7 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
             const attributes = {};
             const classes = new Set();
             elements[id] = {
-                id, value: '', textContent: '', innerHTML: '', dataset: {}, style: {}, options: [],
+                id, value: '', textContent: '', innerHTML: '', dataset: {}, style: {}, options: [], scrollLeft: 0, scrollWidth: 0, clientWidth: 0, scrollByCalls: [],
                 setAttribute: (name, value) => { attributes[name] = String(value); },
                 getAttribute: (name) => attributes[name] || null,
                 classList: {
@@ -38,6 +38,7 @@ export function createBrowser({ fetchResponses = {}, globals = {} } = {}) {
                     document.activeElement = this;
                 },
                 select() { this.selected = true; },
+                scrollBy(options) { this.scrollByCalls.push(options); },
                 remove() {},
             };
         }

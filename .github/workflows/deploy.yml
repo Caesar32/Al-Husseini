@@ -1,10 +1,8 @@
 name: Deploy to Hostinger
 
 on:
-  push:
-    branches:
-      - main
-      - remediation/2026-10
+  workflow_call:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,7 +10,12 @@ permissions:
 jobs:
   deploy:
     name: Deploy via Native SSH
+    # A manual run is an escape hatch for main only; it does not run the tests first.
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     steps:
       - name: Deploy to Hostinger
         env:
@@ -21,7 +24,7 @@ jobs:
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
           REMOTE_TARGET_PATH: ${{ secrets.REMOTE_TARGET_PATH }}
-          BRANCH: ${{ github.ref_name }}
+          BRANCH: ${{ github.sha }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
@@ -41,8 +44,24 @@ jobs:
               -p "$PORT" \
               "$USER_NAME@$HOST" << EOF
             set -e
-            trap 'php artisan up' ERR
             cd "$TARGET"
+            # \$ is evaluated on the server; a bare $ is filled in by the runner before sending.
+            PREV=\$(git rev-parse HEAD)
+            rollback() {
+              trap - ERR
+              set +e
+              echo "Deploy failed. Restoring \$PREV"
+              git reset --hard "\$PREV"
+              composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+              php artisan package:discover --ansi
+              php artisan optimize:clear
+              php artisan config:cache
+              php artisan route:cache
+              php artisan view:cache
+              php artisan up
+              exit 1
+            }
+            trap rollback ERR
             php artisan down || true
             git fetch "https://x-access-token:$GH_TOKEN@github.com/$GH_REPO.git" "$BRANCH"
             git reset --hard FETCH_HEAD
@@ -56,3 +75,6 @@ jobs:
             php artisan up
             echo "✅ Deployment successful!"
           EOF
+
+      - name: Health check
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors --max-time 20 --output /dev/null https://alhusseini.shop/up
