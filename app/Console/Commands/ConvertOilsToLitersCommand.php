@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Contracts\Catalog\ProductServiceInterface;
 use App\Enums\ProductUnit;
+use App\Models\Category;
 use App\Models\Product;
 use App\Support\Quantity;
 use DomainException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use OpenSpout\Reader\XLSX\Options as XlsxOptions;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 
@@ -28,8 +30,8 @@ class ConvertOilsToLitersCommand extends Command
 
     protected $description = 'Convert packaged oils to liter products (dry run unless --apply)';
 
-    private const SIZE_IN_NAME = '/(\d+(?:[.,]\d+)?)\s*(?:لتر|ليتر|L\b)/ui';
-    private const NOT_AN_OIL = '/فلتر|فلاتر|طلمبة|طرمبة|جوان|بلف|غطا|مانع|حساس|خرطوم|طاسة/u';
+    private const SIZE_IN_NAME = '/(\d+(?:[.,]\d+)?)\s*(?:لتر|ليتر|L\b|ل(?![\p{L}\p{N}]))/ui';
+    private const NOT_AN_OIL = '/فلتر|فلاتر|حشو|حشوة|جوان|جلبة|ساعة|طلمبة|طرمبة|خرطوم|اسبراي|بلف|غطا|طاسة/u';
 
     public function handle(ProductServiceInterface $products): int
     {
@@ -67,10 +69,24 @@ class ConvertOilsToLitersCommand extends Command
         ])->values()->toJson(JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $this->info('Previous values saved: '.$report);
 
+        $oilCategoryId = Category::where('slug', 'oils')->value('id');
+        $generalCategoryId = Category::where('slug', 'general')->value('id');
+        if ($oilCategoryId === null) {
+            $this->error('The oils category does not exist.');
+
+            return self::FAILURE;
+        }
+
         $failures = 0;
         foreach ($candidates as $candidate) {
             try {
-                $products->convertToLiters($candidate['product'], $candidate['size']);
+                DB::transaction(function () use ($candidate, $generalCategoryId, $oilCategoryId, $products) {
+                    if ($generalCategoryId !== null && $candidate['product']->category_id === $generalCategoryId) {
+                        $candidate['product']->update(['category_id' => $oilCategoryId]);
+                    }
+
+                    $products->convertToLiters($candidate['product'], $candidate['size']);
+                });
             } catch (DomainException $e) {
                 $failures++;
                 $this->error($candidate['product']->sku.': '.$e->getMessage());
@@ -132,7 +148,6 @@ class ConvertOilsToLitersCommand extends Command
     {
         return Product::where('unit', ProductUnit::Piece->value)
             ->where('is_battery', false)
-            ->whereHas('category', fn ($q) => $q->where('slug', 'oils'))
             ->get();
     }
 
