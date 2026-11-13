@@ -15,11 +15,6 @@ enum BarcodeLabelSize: string
 
     public const DEFAULT = self::Medium;
 
-    /** Measured on a printed label: 1.5 mm clipped the characters at the left edge. */
-    private const SIDE_PADDING_MM = 2.5;
-
-    private const BARCODE_HEIGHT_MM = 10;
-
     public function label(): string
     {
         return match ($this) {
@@ -41,9 +36,16 @@ enum BarcodeLabelSize: string
         return 25;
     }
 
+    /**
+     * Measured on a printed label: 1.5 mm clipped the characters at the left edge.
+     * The layout check accepts a minimum of 2 mm.
+     */
     public function sidePaddingMm(): float
     {
-        return self::SIDE_PADDING_MM;
+        return match ($this) {
+            self::Medium => 2.5,
+            self::Small => 2.0,
+        };
     }
 
     public function printableWidthMm(): float
@@ -53,6 +55,9 @@ enum BarcodeLabelSize: string
 
     public function barcodeHeightMm(): float
     {
-        return self::BARCODE_HEIGHT_MM;
+        return match ($this) {
+            self::Medium => 10,
+            self::Small => 9.5,
+        };
     }
 }
