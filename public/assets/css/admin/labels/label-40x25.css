@@ -4,4 +4,5 @@
  * explicit lengths, and Chrome then ignores the whole size and prints on a Letter sheet.
  */
 @page { size: 40mm 25mm; margin: 0; }
-:root { --label-w: 40mm; --label-h: 25mm; --side-pad: 2mm; --bar-h: 9.5mm; --font: 6pt; }
+/* Printed on the XP-237B with a 2mm side margin, the currency after the price was cut at the edge. */
+:root { --label-w: 40mm; --label-h: 25mm; --side-pad: 2.5mm; --bar-h: 9.5mm; --font: 6pt; --price-inset: 1mm; }

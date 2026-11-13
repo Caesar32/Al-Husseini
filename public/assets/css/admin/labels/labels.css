@@ -27,7 +27,8 @@ html, body { background: #fff; color: #000; font-family: 'Cairo', Tahoma, sans-s
 /* The label is wider than tall: text shares rows across the width, leaving the height to the barcode. */
 .label__header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 1mm; }
 .label__company { font-size: 0.9em; font-weight: 800; white-space: nowrap; }
-.label__price { font-size: 1.05em; font-weight: 800; white-space: nowrap; }
+/* The price ends at the label's edge (the left one in RTL); a size may pull it further in. */
+.label__price { font-size: 1.05em; font-weight: 800; white-space: nowrap; padding-inline-end: var(--price-inset, 0mm); }
 .label__title {
     display: -webkit-box;
     -webkit-box-orient: vertical;

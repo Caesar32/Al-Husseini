@@ -37,15 +37,12 @@ enum BarcodeLabelSize: string
     }
 
     /**
-     * Measured on a printed label: 1.5 mm clipped the characters at the left edge.
-     * The layout check accepts a minimum of 2 mm.
+     * Measured on printed labels: 1.5 mm clipped the characters at the left edge, and 2 mm on the
+     * 40x25 stock still cut the currency after the price.
      */
     public function sidePaddingMm(): float
     {
-        return match ($this) {
-            self::Medium => 2.5,
-            self::Small => 2.0,
-        };
+        return 2.5;
     }
 
     public function printableWidthMm(): float
