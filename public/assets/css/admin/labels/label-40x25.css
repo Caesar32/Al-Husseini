@@ -6,3 +6,11 @@
 @page { size: 40mm 25mm; margin: 0; }
 /* Printed on the XP-237B with a 2mm side margin, the currency after the price was cut at the edge. */
 :root { --label-w: 40mm; --label-h: 25mm; --side-pad: 2.5mm; --bar-h: 9.5mm; --font: 6pt; --price-inset: 1mm; }
+
+/*
+ * The narrow header: the company never takes more than half the row, so the price keeps its place
+ * beside it. Clipping is on the inline axis only: Cairo's letters are taller than the line.
+ */
+.label__header { gap: 0 2mm; }
+.label__company { max-width: 50%; overflow-x: clip; text-overflow: ellipsis; font-size: 5pt; font-weight: 700; }
+.label__price { font-size: 6.2pt; }
